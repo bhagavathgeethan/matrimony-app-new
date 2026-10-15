@@ -1,357 +1,357 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { Capacitor } from '@capacitor/core';
+import { Sparkles, MessageCircle, Users, User, Search, ChevronDown, X } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
-import {
-  Sparkles,
-  MessageSquare,
-  Users,
-  User,
-  Layers,
-  Sliders,
-} from 'lucide-react';
+import { NotificationBanner } from '../notifications/NotificationUI';
+import { CallOverlay } from '../engage/CallOverlay';
+import { t } from '@shared/i18n';
+
+const { colors, fonts, gradients, shadows } = theme;
+
+// Installed app fills the device; desktop browsers get a centred phone-width column
+const isNativeApp = Capacitor.isNativePlatform();
+// The screen picker is a development aid only; release builds navigate through the real flow
+const SHOW_SCREEN_PICKER = import.meta.env.DEV;
+
+const SCREEN_GROUPS = [
+  ['Sign up', [
+    { id: 'welcome', label: '2a Welcome' },
+    { id: 'phone', label: '2b Sign In' },
+    { id: 'otp', label: '2c OTP' },
+    { id: 'consent', label: '2d DPDP Consent' },
+  ]],
+  ['Onboarding', [
+    { id: 'basics', label: '2e Basics' },
+    { id: 'personal', label: 'About you (personal)' },
+    { id: 'blueprint-intro', label: '2f Blueprint Intro' },
+    { id: 'blueprint-q1', label: '2g Question Q1' },
+    { id: 'blueprint-tuner', label: '1a Tuner' },
+    { id: 'vibes', label: '2h Vibes Picker' },
+    { id: 'photos', label: '2i Photo Blur & ID' },
+    { id: 'blueprint-summary', label: '2j My Blueprint', tab: 'me' },
+  ]],
+  ['App', [
+    { id: 'feed', label: '1b Match Feed', tab: 'feed' },
+    { id: 'profile-list', label: '3a Profile List', tab: 'list' },
+    { id: 'conversations', label: '2k Chats', tab: 'chats' },
+    { id: 'chat-thread', label: '2l Chat Thread' },
+    { id: 'family-tracker', label: '3c Family Tracker', tab: 'family' },
+    { id: 'link-parent', label: '2m Link Parent' },
+    { id: 'notifications', label: 'Notifications' },
+    { id: 'personal-details', label: 'Personal details' },
+    { id: 'daily', label: 'Today’s picks' },
+    { id: 'shortlist', label: 'Shortlist' },
+    { id: 'preferences', label: 'Preferences & prompts' },
+    { id: 'premium', label: 'Premium' },
+    { id: 'verification', label: 'Verification' },
+    { id: 'stories', label: 'Success stories' },
+    { id: 'safety', label: 'Safety' },
+    { id: 'privacy', label: '2n Privacy & Erasure' },
+    { id: 'parent-portal', label: '★ 1d Parent Portal' },
+  ]],
+];
+
+const TABS = [
+  { tab: 'feed', screen: 'feed', label: 'Aligned', icon: Sparkles },
+  { tab: 'list', screen: 'profile-list', label: 'Search', icon: Search },
+  { tab: 'chats', screen: 'conversations', label: 'Chats', icon: MessageCircle },
+  { tab: 'family', screen: 'family-tracker', label: 'Family', icon: Users },
+  { tab: 'me', screen: 'blueprint-summary', label: 'Me', icon: User },
+];
+
+const TAB_SCREENS = TABS.map((t) => t.screen);
 
 export const IOSDeviceFrame = ({ children, customBottomNav = true }) => {
-  const { currentScreen, setCurrentScreen, activeTab, setActiveTab } = useApp();
-  const [showScreenSwitcher, setShowScreenSwitcher] = useState(true);
+  const { currentScreen, setCurrentScreen, activeTab, setActiveTab, conversations, user } = useApp();
+  const [pickerOpen, setPickerOpen] = useState(false);
 
-  const isMainTabScreen = [
-    'feed',
-    'profile-list',
-    'conversations',
-    'family-tracker',
-    'blueprint-summary',
-  ].includes(currentScreen);
+  // Personal details lives under the Me tab
+  const isMainTabScreen = [...TAB_SCREENS, 'personal-details', 'daily', 'shortlist', 'preferences', 'premium', 'verification', 'stories', 'safety', 'notifications', 'privacy']
+    .includes(currentScreen) && Boolean(user?.onboarding?.completed);
+  const unread = conversations.filter((t) => t.unread).length;
+  const currentLabel =
+    SCREEN_GROUPS.flatMap(([, items]) => items).find((i) => i.id === currentScreen)?.label || currentScreen;
+
+  const go = (item) => {
+    setCurrentScreen(item.id);
+    if (item.tab) setActiveTab(item.tab);
+    setPickerOpen(false);
+  };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.appContainer}>
-        {/* Top Developer & Flow Switcher Bar */}
-        <View style={styles.topDevBar}>
-          <View style={styles.topDevHeader}>
-            <View style={styles.brandGroup}>
-              <Text style={styles.brandTitle}>MATRIMONY</Text>
-              <Text style={styles.brandSub}>Values-Led · DPDP 2026</Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => setShowScreenSwitcher((s) => !s)}
-              style={styles.toggleSwitcherBtn}
-            >
-              <Sliders size={13} color={theme.colors.accent} />
-              <Text style={styles.toggleSwitcherText}>
-                {showScreenSwitcher ? 'Hide Screen Picker' : 'Switch Screen'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+    <View style={styles.page}>
+      <View style={[styles.app, isNativeApp && styles.appNative]}>
+        {/* Developer screen switcher (dev builds only, collapsed by default) */}
+        {SHOW_SCREEN_PICKER && (
+        <TouchableOpacity activeOpacity={0.9} onPress={() => setPickerOpen((o) => !o)} style={styles.devStrip}>
+          <View style={styles.devDot} />
+          <Text style={styles.devText}>Screens</Text>
+          <Text style={styles.devCurrent} numberOfLines={1}>{currentLabel}</Text>
+          <ChevronDown size={14} color="rgba(255,246,238,0.7)" />
+        </TouchableOpacity>
+        )}
 
-          {/* Collapsible Screen Switcher Strip */}
-          {showScreenSwitcher && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.screenPickerScroll}
-            >
-              {[
-                { id: 'welcome', label: '2a Welcome' },
-                { id: 'phone', label: '2b Sign In' },
-                { id: 'otp', label: '2c OTP' },
-                { id: 'consent', label: '2d DPDP Consent' },
-                { id: 'basics', label: '2e Basics' },
-                { id: 'blueprint-intro', label: '2f Blueprint Intro' },
-                { id: 'blueprint-q1', label: '2g Question Q1' },
-                { id: 'blueprint-tuner', label: '1a Tuner' },
-                { id: 'vibes', label: '2h Vibes Picker' },
-                { id: 'photos', label: '2i Photo Blur & ID' },
-                { id: 'blueprint-summary', label: '2j My Blueprint' },
-                { id: 'feed', label: '1b Match Feed', tab: 'feed' },
-                { id: 'profile-list', label: '3a Profile List', tab: 'list' },
-                { id: 'conversations', label: '2k Chats', tab: 'chats' },
-                { id: 'chat-thread', label: '2l Chat Thread' },
-                { id: 'family-tracker', label: '3c Family Tracker', tab: 'family' },
-                { id: 'link-parent', label: '2m Link Parent' },
-                { id: 'privacy', label: '2n Privacy & Erasure' },
-                { id: 'parent-portal', label: '★ 1d Parent Portal', highlight: true },
-              ].map((item) => {
-                const isActive = currentScreen === item.id;
+        <View style={[styles.viewport, !SHOW_SCREEN_PICKER && { minHeight: '100vh' }]}>{children}</View>
+
+        {user && <NotificationBanner />}
+        {user && <CallOverlay />}
+
+        {pickerOpen && (
+          <View style={styles.pickerOverlay}>
+            <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setPickerOpen(false)} />
+            <View style={styles.pickerPanel}>
+              <View style={styles.pickerHeader}>
+                <Text style={styles.pickerTitle}>Jump to screen</Text>
+                <TouchableOpacity onPress={() => setPickerOpen(false)} style={styles.pickerClose}>
+                  <X size={16} color={colors.onDark} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={{ maxHeight: 520 }} contentContainerStyle={{ gap: 16 }}>
+                {SCREEN_GROUPS.map(([group, items]) => (
+                  <View key={group} style={{ gap: 8 }}>
+                    <Text style={styles.pickerGroup}>{group}</Text>
+                    <View style={styles.pickerGrid}>
+                      {items.map((item) => {
+                        const active = item.id === currentScreen;
+                        return (
+                          <TouchableOpacity
+                            key={item.id}
+                            onPress={() => go(item)}
+                            style={[styles.pickerPill, active && styles.pickerPillActive]}
+                          >
+                            <Text style={[styles.pickerPillText, active && styles.pickerPillTextActive]}>
+                              {item.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        )}
+
+        {/* Floating glass tab bar */}
+        {isMainTabScreen && customBottomNav && (
+          <View style={styles.tabBarWrap} pointerEvents="box-none">
+            <View style={[styles.tabBar, isNativeApp && styles.fullWidth]}>
+              {TABS.map(({ tab, screen, label, icon: Icon }) => {
+                const active = activeTab === tab;
                 return (
                   <TouchableOpacity
-                    key={item.id}
+                    key={tab}
+                    activeOpacity={0.8}
                     onPress={() => {
-                      setCurrentScreen(item.id);
-                      if (item.tab) setActiveTab(item.tab);
+                      setCurrentScreen(screen);
+                      setActiveTab(tab);
                     }}
-                    style={[
-                      styles.screenPill,
-                      isActive && styles.screenPillActive,
-                      item.highlight && styles.screenPillHighlight,
-                      item.highlight && isActive && styles.screenPillHighlightActive,
-                    ]}
+                    style={styles.tabItem}
                   >
-                    <Text
-                      style={[
-                        styles.screenPillText,
-                        isActive && styles.screenPillTextActive,
-                        item.highlight && styles.screenPillTextHighlight,
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
+                    <View style={[styles.tabIcon, active && styles.tabIconActive]}>
+                      <Icon size={19} color={active ? colors.white : colors.textMuted} strokeWidth={active ? 2.4 : 2} />
+                      {tab === 'chats' && unread > 0 && <View style={styles.tabDot} />}
+                    </View>
+                    <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{t(label)}</Text>
                   </TouchableOpacity>
                 );
               })}
-            </ScrollView>
-          )}
-        </View>
-
-        {/* Direct Edge-to-Edge Screen Viewport */}
-        <View style={styles.screenViewport}>{children}</View>
-
-        {/* App Bottom Tab Navigation */}
-        {isMainTabScreen && customBottomNav && (
-          <View style={styles.bottomNavContainer}>
-            <View style={styles.bottomNav}>
-              <TouchableOpacity
-                onPress={() => {
-                  setCurrentScreen('feed');
-                  setActiveTab('feed');
-                }}
-                style={styles.navItem}
-              >
-                <View style={[styles.navIconBox, activeTab === 'feed' && styles.navIconBoxActive]}>
-                  <Sparkles size={16} color={activeTab === 'feed' ? theme.colors.white : theme.colors.textMuted} />
-                </View>
-                <Text style={[styles.navLabel, activeTab === 'feed' && styles.navLabelActive]}>Aligned</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => {
-                  setCurrentScreen('profile-list');
-                  setActiveTab('list');
-                }}
-                style={styles.navItem}
-              >
-                <View style={[styles.navIconBox, activeTab === 'list' && styles.navIconBoxActive]}>
-                  <Layers size={16} color={activeTab === 'list' ? theme.colors.white : theme.colors.textMuted} />
-                </View>
-                <Text style={[styles.navLabel, activeTab === 'list' && styles.navLabelActive]}>Browse</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => {
-                  setCurrentScreen('conversations');
-                  setActiveTab('chats');
-                }}
-                style={styles.navItem}
-              >
-                <View style={[styles.navIconBox, activeTab === 'chats' && styles.navIconBoxActive]}>
-                  <MessageSquare size={16} color={activeTab === 'chats' ? theme.colors.white : theme.colors.textMuted} />
-                </View>
-                <Text style={[styles.navLabel, activeTab === 'chats' && styles.navLabelActive]}>Chats</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => {
-                  setCurrentScreen('family-tracker');
-                  setActiveTab('family');
-                }}
-                style={styles.navItem}
-              >
-                <View style={[styles.navIconBox, activeTab === 'family' && styles.navIconBoxActive]}>
-                  <Users size={16} color={activeTab === 'family' ? theme.colors.white : theme.colors.textMuted} />
-                </View>
-                <Text style={[styles.navLabel, activeTab === 'family' && styles.navLabelActive]}>Family</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => {
-                  setCurrentScreen('blueprint-summary');
-                  setActiveTab('me');
-                }}
-                style={styles.navItem}
-              >
-                <View style={[styles.navIconBox, activeTab === 'me' && styles.navIconBoxActive]}>
-                  <User size={16} color={activeTab === 'me' ? theme.colors.white : theme.colors.textMuted} />
-                </View>
-                <Text style={[styles.navLabel, activeTab === 'me' && styles.navLabelActive]}>Me</Text>
-              </TouchableOpacity>
             </View>
           </View>
         )}
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
+  page: {
     minHeight: '100vh',
-    backgroundColor: theme.colors.bg,
-    display: 'flex',
+    backgroundColor: colors.bgDeep,
     alignItems: 'center',
-    justifyContent: 'flex-start',
   },
-  appContainer: {
+  app: {
     width: '100%',
-    maxWidth: 480, // Clean standard mobile viewport width on desktop, 100% on mobile
+    maxWidth: 440,
     minHeight: '100vh',
-    backgroundColor: theme.colors.bg,
-    display: 'flex',
-    flexDirection: 'column',
+    backgroundColor: colors.bg,
     position: 'relative',
-    boxShadow: '0 0 40px rgba(90, 60, 45, 0.06)',
+    boxShadow: '0 0 60px rgba(60, 30, 20, 0.12)',
   },
-  topDevBar: {
-    backgroundColor: theme.colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.cardBorder,
+  appNative: {
+    maxWidth: '100%',
+    boxShadow: 'none',
+  },
+  devStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 7,
+    backgroundColor: colors.surfaceDark,
+  },
+  devDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.gold,
+  },
+  devText: {
+    fontFamily: fonts.sans,
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 1.6,
+    color: colors.gold,
+    textTransform: 'uppercase',
+  },
+  devCurrent: {
+    flex: 1,
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: 'rgba(255,246,238,0.7)',
+  },
+  viewport: {
+    flex: 1,
+    minHeight: 'calc(100vh - 30px)',
     display: 'flex',
     flexDirection: 'column',
-    gap: 8,
-    zIndex: 60,
   },
-  topDevHeader: {
-    display: 'flex',
+  pickerOverlay: {
+    position: 'absolute',
+    top: 30,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 50,
+    backgroundColor: colors.overlay,
+  },
+  pickerPanel: {
+    margin: 12,
+    padding: 18,
+    borderRadius: 24,
+    backgroundImage: gradients.hero,
+    boxShadow: shadows.raised,
+    gap: 14,
+  },
+  pickerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  brandGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 1,
+  pickerTitle: {
+    fontFamily: fonts.sans,
+    fontWeight: '800',
+    fontSize: 20.8,
+    color: colors.onDark,
+    letterSpacing: -0.4,
   },
-  brandTitle: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 11.5,
-    fontWeight: '700',
-    letterSpacing: 2,
-    color: theme.colors.accent,
-  },
-  brandSub: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 10.5,
-    color: theme.colors.textMuted,
-  },
-  toggleSwitcherBtn: {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: theme.colors.cardSecondary,
-    borderWidth: 1,
-    borderColor: theme.colors.borderLight,
-    paddingVertical: 5,
-    paddingHorizontal: 9,
-    borderRadius: 99,
-  },
-  toggleSwitcherText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 10.5,
-    fontWeight: '700',
-    color: theme.colors.accent,
-  },
-  screenPickerScroll: {
-    display: 'flex',
-    flexDirection: 'row',
-    gap: 6,
-    paddingVertical: 2,
-  },
-  screenPill: {
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 99,
-    backgroundColor: theme.colors.cardSecondary,
-    borderWidth: 1,
-    borderColor: theme.colors.borderLight,
-  },
-  screenPillActive: {
-    backgroundColor: theme.colors.accent,
-    borderColor: theme.colors.accent,
-  },
-  screenPillHighlight: {
-    backgroundColor: '#3A2420',
-    borderColor: '#3A2420',
-  },
-  screenPillHighlightActive: {
-    backgroundColor: theme.colors.accent,
-    borderColor: theme.colors.accent,
-  },
-  screenPillText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11,
-    fontWeight: '600',
-    color: theme.colors.textPrimary,
-  },
-  screenPillTextActive: {
-    color: theme.colors.white,
-  },
-  screenPillTextHighlight: {
-    color: '#FFF8F2',
-    fontWeight: '700',
-  },
-  screenViewport: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden',
-  },
-  bottomNavContainer: {
-    position: 'sticky',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-    paddingTop: 4,
-    backgroundColor: 'rgba(251, 246, 238, 0.95)',
-    backdropFilter: 'blur(10px)',
-    zIndex: 50,
-  },
-  bottomNav: {
-    backgroundColor: theme.colors.card,
-    borderWidth: 1,
-    borderColor: theme.colors.cardBorder,
-    borderRadius: 22,
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    shadowColor: '#5A3C2D',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-  },
-  navItem: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 3,
-  },
-  navIconBox: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
-    backgroundColor: 'transparent',
-    display: 'flex',
+  pickerClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  navIconBoxActive: {
-    backgroundColor: theme.colors.accent,
+  pickerGroup: {
+    fontFamily: fonts.sans,
+    fontWeight: '700',
+    fontSize: 10,
+    letterSpacing: 1.8,
+    color: colors.gold,
+    textTransform: 'uppercase',
   },
-  navLabel: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 9.5,
+  pickerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  pickerPill: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+  },
+  pickerPillActive: {
+    backgroundImage: gradients.gold,
+    borderColor: 'transparent',
+  },
+  pickerPillText: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
     fontWeight: '600',
-    color: theme.colors.textSubtle,
+    color: colors.onDark,
   },
-  navLabelActive: {
-    color: theme.colors.accent,
+  pickerPillTextActive: {
+    color: colors.surfaceDark,
+  },
+  tabBarWrap: {
+    position: 'fixed',
+    bottom: 14,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 40,
+    paddingHorizontal: 14,
+  },
+  tabBar: {
+    width: '100%',
+    maxWidth: 412,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    backdropFilter: 'blur(18px) saturate(1.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.9)',
+    boxShadow: shadows.floatingBar,
+  },
+  fullWidth: {
+    maxWidth: '100%',
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 3,
+  },
+  tabIcon: {
+    width: 44,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  tabIconActive: {
+    backgroundImage: gradients.primary,
+    boxShadow: '0 6px 14px rgba(168, 30, 60, 0.35)',
+  },
+  tabDot: {
+    position: 'absolute',
+    top: 4,
+    right: 9,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.gold,
+    borderWidth: 1.5,
+    borderColor: colors.white,
+  },
+  tabLabel: {
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  tabLabelActive: {
+    color: colors.accent,
     fontWeight: '800',
   },
 });

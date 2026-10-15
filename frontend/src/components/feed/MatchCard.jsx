@@ -1,122 +1,105 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { X, MessageCircle, Users, Lock, BadgeCheck, Quote, ClipboardList } from 'lucide-react';
 import { theme } from '../../theme/tokens';
-import { RadialScoreGauge } from './RadialScoreGauge';
-import { PillarBar } from '../blueprint/PillarBar';
-import { Users, Sparkles, MessageCircle, X } from 'lucide-react';
+import { ScoreRing, Meter, SectionLabel, Card } from '../ui/kit';
+import { InterestButton, ShortlistStar, CardBadges, PromptCards } from '../engage/EngageUI';
+import { t } from '@shared/i18n';
 
-export const MatchCard = ({
-  candidate,
-  onPass,
-  onStartChat,
-  onShareWithParents,
-}) => {
-  const scores = candidate.overlapScores || {
-    overall: 87,
-    money: 94,
-    roots: 71,
-    kids: 88,
-    ambition: 62,
-  };
+const { colors, fonts, gradients, radii, shadows } = theme;
 
-  const photo = candidate.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80';
+export const MatchCard = ({ candidate, onPass, onStartChat, onShareWithParents, onViewProfile }) => {
+  const scores = candidate.overlapScores || {};
+  const photo = candidate.photos?.[0];
+  // The server already sends a blurred copy until mutual interest
+  const blurred = candidate.photoBlurred;
 
   return (
-    <View style={styles.card}>
-      {/* Portrait Header Area */}
-      <View style={styles.portraitContainer}>
-        <Image
-          source={{ uri: photo }}
-          style={styles.portraitImage}
-          resizeMode="cover"
-        />
-        {/* Blur overlay simulating photo privacy */}
-        <View style={styles.portraitBlurOverlay}>
-          <Text style={styles.portraitPlaceholderText}>PORTRAIT — USER UPLOAD</Text>
+    <View style={styles.wrap}>
+      {/* Portrait — blurred until mutual interest */}
+      <View style={styles.portrait}>
+        {photo && <Image source={{ uri: photo }} style={[styles.photo, !blurred && styles.photoClear]} resizeMode="cover" />}
+        <View style={styles.photoFade} />
+
+        <View style={styles.ring}>
+          <ScoreRing score={scores.overall ?? 0} size={78} dark />
         </View>
 
-        {/* DPDP Photo Privacy Badge */}
-        <View style={styles.privacyBadge}>
-          <Text style={styles.privacyBadgeText}>PHOTO REVEALS AFTER MUTUAL INTEREST</Text>
-        </View>
-
-        {/* Floating Conic Radial Score Badge */}
-        <View style={styles.radialGaugeWrapper}>
-          <RadialScoreGauge score={scores.overall} size={84} />
+        <View style={styles.identity}>
+          {blurred && (
+            <View style={styles.privacyPill}>
+              <Lock size={11} color={colors.onDark} />
+              <Text style={styles.privacyText}>Photo reveals after mutual interest</Text>
+            </View>
+          )}
+          <Text style={styles.name}>
+            {candidate.firstName}, {candidate.age}
+          </Text>
+          <View style={styles.metaRow}>
+            {candidate.verified && <BadgeCheck size={14} color={colors.gold} />}
+            <Text style={styles.meta}>
+              {candidate.city}
+              {candidate.profession ? ` · ${candidate.profession}` : ''}
+            </Text>
+          </View>
+          <CardBadges c={{ ...candidate, verified: false }} dark />
         </View>
       </View>
 
-      {/* Main Details Body */}
-      <View style={styles.body}>
-        {/* Name & Verification Info */}
-        <View style={styles.nameHeader}>
-          <Text style={styles.candidateName}>
-            {candidate.firstName}, {candidate.age}
-          </Text>
-          <Text style={styles.metaText}>
-            {candidate.city} · {candidate.verifiedDate || 'verified 2 weeks ago'}
-          </Text>
+      {/* Blueprint overlap */}
+      <Card style={styles.body}>
+        <SectionLabel right={<Text style={styles.verifiedDate}>{candidate.verifiedDate || 'Verified'}</Text>}>
+          Blueprint overlap
+        </SectionLabel>
+        <View style={{ gap: 11 }}>
+          <Meter label="Money" value={scores.money ?? 0} />
+          <Meter label="Roots" value={scores.roots ?? 0} />
+          <Meter label="Kids" value={scores.kids ?? 0} />
+          <Meter label="Ambition" value={scores.ambition ?? 0} />
         </View>
 
-        {/* Blueprint Overlap Breakdown */}
-        <View style={styles.overlapSection}>
-          <Text style={styles.sectionHeader}>BLUEPRINT OVERLAP</Text>
-          <View style={styles.pillarStack}>
-            <PillarBar label="Money" value={scores.money} color={theme.colors.accent} />
-            <PillarBar label="Roots" value={scores.roots} color={theme.colors.accent} />
-            <PillarBar label="Kids" value={scores.kids} color={theme.colors.accent} />
-            <PillarBar label="Ambition" value={scores.ambition} color="#C9B7A2" />
+        {candidate.quote ? (
+          <View style={styles.quote}>
+            <Quote size={16} color={colors.gold} />
+            <Text style={styles.quoteText}>{candidate.quote}</Text>
           </View>
-        </View>
+        ) : null}
 
-        {/* Quote Block */}
-        <View style={styles.quoteCard}>
-          <Text style={styles.quoteHeader}>THEY WROTE</Text>
-          <Text style={styles.quoteBody}>
-            {candidate.quote || '“Two incomes, one index fund, and a rule that neither of us checks Slack after 9pm.”'}
-          </Text>
-        </View>
+        <PromptCards prompts={candidate.prompts?.slice(0, 1)} />
+        {candidate.fitsMyPreferences?.total > 0 && (
+          <Text style={styles.verifiedDate}>Fits {candidate.fitsMyPreferences.met} of your {candidate.fitsMyPreferences.total} preferences</Text>
+        )}
 
-        {/* Common Tag Pills */}
-        <View style={styles.tagsRow}>
-          {(candidate.tags || ['Both: no big wedding', 'Both: dog people']).map((tag, idx) => (
-            <View
-              key={idx}
-              style={[
-                styles.tagPill,
-                idx === 0 ? styles.tagPillActive : styles.tagPillMuted,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.tagPillText,
-                  idx === 0 ? styles.tagPillTextActive : styles.tagPillTextMuted,
-                ]}
-              >
-                {tag}
-              </Text>
-            </View>
-          ))}
-        </View>
+        {(candidate.tags || []).length > 0 && (
+          <View style={styles.tags}>
+            {candidate.tags.map((tag, idx) => (
+              <View key={tag} style={[styles.tag, idx === 0 && styles.tagStrong]}>
+                <Text style={[styles.tagText, idx === 0 && styles.tagTextStrong]}>{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </Card>
 
-        {/* Action Buttons */}
-        <View style={styles.actionRow}>
-          <TouchableOpacity onPress={onPass} style={styles.passBtn}>
-            <Text style={styles.passBtnText}>Pass</Text>
+      {/* Actions */}
+      <View style={styles.actions}>
+        <TouchableOpacity activeOpacity={0.85} onPress={onPass} style={styles.roundBtn} accessibilityLabel="Pass">
+          <X size={22} color={colors.textSecondary} strokeWidth={2.4} />
+          <Text style={styles.roundLabel}>{t('Pass')}</Text>
+        </TouchableOpacity>
+        <InterestButton candidate={candidate} style={{ flex: 1 }} onOpenThread={onStartChat} />
+        <ShortlistStar candidate={candidate} size={56} />
+      </View>
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        {onViewProfile && (
+          <TouchableOpacity activeOpacity={0.85} onPress={onViewProfile} style={[styles.shareBtn, { flex: 1 }]}>
+            <ClipboardList size={16} color={colors.accent} />
+            <Text style={styles.shareText}>{t('Why we matched')}</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity onPress={onStartChat} style={styles.chatBtn}>
-            <Text style={styles.chatBtnText}>Start a conversation</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Share With Parents Link */}
-        <TouchableOpacity
-          onPress={onShareWithParents}
-          style={styles.shareParentRow}
-        >
-          <View style={styles.shareIconBox} />
-          <Text style={styles.shareParentText}>Share with parents</Text>
+        )}
+        <TouchableOpacity activeOpacity={0.85} onPress={onShareWithParents} style={[styles.shareBtn, { flex: 1 }]}>
+          <Users size={16} color={colors.accent} />
+          <Text style={styles.shareText}>{t('Share with parents')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -124,219 +107,192 @@ export const MatchCard = ({
 };
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: theme.colors.card,
-    borderWidth: 1,
-    borderColor: theme.colors.borderLight,
-    borderRadius: 24,
-    overflow: 'hidden',
-    marginBottom: 16,
-    shadowColor: '#5A3C2D',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
+  wrap: {
+    gap: 12,
   },
-  portraitContainer: {
+  portrait: {
+    height: 440,
+    borderRadius: radii.xl,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceDark,
     position: 'relative',
-    height: 224,
-    backgroundColor: '#F8F2E9',
-    overflow: 'hidden',
+    boxShadow: shadows.raised,
   },
-  portraitImage: {
-    width: '100%',
-    height: '100%',
-    opacity: 0.8,
-  },
-  portraitBlurOverlay: {
+  photo: {
     position: 'absolute',
-    inset: 0,
-    backgroundColor: 'rgba(240, 231, 218, 0.45)',
-    backdropFilter: 'blur(8px)',
-    display: 'flex',
+    top: -20,
+    left: -20,
+    right: -20,
+    bottom: -20,
+    filter: 'blur(6px) saturate(1.1)',
+  },
+  photoClear: {
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    filter: 'none',
+  },
+  photoFade: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundImage: gradients.photoFade,
+  },
+  privacyPill: {
+    alignSelf: 'flex-start',
+    marginBottom: 6,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 11,
+    borderRadius: 999,
+    backgroundColor: 'rgba(20,8,6,0.4)',
+    backdropFilter: 'blur(10px)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
   },
-  portraitPlaceholderText: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 10.5,
-    letterSpacing: 1,
-    color: '#A8927F',
-    backgroundColor: 'rgba(255, 253, 249, 0.8)',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 4,
+  privacyText: {
+    fontFamily: fonts.sans,
+    fontWeight: '700',
+    fontSize: 9.5,
+    letterSpacing: 1.1,
+    color: colors.onDark,
+    textTransform: 'uppercase',
   },
-  privacyBadge: {
+  ring: {
     position: 'absolute',
     top: 14,
-    left: 14,
-    backgroundColor: 'rgba(42, 27, 24, 0.78)',
-    paddingVertical: 7,
-    paddingHorizontal: 10,
-    borderRadius: 99,
-  },
-  privacyBadgeText: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 10,
-    letterSpacing: 0.8,
-    color: '#FFF6EE',
-    fontWeight: '500',
-  },
-  radialGaugeWrapper: {
-    position: 'absolute',
     right: 14,
-    bottom: -30,
-    zIndex: 10,
   },
-  body: {
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 20,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
-  },
-  nameHeader: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
-    paddingRight: 96, // Keep clear of radial score gauge
-  },
-  candidateName: {
-    fontFamily: theme.fonts.serif,
-    fontSize: 26,
-    lineHeight: 28,
-    color: theme.colors.textPrimary,
-  },
-  metaText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 12,
-    color: theme.colors.textMuted,
-  },
-  overlapSection: {
-    display: 'flex',
-    flexDirection: 'column',
+  identity: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 20,
     gap: 6,
   },
-  sectionHeader: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 10,
-    letterSpacing: 1.2,
-    color: '#9E8877',
-    fontWeight: '500',
+  name: {
+    fontFamily: fonts.sans,
+    fontWeight: '800',
+    fontSize: 35.2,
+    lineHeight: 36.8,
+    color: colors.white,
+    letterSpacing: -0.5,
   },
-  pillarStack: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 2,
-  },
-  quoteCard: {
-    backgroundColor: theme.colors.cardSecondary,
-    borderWidth: 1,
-    borderColor: theme.colors.borderLight,
-    borderRadius: 14,
-    paddingVertical: 11,
-    paddingHorizontal: 14,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 5,
-  },
-  quoteHeader: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 10,
-    letterSpacing: 1.2,
-    color: '#9E8877',
-    fontWeight: '500',
-  },
-  quoteBody: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 13.5,
-    lineHeight: 20,
-    color: '#3A2926',
-  },
-  tagsRow: {
-    display: 'flex',
+  metaRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 7,
+    alignItems: 'center',
+    gap: 6,
   },
-  tagPill: {
-    paddingVertical: 8,
-    paddingHorizontal: 11,
-    borderRadius: 99,
-  },
-  tagPillActive: {
-    backgroundColor: theme.colors.accent,
-  },
-  tagPillMuted: {
-    backgroundColor: '#F0E7DA',
-  },
-  tagPillText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11.5,
+  meta: {
+    fontFamily: fonts.sans,
+    fontSize: 14,
     fontWeight: '600',
+    color: 'rgba(255,246,238,0.85)',
   },
-  tagPillTextActive: {
-    color: theme.colors.white,
+  body: {
+    gap: 16,
   },
-  tagPillTextMuted: {
-    color: '#4B3833',
+  verifiedDate: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.textMuted,
   },
-  actionRow: {
-    display: 'flex',
+  quote: {
     flexDirection: 'row',
     gap: 10,
-    paddingTop: 4,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: colors.cardSecondary,
   },
-  passBtn: {
+  quoteText: {
     flex: 1,
-    backgroundColor: '#F0E7DA',
-    borderRadius: 13,
-    paddingVertical: 16,
-    display: 'flex',
+    fontFamily: fonts.sans,
+    fontWeight: '800',
+    fontSize: 14.4,
+    lineHeight: 19.2,
+    color: colors.textPrimary,
+    letterSpacing: -0.4,
+  },
+  tags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tag: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: colors.cardSecondary,
+  },
+  tagStrong: {
+    backgroundColor: colors.accentSoft,
+  },
+  tagText: {
+    fontFamily: fonts.sans,
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  tagTextStrong: {
+    color: colors.accent,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  roundBtn: {
+    width: 86,
+    height: 58,
+    borderRadius: 18,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6,
   },
-  passBtnText: {
-    fontFamily: theme.fonts.sans,
+  roundLabel: {
+    fontFamily: fonts.sans,
     fontSize: 14,
     fontWeight: '700',
-    color: '#7A675C',
+    color: colors.textSecondary,
   },
   chatBtn: {
-    flex: 2,
-    backgroundColor: theme.colors.accent,
-    borderRadius: 13,
-    paddingVertical: 16,
-    display: 'flex',
+    flex: 1,
+    height: 58,
+    borderRadius: 18,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 9,
+    backgroundImage: gradients.primary,
+    boxShadow: shadows.glow,
   },
-  chatBtnText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 14,
-    fontWeight: '800',
-    color: theme.colors.white,
+  chatText: {
+    fontFamily: fonts.sans,
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.white,
   },
-  shareParentRow: {
-    display: 'flex',
+  shareBtn: {
+    height: 50,
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingTop: 2,
+    backgroundColor: colors.accentSoft,
   },
-  shareIconBox: {
-    width: 12,
-    height: 9,
-    borderWidth: 1.5,
-    borderColor: theme.colors.accent,
-    borderRadius: 2,
-  },
-  shareParentText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: theme.colors.accent,
+  shareText: {
+    fontFamily: fonts.sans,
+    fontSize: 14.5,
+    fontWeight: '700',
+    color: colors.accent,
   },
 });

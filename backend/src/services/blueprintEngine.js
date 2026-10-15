@@ -54,7 +54,7 @@ function computeMatchScore(userBlueprint, candidateBlueprint) {
 }
 
 function synthesizeArchetype(blueprint) {
-  const moneyDesc = blueprint.money > 60 ? "saver" : "living for now";
+  const moneyDesc = blueprint.money > 60 ? "saver" : "spender who lives for now";
   const rootsDesc = blueprint.roots < 45 ? "who'd move cities for the right role" : "anchored to family roots";
   const kidsDesc = blueprint.kids > 50 ? "wants kids within a few years" : "focused on shared partnership";
   const ambitionDesc = blueprint.ambition > 70 ? "won't apologise for ambition" : "protects evening work-life balance";

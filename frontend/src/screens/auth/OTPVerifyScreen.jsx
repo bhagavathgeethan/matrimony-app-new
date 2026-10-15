@@ -1,220 +1,221 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { ShieldCheck } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
-import { ChevronLeft } from 'lucide-react';
+import { OnboardingScreen, TopBar, FadeIn, Eyebrow, Heading, Accent, Body, Button, Card } from '../../components/ui/kit';
+
+const { colors, fonts, radii } = theme;
+const RESEND_SECONDS = 30;
 
 export const OTPVerifyScreen = () => {
-  const { setCurrentScreen, user } = useApp();
-  const [digits, setDigits] = useState(['4', '8', '1', '', '', '']);
+  const { setCurrentScreen, pendingPhone, devCode, sendOtp, verifyOtp } = useApp();
+  const [code, setCode] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [error, setError] = useState(null);
 
-  const handleVerify = () => {
-    setCurrentScreen('consent');
+  const handleVerify = async (value = code) => {
+    if (value.length !== 6 || verifying) return;
+    setVerifying(true);
+    setError(null);
+    const res = await verifyOtp(value);
+    setVerifying(false);
+    if (!res.ok) {
+      setError(res.error);
+      setCode('');
+    }
   };
 
+  const handleResend = async () => {
+    setError(null);
+    const res = await sendOtp(pendingPhone);
+    if (res.ok) setSecondsLeft(RESEND_SECONDS);
+    else setError(res.error);
+  };
+  const [secondsLeft, setSecondsLeft] = useState(RESEND_SECONDS);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (secondsLeft <= 0) return undefined;
+    const t = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [secondsLeft]);
+
+  const boxes = Array.from({ length: 6 }, (_, i) => code[i] || '');
+  const activeIndex = Math.min(code.length, 5);
+
   return (
-    <View style={styles.container}>
-      {/* Back button */}
-      <TouchableOpacity onPress={() => setCurrentScreen('phone')} style={styles.backBtn}>
-        <ChevronLeft size={22} color={theme.colors.textPrimary} />
-      </TouchableOpacity>
+    <OnboardingScreen
+      top={<TopBar onBack={() => setCurrentScreen('phone')} />}
+      footer={
+        <Button label={verifying ? 'Verifying…' : 'Verify'} disabled={code.length !== 6 || verifying} onPress={() => handleVerify()} />
+      }
+    >
+      <FadeIn>
+        <View style={styles.header}>
+          <Eyebrow>Verification</Eyebrow>
+          <Heading size={34}>
+            Enter the <Accent>6-digit code</Accent>
+          </Heading>
+          <Body size={14}>
+            Sent to <Text style={styles.phone}>{pendingPhone}</Text> ·{' '}
+            <Text style={styles.link} onPress={() => setCurrentScreen('phone')}>
+              Change
+            </Text>
+          </Body>
+        </View>
+      </FadeIn>
 
-      {/* Header */}
-      <View style={styles.headerGroup}>
-        <Text style={styles.title}>Enter the 6-digit{'\n'}code</Text>
-        <Text style={styles.subtitle}>
-          Sent to {user?.phone || '+91 98765 43210'} ·{' '}
-          <Text
-            onPress={() => setCurrentScreen('phone')}
-            style={styles.changeLink}
-          >
-            Change
-          </Text>
-        </Text>
-      </View>
+      <FadeIn delay={80}>
+        <TouchableOpacity activeOpacity={1} onPress={() => inputRef.current?.focus()}>
+          <View style={styles.boxes}>
+            {boxes.map((d, i) => (
+              <View key={i} style={[styles.box, d && styles.boxFilled, i === activeIndex && styles.boxActive]}>
+                <Text style={styles.boxText}>{d}</Text>
+              </View>
+            ))}
+          </View>
+          <TextInput
+            ref={inputRef}
+            value={code}
+            onChangeText={(t) => {
+              const next = t.replace(/\D/g, '').slice(0, 6);
+              setCode(next);
+              if (next.length === 6) handleVerify(next);
+            }}
+            keyboardType="number-pad"
+            autoFocus
+            style={styles.hiddenInput}
+            accessibilityLabel="One-time code"
+          />
+        </TouchableOpacity>
+      </FadeIn>
 
-      {/* 6-Digit Pin Boxes */}
-      <View style={styles.pinRow}>
-        <View style={styles.pinBoxFilled}>
-          <Text style={styles.pinDigit}>4</Text>
-        </View>
-        <View style={styles.pinBoxFilled}>
-          <Text style={styles.pinDigit}>8</Text>
-        </View>
-        <View style={styles.pinBoxFilled}>
-          <Text style={styles.pinDigit}>1</Text>
-        </View>
-        <View style={styles.pinBoxActive}>
-          <View style={styles.cursor} />
-        </View>
-        <View style={styles.pinBoxEmpty} />
-        <View style={styles.pinBoxEmpty} />
-      </View>
-
-      {/* Resend Row */}
       <View style={styles.resendRow}>
-        <Text style={styles.timerText}>Resend in 0:24</Text>
-        <Text style={styles.resendDisabled}>Resend code</Text>
+        {secondsLeft > 0 ? (
+          <Text style={styles.resendWait}>Resend in 0:{String(secondsLeft).padStart(2, '0')}</Text>
+        ) : (
+          <Text style={styles.link} onPress={handleResend}>
+            Resend code
+          </Text>
+        )}
       </View>
 
-      {/* Verify Button */}
-      <TouchableOpacity
-        activeOpacity={0.88}
-        onPress={handleVerify}
-        style={styles.verifyBtn}
-      >
-        <Text style={styles.verifyBtnText}>Verify</Text>
-      </TouchableOpacity>
+      {error && <Text style={styles.error}>{error}</Text>}
+      {devCode && (
+        <View style={styles.devCode}>
+          <Text style={styles.devCodeText}>Test SMS · your code is {devCode}</Text>
+        </View>
+      )}
 
-      {/* Why We Verify Card */}
-      <View style={styles.whyCard}>
-        <Text style={styles.whyTitle}>Why we verify</Text>
-        <Text style={styles.whyDesc}>
-          Every profile is tied to one verified number, so nobody can run five accounts and waste your family’s time.
-        </Text>
-      </View>
-    </View>
+      <FadeIn delay={160}>
+        <Card variant="gold" style={styles.whyCard} padding={14}>
+          <ShieldCheck size={18} color="#8A6A2E" />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={styles.whyTitle}>Why we verify</Text>
+            <Text style={styles.whyText}>
+              One verified number per profile, so nobody can run five accounts and waste your family’s time.
+            </Text>
+          </View>
+        </Card>
+      </FadeIn>
+    </OnboardingScreen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.bg,
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 20,
+  header: {
+    gap: 10,
   },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 99,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
-  },
-  title: {
-    fontFamily: theme.fonts.serif,
-    fontSize: 32,
-    lineHeight: 34,
-    color: theme.colors.textPrimary,
-  },
-  subtitle: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 13.5,
-    color: theme.colors.textSecondary,
-  },
-  changeLink: {
-    color: theme.colors.accent,
+  phone: {
     fontWeight: '700',
+    color: colors.textPrimary,
   },
-  pinRow: {
-    display: 'flex',
+  link: {
+    fontFamily: fonts.sans,
+    fontWeight: '700',
+    color: colors.accent,
+  },
+  boxes: {
     flexDirection: 'row',
-    gap: 9,
-    paddingVertical: 4,
+    gap: 8,
   },
-  pinBoxFilled: {
+  box: {
     flex: 1,
-    aspectRatio: 1 / 1.15,
-    backgroundColor: theme.colors.card,
-    borderWidth: 1,
-    borderColor: theme.colors.cardBorder,
-    borderRadius: 13,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pinBoxActive: {
-    flex: 1,
-    aspectRatio: 1 / 1.15,
-    backgroundColor: theme.colors.card,
+    height: 58,
+    borderRadius: radii.md,
+    backgroundColor: colors.card,
     borderWidth: 1.5,
-    borderColor: theme.colors.accent,
-    borderRadius: 13,
-    display: 'flex',
+    borderColor: colors.cardBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pinBoxEmpty: {
-    flex: 1,
-    aspectRatio: 1 / 1.15,
-    backgroundColor: theme.colors.cardSecondary,
-    borderWidth: 1,
-    borderColor: theme.colors.borderLight,
-    borderRadius: 13,
+  boxFilled: {
+    backgroundColor: colors.accentSoft,
+    borderColor: 'transparent',
   },
-  pinDigit: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 22,
-    fontWeight: '700',
-    color: theme.colors.textPrimary,
+  boxActive: {
+    borderColor: colors.accent,
+    boxShadow: '0 0 0 4px rgba(168, 30, 60, 0.12)',
   },
-  cursor: {
-    width: 1.5,
-    height: 22,
-    backgroundColor: theme.colors.accent,
+  boxText: {
+    fontFamily: fonts.sans,
+    fontWeight: '800',
+    fontSize: 24,
+    color: colors.textPrimary,
+  },
+  hiddenInput: {
+    position: 'absolute',
+    opacity: 0,
+    width: 1,
+    height: 1,
   },
   resendRow: {
-    display: 'flex',
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
-  timerText: {
-    fontFamily: theme.fonts.sans,
+  resendWait: {
+    fontFamily: fonts.sans,
+    fontWeight: '600',
     fontSize: 12.5,
-    color: theme.colors.textSubtle,
+    color: colors.textMuted,
   },
-  resendDisabled: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 12.5,
+  error: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.accent,
+    textAlign: 'center',
+  },
+  devCode: {
+    alignSelf: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.cardBorder,
+  },
+  devCodeText: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
     fontWeight: '700',
-    color: theme.colors.textDisabled,
-  },
-  verifyBtn: {
-    backgroundColor: theme.colors.accent,
-    borderRadius: 14,
-    paddingVertical: 17,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  verifyBtnText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 15,
-    fontWeight: '800',
-    color: theme.colors.white,
+    color: colors.textSecondary,
   },
   whyCard: {
-    marginTop: 'auto',
-    backgroundColor: theme.colors.cardSecondary,
-    borderWidth: 1,
-    borderColor: theme.colors.borderLight,
-    borderRadius: 16,
-    padding: 16,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
   },
   whyTitle: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: theme.colors.textPrimary,
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.textPrimary,
   },
-  whyDesc: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11.5,
-    lineHeight: 17,
-    color: theme.colors.textSecondary,
+  whyText: {
+    fontFamily: fonts.sans,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: colors.textSecondary,
   },
 });

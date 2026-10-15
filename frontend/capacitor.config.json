@@ -1,0 +1,9 @@
+{
+  "appId": "com.stucompany.matrimony",
+  "appName": "Sangam",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  }
+}

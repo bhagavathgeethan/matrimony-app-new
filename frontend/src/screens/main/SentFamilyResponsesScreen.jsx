@@ -1,248 +1,290 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Users, Check, AlertTriangle, Hourglass, Settings2, Quote, ChevronDown, ChevronUp, HelpCircle, ThumbsUp } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
+import { Screen, FadeIn, Eyebrow, Heading, Card, Badge, Button, Body, Avatar } from '../../components/ui/kit';
+
+const { colors, fonts, radii } = theme;
+
+const STATUS = {
+  approved: { tone: 'success', icon: Check },
+  unsure: { tone: 'gold', icon: HelpCircle },
+  concern_raised: { tone: 'warning', icon: AlertTriangle },
+  awaiting: { tone: 'neutral', icon: Hourglass },
+};
 
 export const SentFamilyResponsesScreen = () => {
-  const { sentRecords, setCurrentScreen } = useApp();
+  const { sentRecords, setCurrentScreen, familyVotes, loadFamilyVotes } = useApp();
+  useEffect(() => {
+    loadFamilyVotes();
+  }, [loadFamilyVotes, sentRecords]);
+  const [showExpired, setShowExpired] = useState(false);
+  const active = sentRecords.filter((r) => !r.expired);
+  const expired = sentRecords.filter((r) => r.expired);
+
+  const counts = {
+    shared: sentRecords.length,
+    awaiting: sentRecords.filter((r) => r.status === 'awaiting').length,
+    approved: sentRecords.filter((r) => r.status === 'approved').length,
+  };
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <View style={styles.headerGroup}>
-        <Text style={styles.title}>Sent to family</Text>
-        <Text style={styles.subtitle}>
-          {sentRecords.length} shared · {sentRecords.filter((r) => r.status === 'awaiting').length} awaiting a response
-        </Text>
-      </View>
-
-      {/* List of Sent Cards */}
-      <View style={styles.recordsList}>
-        {sentRecords.map((record) => (
-          <View key={record.id} style={styles.recordCard}>
-            {/* Top row: thumbnail, name, sent time, score */}
-            <View style={styles.recordTopRow}>
-              <View style={styles.recordThumbnail}>
-                <Text style={styles.recordThumbChar}>{record.candidateName[0]}</Text>
-              </View>
-              <View style={styles.recordInfo}>
-                <Text style={styles.candidateName}>
-                  {record.candidateName}, {record.candidateAge}
-                </Text>
-                <Text style={styles.sentTime}>
-                  Sent to {record.recipientParentName} · {record.sentAt}
-                </Text>
-              </View>
-              <Text style={styles.scoreText}>{record.overlapScore}%</Text>
-            </View>
-
-            {/* Status / Feedback Box */}
-            {record.status === 'approved' && (
-              <View style={styles.approvedBox}>
-                <Text style={styles.approvedTag}>AMMA APPROVED</Text>
-                <Text style={styles.feedbackQuote}>{record.feedbackNote}</Text>
-              </View>
-            )}
-
-            {record.status === 'awaiting' && (
-              <View style={styles.awaitingBox}>
-                <Text style={styles.awaitingText}>{record.feedbackNote}</Text>
-              </View>
-            )}
-
-            {record.status === 'concern_raised' && (
-              <View style={styles.concernBox}>
-                <Text style={styles.concernTag}>CONCERN RAISED</Text>
-                <Text style={styles.feedbackQuote}>{record.feedbackNote}</Text>
-              </View>
-            )}
+    <Screen tabBar>
+      <FadeIn>
+        <View style={styles.titleRow}>
+          <View style={{ gap: 4, flex: 1 }}>
+            <Eyebrow>Family co-pilot</Eyebrow>
+            <Heading size={38}>Sent to family</Heading>
           </View>
-        ))}
+          <TouchableOpacity onPress={() => setCurrentScreen('link-parent')} style={styles.manage}>
+            <Settings2 size={18} color={colors.accent} />
+          </TouchableOpacity>
+        </View>
+      </FadeIn>
+
+      <FadeIn delay={60}>
+        <Card variant="dark" style={styles.stats}>
+          {[
+            ['Shared', counts.shared],
+            ['Awaiting', counts.awaiting],
+            ['Approved', counts.approved],
+          ].map(([label, n], i) => (
+            <View key={label} style={[styles.stat, i > 0 && styles.statDivider]}>
+              <Text style={styles.statNum}>{n}</Text>
+              <Text style={styles.statLabel}>{label}</Text>
+            </View>
+          ))}
+        </Card>
+        <Text style={styles.statsCaption}>
+          {counts.shared} shared · {counts.awaiting} awaiting a response
+        </Text>
+      </FadeIn>
+
+      {familyVotes.length > 0 && (
+        <Card style={{ gap: 12, marginBottom: 12 }}>
+          <Text style={styles.recordMeta}>FAMILY VOTES</Text>
+          {familyVotes.map((v) => (
+            <View key={v.candidateId} style={{ gap: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Avatar uri={v.candidatePhoto} name={v.candidateName} size={34} />
+                <Text style={[styles.recordName, { flex: 1 }]}>{v.candidateName}, {v.candidateAge}</Text>
+                <ThumbsUp size={14} color={colors.success} /><Text style={styles.recordMeta}>{v.tally.approved}</Text>
+                <HelpCircle size={14} color={colors.gold} /><Text style={styles.recordMeta}>{v.tally.unsure}</Text>
+                <AlertTriangle size={14} color={colors.warning} /><Text style={styles.recordMeta}>{v.tally.concern_raised}</Text>
+              </View>
+              <Text style={styles.recordMeta}>
+                {v.votes.map((x) => `${x.name}: ${{ approved: 'yes', unsure: 'unsure', concern_raised: 'concern', awaiting: 'waiting' }[x.status]}`).join(' · ')}
+              </Text>
+            </View>
+          ))}
+        </Card>
+      )}
+
+      <View style={{ gap: 12 }}>
+        {[...active, ...(showExpired ? expired : [])].map((record, i) => {
+          const st = STATUS[record.status] || STATUS.awaiting;
+          return (
+            <FadeIn key={record.id} delay={100 + Math.min(i, 6) * 50}>
+              <Card style={[styles.record, record.expired && { opacity: 0.6 }]}>
+                <View style={styles.recordTop}>
+                  <Avatar uri={record.candidatePhoto} name={record.candidateName} size={48} />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={styles.recordName}>
+                      {record.candidateName}, {record.candidateAge}
+                    </Text>
+                    <Text style={styles.recordMeta}>
+                      Sent to {record.recipientParentName} · {record.sentAt}
+                      {record.expired ? ' · access expired' : ''}
+                    </Text>
+                  </View>
+                  {record.overlapScore != null && <Text style={styles.recordScore}>{record.overlapScore}%</Text>}
+                </View>
+
+                <View style={styles.statusRow}>
+                  <Badge label={record.statusBadge || 'AWAITING REVIEW'} tone={st.tone} icon={st.icon} />
+                </View>
+                {record.status === 'awaiting' ? (
+                  <Text style={styles.awaiting}>{record.feedbackNote}</Text>
+                ) : (
+                  <View style={styles.feedback}>
+                    <Quote size={14} color={colors.textLight} />
+                    <Text style={styles.feedbackText}>{record.feedbackNote}</Text>
+                  </View>
+                )}
+              </Card>
+            </FadeIn>
+          );
+        })}
+        {expired.length > 0 && (
+          <TouchableOpacity onPress={() => setShowExpired((v) => !v)} style={styles.expiredToggle}>
+            <Text style={styles.expiredText}>
+              {showExpired ? 'Hide' : 'Show'} {expired.length} expired share{expired.length === 1 ? '' : 's'}
+            </Text>
+            {showExpired ? (
+              <ChevronUp size={16} color={colors.textSecondary} />
+            ) : (
+              <ChevronDown size={16} color={colors.textSecondary} />
+            )}
+          </TouchableOpacity>
+        )}
+        {sentRecords.length === 0 && (
+          <Card variant="tinted" style={{ alignItems: 'center', gap: 10, paddingVertical: 30 }}>
+            <Users size={26} color={colors.gold} />
+            <Body style={{ textAlign: 'center' }}>
+              Nothing shared yet. Use “Share with parents” on any match.
+            </Body>
+          </Card>
+        )}
       </View>
 
-      {/* Advice vs Veto Philosophy Banner */}
-      <View style={styles.footerGroup}>
-        <Text style={styles.advicePhilosophyText}>
-          A parent’s note is advice, not a veto. The decision stays yours.
-        </Text>
-        <TouchableOpacity
-          onPress={() => setCurrentScreen('link-parent')}
-          style={styles.manageFamilyBtn}
-        >
-          <Text style={styles.manageFamilyBtnText}>Manage family access</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+      <FadeIn delay={300}>
+        <View style={{ gap: 12 }}>
+          <Card variant="gold" style={styles.advice}>
+            <Text style={styles.adviceText}>A parent’s note is advice, not a veto. The decision stays yours.</Text>
+          </Card>
+          <Button
+            label="Manage family access"
+            variant="secondary"
+            icon={Settings2}
+            onPress={() => setCurrentScreen('link-parent')}
+          />
+        </View>
+      </FadeIn>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  scrollContainer: {
-    minHeight: '100%',
-    backgroundColor: theme.colors.bg,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 24,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginTop: 4,
   },
-  headerGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
-    paddingHorizontal: 4,
+  manage: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
   },
-  title: {
-    fontFamily: theme.fonts.serif,
-    fontSize: 28,
-    color: theme.colors.textPrimary,
+  stats: {
+    flexDirection: 'row',
+    paddingVertical: 18,
+    paddingHorizontal: 8,
   },
-  subtitle: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 12,
-    color: theme.colors.textMuted,
+  stat: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
   },
-  recordsList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
+  statDivider: {
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(255,255,255,0.14)',
   },
-  recordCard: {
-    backgroundColor: theme.colors.card,
-    borderWidth: 1,
-    borderColor: theme.colors.cardBorder,
-    borderRadius: 18,
-    padding: 14,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 11,
+  statNum: {
+    fontFamily: fonts.sans,
+    fontWeight: '800',
+    fontSize: 28.8,
+    color: colors.onDark,
+    letterSpacing: -0.4,
   },
-  recordTopRow: {
-    display: 'flex',
+  statLabel: {
+    fontFamily: fonts.sans,
+    fontWeight: '700',
+    fontSize: 10,
+    letterSpacing: 1.4,
+    color: colors.gold,
+    textTransform: 'uppercase',
+  },
+  statsCaption: {
+    fontFamily: fonts.sans,
+    fontSize: 12.5,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  record: {
+    gap: 12,
+    padding: 16,
+  },
+  recordTop: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  recordThumbnail: {
-    width: 44,
-    height: 44,
-    borderRadius: 13,
-    backgroundColor: theme.colors.cardSecondary,
-    borderWidth: 1,
-    borderColor: '#E7DACA',
-    display: 'flex',
+  recordName: {
+    fontFamily: fonts.sans,
+    fontWeight: '800',
+    fontSize: 17.6,
+    color: colors.textPrimary,
+    letterSpacing: -0.4,
+  },
+  recordMeta: {
+    fontFamily: fonts.sans,
+    fontSize: 12.5,
+    color: colors.textMuted,
+  },
+  recordScore: {
+    fontFamily: fonts.sans,
+    fontWeight: '800',
+    fontSize: 20.8,
+    color: colors.accent,
+    letterSpacing: -0.4,
+  },
+  statusRow: {
+    flexDirection: 'row',
+  },
+  awaiting: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  feedback: {
+    flexDirection: 'row',
+    gap: 8,
+    padding: 12,
+    borderRadius: radii.md,
+    backgroundColor: colors.cardSecondary,
+  },
+  feedbackText: {
+    flex: 1,
+    fontFamily: fonts.sans,
+    fontWeight: '800',
+    fontSize: 13.6,
+    lineHeight: 17.6,
+    color: colors.textPrimary,
+    letterSpacing: -0.4,
+  },
+  expiredToggle: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  recordThumbChar: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 16,
-    fontWeight: '700',
-    color: theme.colors.textSecondary,
-  },
-  recordInfo: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 2,
-  },
-  candidateName: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 14.5,
-    fontWeight: '700',
-    color: theme.colors.textPrimary,
-  },
-  sentTime: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11.5,
-    color: theme.colors.textMuted,
-  },
-  scoreText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 15,
-    fontWeight: '700',
-    color: theme.colors.accent,
-  },
-  approvedBox: {
-    backgroundColor: '#F8F2E9',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 13,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
-  },
-  approvedTag: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11,
-    fontWeight: '700',
-    color: theme.colors.accent,
-  },
-  awaitingBox: {
-    backgroundColor: '#F8F2E9',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 14,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: '#E7DACA',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 13,
+    borderColor: colors.cardBorder,
   },
-  awaitingText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#96806F',
-  },
-  concernBox: {
-    backgroundColor: '#F8F2E9',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 13,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
-  },
-  concernTag: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11,
+  expiredText: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#8A756A',
+    color: colors.textSecondary,
   },
-  feedbackQuote: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 12.5,
-    lineHeight: 18,
-    color: '#4B3833',
+  advice: {
+    padding: 16,
   },
-  footerGroup: {
-    marginTop: 'auto',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 9,
-    paddingTop: 8,
-  },
-  advicePhilosophyText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11.5,
-    lineHeight: 16,
-    color: '#96806F',
+  adviceText: {
+    fontFamily: fonts.sans,
+    fontWeight: '800',
+    fontSize: 14.4,
+    lineHeight: 19.2,
+    color: colors.textPrimary,
     textAlign: 'center',
-  },
-  manageFamilyBtn: {
-    borderWidth: 1,
-    borderColor: theme.colors.cardBorder,
-    backgroundColor: theme.colors.card,
-    borderRadius: 14,
-    paddingVertical: 15,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  manageFamilyBtnText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 14,
-    fontWeight: '700',
-    color: theme.colors.textPrimary,
+    letterSpacing: -0.4,
   },
 });

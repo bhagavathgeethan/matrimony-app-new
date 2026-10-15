@@ -1,23 +1,32 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { Wallet, MapPin, Baby, Briefcase, Info } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { BlueprintSlider } from '../../components/blueprint/BlueprintSlider';
+import { OnboardingScreen, StepBar, FadeIn, Eyebrow, Heading, Accent, Button } from '../../components/ui/kit';
+
+const { colors, fonts } = theme;
 
 export const BlueprintTunerScreen = () => {
   const { setCurrentScreen, user, updateBlueprint } = useApp();
+  const bp = user?.blueprint || {};
+  const [money, setMoney] = useState(bp.money ?? 50);
+  const [moneyFlexibility, setMoneyFlexibility] = useState(bp.moneyFlexibility || 'open');
+  const [roots, setRoots] = useState(bp.roots ?? 50);
+  const [rootsFlexibility, setRootsFlexibility] = useState(bp.rootsFlexibility || 'open');
+  const [kids, setKids] = useState(bp.kids ?? 50);
+  const [kidsFlexibility, setKidsFlexibility] = useState(bp.kidsFlexibility || 'open');
+  const [ambition, setAmbition] = useState(bp.ambition ?? 50);
+  const [ambitionFlexibility, setAmbitionFlexibility] = useState(bp.ambitionFlexibility || 'open');
 
-  const [money, setMoney] = useState(user?.blueprint?.money || 72);
-  const [moneyFlexibility, setMoneyFlexibility] = useState(user?.blueprint?.moneyFlexibility || 'open');
-  const [roots, setRoots] = useState(user?.blueprint?.roots || 31);
-  const [rootsFlexibility, setRootsFlexibility] = useState(user?.blueprint?.rootsFlexibility || 'firm');
-  const [kids, setKids] = useState(user?.blueprint?.kids || 58);
-  const [kidsFlexibility, setKidsFlexibility] = useState(user?.blueprint?.kidsFlexibility || 'open');
-  const [ambition, setAmbition] = useState(user?.blueprint?.ambition || 84);
-  const [ambitionFlexibility, setAmbitionFlexibility] = useState(user?.blueprint?.ambitionFlexibility || 'firm');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
 
-  const handleSave = () => {
-    updateBlueprint({
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    const res = await updateBlueprint({
       money,
       moneyFlexibility,
       roots,
@@ -27,175 +36,80 @@ export const BlueprintTunerScreen = () => {
       ambition,
       ambitionFlexibility,
     });
-    setCurrentScreen('vibes');
+    setSaving(false);
+    if (!res.ok) return setError(res.error);
+    setCurrentScreen(user?.onboarding?.completed ? 'blueprint-summary' : 'vibes');
   };
 
+  const sliders = [
+    ['Money', 'Save aggressively → Live for now', Wallet, money, setMoney, moneyFlexibility, setMoneyFlexibility],
+    ['Roots', 'Stay near family → Move anywhere', MapPin, roots, setRoots, rootsFlexibility, setRootsFlexibility],
+    ['Kids', 'Not planning → Soon, hands-on', Baby, kids, setKids, kidsFlexibility, setKidsFlexibility],
+    ['Ambition', 'Protect balance → All-in on work', Briefcase, ambition, setAmbition, ambitionFlexibility, setAmbitionFlexibility],
+  ];
+
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-      {/* 4-Step Indicator Bars */}
-      <View style={styles.stepBarsRow}>
-        <View style={styles.stepBarActive} />
-        <View style={styles.stepBarActive} />
-        <View style={styles.stepBarActive} />
-        <View style={styles.stepBarInactive} />
+    <OnboardingScreen
+      top={<StepBar step={4} total={5} />}
+      footer={
+        <>
+          <View style={styles.hint}>
+            <Info size={13} color={colors.gold} />
+            <Text style={styles.hintText}>Gold band = how much difference you’ll accept</Text>
+          </View>
+          {error && <Text style={styles.error}>{error}</Text>}
+          <Button label={saving ? 'Saving…' : 'Save blueprint'} disabled={saving} onPress={handleSave} />
+        </>
+      }
+    >
+      <FadeIn>
+        <View style={styles.header}>
+          <Eyebrow>Step 04 / 05 · Blueprint</Eyebrow>
+          <Heading size={32}>
+            Your <Accent>shared future</Accent>
+          </Heading>
+        </View>
+      </FadeIn>
+
+      <View style={{ gap: 8 }}>
+        {sliders.map(([title, subtitle, icon, value, setValue, flex, setFlex], i) => (
+          <FadeIn key={title} delay={60 + i * 60}>
+            <BlueprintSlider
+              title={title}
+              subtitle={subtitle}
+              icon={icon}
+              value={value}
+              flexibility={flex}
+              onChangeValue={setValue}
+              onChangeFlexibility={setFlex}
+            />
+          </FadeIn>
+        ))}
       </View>
-
-      {/* Header */}
-      <View style={styles.headerGroup}>
-        <Text style={styles.stepTag}>STEP 03 / 04 · BLUEPRINT</Text>
-        <Text style={styles.title}>
-          What does your{'\n'}
-          <Text style={styles.titleItalic}>shared future</Text> look like?
-        </Text>
-        <Text style={styles.subtitle}>
-          No caste, no income slabs. Four questions about the life you actually want to build.
-        </Text>
-      </View>
-
-      {/* 4 Pillar Sliders */}
-      <View style={styles.slidersList}>
-        <BlueprintSlider
-          title="Money philosophy"
-          subtitle="Save aggressively → Live for now"
-          value={money}
-          flexibility={moneyFlexibility}
-          onChangeValue={setMoney}
-          onChangeFlexibility={setMoneyFlexibility}
-        />
-
-        <BlueprintSlider
-          title="Roots & geography"
-          subtitle="Stay near family → Move anywhere"
-          value={roots}
-          flexibility={rootsFlexibility}
-          onChangeValue={setRoots}
-          onChangeFlexibility={setRootsFlexibility}
-        />
-
-        <BlueprintSlider
-          title="Kids & parenting"
-          subtitle="Not planning → Soon, hands-on"
-          value={kids}
-          flexibility={kidsFlexibility}
-          onChangeValue={setKids}
-          onChangeFlexibility={setKidsFlexibility}
-        />
-
-        <BlueprintSlider
-          title="Career ambition"
-          subtitle="Protect balance → All-in on work"
-          value={ambition}
-          flexibility={ambitionFlexibility}
-          onChangeValue={setAmbition}
-          onChangeFlexibility={setAmbitionFlexibility}
-        />
-      </View>
-
-      {/* Footer */}
-      <View style={styles.footerGroup}>
-        <Text style={styles.bandExplainer}>
-          Dashed bands = how much difference you’ll accept. Wider band, wider match pool.
-        </Text>
-        <TouchableOpacity
-          activeOpacity={0.88}
-          onPress={handleSave}
-          style={styles.saveBtn}
-        >
-          <Text style={styles.saveBtnText}>Save blueprint</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+    </OnboardingScreen>
   );
 };
 
 const styles = StyleSheet.create({
-  scrollContainer: {
-    minHeight: '100%',
-    backgroundColor: theme.colors.bg,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
-  },
-  stepBarsRow: {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
+  header: {
     gap: 8,
   },
-  stepBarActive: {
-    height: 3,
-    width: 44,
-    borderRadius: 2,
-    backgroundColor: theme.colors.accent,
-  },
-  stepBarInactive: {
-    height: 3,
-    width: 44,
-    borderRadius: 2,
-    backgroundColor: '#E7DACA',
-  },
-  headerGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-  },
-  stepTag: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 11,
-    letterSpacing: 1.4,
-    color: '#8A756A',
-  },
-  title: {
-    fontFamily: theme.fonts.serif,
-    fontSize: 34,
-    lineHeight: 36,
-    color: theme.colors.textPrimary,
-    letterSpacing: -0.2,
-  },
-  titleItalic: {
-    fontStyle: 'italic',
-    color: theme.colors.accent,
-  },
-  subtitle: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 13.5,
-    lineHeight: 20,
-    color: theme.colors.textSecondary,
-    maxWidth: 320,
-  },
-  slidersList: {
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  footerGroup: {
-    marginTop: 'auto',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
-    paddingTop: 8,
-  },
-  bandExplainer: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11.5,
-    lineHeight: 16,
-    color: '#9E8877',
+  error: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.accent,
     textAlign: 'center',
   },
-  saveBtn: {
-    backgroundColor: theme.colors.accent,
-    borderRadius: 14,
-    paddingVertical: 17,
-    display: 'flex',
+  hint: {
+    flexDirection: 'row',
+    gap: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  saveBtnText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 15,
-    fontWeight: '800',
-    color: theme.colors.white,
+  hintText: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.textSecondary,
   },
 });

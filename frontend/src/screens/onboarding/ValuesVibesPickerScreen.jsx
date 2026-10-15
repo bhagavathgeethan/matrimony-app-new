@@ -1,137 +1,88 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { VibeTileGrid } from '../../components/vibes/VibeTileGrid';
+import { OnboardingScreen, StepBar, FadeIn, Eyebrow, Heading, Accent, Body, Button } from '../../components/ui/kit';
+
+const { colors, fonts, gradients } = theme;
 
 export const ValuesVibesPickerScreen = () => {
   const { setCurrentScreen, user, toggleVibe } = useApp();
-  const selectedCount = user?.vibes?.length || 4;
-
-  const handleFinish = () => {
-    setCurrentScreen('photos');
-  };
+  const selectedCount = user?.vibes?.length ?? 0;
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <View style={styles.headerGroup}>
-        <Text style={styles.stepTag}>STEP 04 / 04 · VALUES & VIBES</Text>
-        <Text style={styles.title}>Pick six that feel{'\n'}like your Sunday</Text>
-        <Text style={styles.subtitle}>
-          Chosen {selectedCount} of 6. Visual, not verbal — this is the texture of daily life.
-        </Text>
-      </View>
+    <OnboardingScreen
+      top={<StepBar step={5} total={5} />}
+      footer={
+        <View style={styles.actions}>
+          <Button label="Skip" variant="secondary" style={{ flex: 1 }} onPress={() => setCurrentScreen('photos')} />
+          <Button
+            label={user?.onboarding?.completed ? 'Done' : 'Next · photos'}
+            style={{ flex: 2 }}
+            onPress={() => setCurrentScreen(user?.onboarding?.completed ? 'blueprint-summary' : 'photos')}
+          />
+        </View>
+      }
+    >
+      <FadeIn>
+        <View style={styles.header}>
+          <Eyebrow>Step 05 / 05 · Vibes</Eyebrow>
+          <Heading size={32}>
+            Six that feel like your <Accent>Sunday</Accent>
+          </Heading>
+          <Body size={13.5}>Visual, not verbal — the texture of daily life.</Body>
+        </View>
+      </FadeIn>
 
-      {/* 3x3 Vibe Grid */}
-      <VibeTileGrid
-        selectedVibes={user?.vibes || []}
-        onToggleVibe={toggleVibe}
-      />
+      <FadeIn delay={60}>
+        <View style={styles.progressRow}>
+          <Text style={styles.progressText}>Chosen {selectedCount} of 6</Text>
+          <View style={styles.dots}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <View key={i} style={[styles.dot, i < selectedCount && styles.dotOn]} />
+            ))}
+          </View>
+        </View>
+      </FadeIn>
 
-      {/* Tile Art Note */}
-      <Text style={styles.tileArtNote}>TILE ART — 24 CURATED IMAGES</Text>
-
-      {/* Bottom Actions */}
-      <View style={styles.bottomRow}>
-        <TouchableOpacity
-          onPress={() => setCurrentScreen('photos')}
-          style={styles.skipBtn}
-        >
-          <Text style={styles.skipBtnText}>Skip</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.88}
-          onPress={handleFinish}
-          style={styles.finishBtn}
-        >
-          <Text style={styles.finishBtnText}>Finish · see matches</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+      <FadeIn delay={120}>
+        <VibeTileGrid selectedVibes={user?.vibes || []} onToggleVibe={toggleVibe} />
+      </FadeIn>
+    </OnboardingScreen>
   );
 };
 
 const styles = StyleSheet.create({
-  scrollContainer: {
-    minHeight: '100%',
-    backgroundColor: theme.colors.bg,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
+  header: {
+    gap: 8,
   },
-  headerGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  stepTag: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 10.5,
-    letterSpacing: 1.2,
-    color: '#96806F',
-    fontWeight: '500',
+  progressText: {
+    fontFamily: fonts.sans,
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: colors.textSecondary,
   },
-  title: {
-    fontFamily: theme.fonts.serif,
-    fontSize: 30,
-    lineHeight: 32,
-    color: theme.colors.textPrimary,
+  dots: {
+    flexDirection: 'row',
+    gap: 4,
   },
-  subtitle: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 13,
-    color: theme.colors.textSecondary,
+  dot: {
+    width: 16,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: colors.cardBorder,
   },
-  tileArtNote: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 10,
-    letterSpacing: 0.8,
-    color: '#A8927F',
-    textAlign: 'center',
-    marginVertical: 4,
+  dotOn: {
+    backgroundImage: gradients.primary,
   },
-  bottomRow: {
-    marginTop: 'auto',
-    display: 'flex',
+  actions: {
     flexDirection: 'row',
     gap: 10,
-    paddingTop: 8,
-  },
-  skipBtn: {
-    flex: 1,
-    backgroundColor: theme.colors.card,
-    borderWidth: 1,
-    borderColor: theme.colors.cardBorder,
-    borderRadius: 14,
-    paddingVertical: 17,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  skipBtnText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 14,
-    fontWeight: '700',
-    color: theme.colors.textSecondary,
-  },
-  finishBtn: {
-    flex: 2,
-    backgroundColor: theme.colors.accent,
-    borderRadius: 14,
-    paddingVertical: 17,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  finishBtnText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 15,
-    fontWeight: '800',
-    color: theme.colors.white,
   },
 });

@@ -1,272 +1,292 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Pencil, ShieldCheck, Users, ChevronRight, BadgeCheck, Sparkles, UserRound, Images, Heart, Bell, ClipboardList, SlidersHorizontal, Crown, Sun, Star, BookHeart } from 'lucide-react';
+import { profileStrengthHint } from '@shared/constants';
+import { SignOutButton } from '../../components/common/SignOutButton';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
-import { PillarBar } from '../../components/blueprint/PillarBar';
+import {
+  Screen, FadeIn, Eyebrow, Heading, Button, Card, Avatar, Meter, SectionLabel, IconBadge, Divider, ScoreRing,
+} from '../../components/ui/kit';
+import { t } from '@shared/i18n';
+
+const { colors, fonts } = theme;
 
 export const MyBlueprintSummaryScreen = () => {
-  const { setCurrentScreen, user } = useApp();
-
-  const bp = user?.blueprint || {
-    money: 72,
-    roots: 31,
-    kids: 58,
-    ambition: 84,
-    summaryText:
-      'In short: a saver who’d move cities for the right role, wants kids within a few years, and won’t apologise for ambition.',
-    profileStrength: 86,
+  const { setCurrentScreen, setActiveTab, user, completeOnboarding, setPersonalSection } = useApp();
+  const [finishing, setFinishing] = useState(false);
+  const [error, setError] = useState(null);
+  const bp = user?.blueprint || {};
+  const summary = (bp.summaryText || '').replace(/^In short:\s*/, '');
+  const strength = user?.profileStrength ?? 0;
+  const photoCount = user?.photos?.length || 0;
+  const completed = Boolean(user?.onboarding?.completed);
+  const strengthHint = profileStrengthHint(user);
+  const nextSection = user?.profileCompletion?.nextSection;
+  const openPersonal = (section = null) => {
+    setPersonalSection(section);
+    setCurrentScreen('personal-details');
   };
 
-  const photo =
-    user?.photos?.[0] ||
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80';
+  const links = [
+    { icon: ClipboardList, label: 'Personal details', sub: `${strength}% complete · family, education, hobbies`, screen: 'personal-details' },
+    { icon: UserRound, label: 'Basics', sub: 'Name, city, timeline', screen: 'basics' },
+    { icon: Images, label: 'Photos & privacy', sub: `${photoCount} photo${photoCount === 1 ? '' : 's'}`, screen: 'photos' },
+    { icon: Heart, label: 'Vibes', sub: `${(user?.vibes || []).length} of 6 picked`, screen: 'vibes' },
+    ...(completed
+      ? [
+          { icon: SlidersHorizontal, label: 'Partner preferences & prompts', sub: `${Object.keys(user?.preferences || {}).length} preferences · ${(user?.prompts || []).length} prompts`, screen: 'preferences' },
+          { icon: BadgeCheck, label: 'ID verification', sub: user?.verified ? 'Verified' : 'Get the verified badge', screen: 'verification' },
+          { icon: Crown, label: 'Premium', sub: user?.plan === 'premium' ? 'Active' : 'Unlimited interests and more', screen: 'premium' },
+          { icon: Sun, label: 'Today’s picks', sub: 'Five curated matches each day', screen: 'daily' },
+          { icon: Star, label: 'Shortlist & who viewed you', sub: 'People you’re considering', screen: 'shortlist' },
+          { icon: BookHeart, label: 'Success stories', sub: 'Share how you met', screen: 'stories' },
+          { icon: ShieldCheck, label: 'Safety centre', sub: 'Tips and blocked members', screen: 'safety' },
+          { icon: Bell, label: 'Notifications', sub: 'Inbox and alerts', screen: 'notifications' },
+          { icon: Users, label: 'Family access', sub: 'Who can see what you forward', screen: 'link-parent' },
+          { icon: ShieldCheck, label: 'Privacy & data', sub: 'Download, consents, erasure', screen: 'privacy' },
+        ]
+      : []),
+  ];
+
+  const handleExplore = async () => {
+    if (completed) {
+      setActiveTab('feed');
+      setCurrentScreen('feed');
+      return;
+    }
+    setFinishing(true);
+    setError(null);
+    const res = await completeOnboarding();
+    setFinishing(false);
+    if (!res.ok) setError(res.error);
+  };
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <View style={styles.topHeader}>
-        <Text style={styles.title}>My blueprint</Text>
-        <TouchableOpacity onPress={() => setCurrentScreen('blueprint-tuner')}>
-          <Text style={styles.editBtn}>Edit</Text>
-        </TouchableOpacity>
-      </View>
+    <Screen tabBar={completed}>
+      <FadeIn>
+        <View style={styles.topRow}>
+          <Heading size={34}>My blueprint</Heading>
+          <TouchableOpacity onPress={() => setCurrentScreen('blueprint-tuner')} style={styles.editBtn}>
+            <Pencil size={14} color={colors.accent} />
+            <Text style={styles.editText}>Edit</Text>
+          </TouchableOpacity>
+        </View>
+      </FadeIn>
 
-      {/* Main Card */}
-      <View style={styles.mainCard}>
-        {/* User Info Header */}
-        <View style={styles.userRow}>
-          <Image source={{ uri: photo }} style={styles.userAvatar} />
-          <View style={styles.userDetails}>
-            <Text style={styles.userName}>
-              {user?.firstName || 'Ananya'}, {user?.age || 29}
-            </Text>
-            <Text style={styles.userSub}>
-              {user?.city || 'Bengaluru'} · verified · blueprint complete
+      {/* Identity + pillars hero */}
+      <FadeIn delay={80}>
+        <Card variant="dark" padding={22} style={{ gap: 20, overflow: 'hidden' }}>
+          <View style={styles.identity}>
+            <Avatar uri={user?.photos?.[0]?.url} name={user?.firstName} size={64} ring />
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={styles.name}>
+                {user?.firstName}, {user?.age}
+              </Text>
+              <View style={styles.verifiedRow}>
+                <BadgeCheck size={14} color={colors.gold} />
+                <Text style={styles.meta}>{user?.city} · {user?.verified ? 'ID verified' : 'phone verified'}</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={{ gap: 12 }}>
+            <Meter label="Money" value={bp.money ?? 0} dark />
+            <Meter label="Roots" value={bp.roots ?? 0} dark />
+            <Meter label="Kids" value={bp.kids ?? 0} dark />
+            <Meter label="Ambition" value={bp.ambition ?? 0} dark />
+          </View>
+
+          <View style={styles.quote}>
+            <Sparkles size={16} color={colors.gold} />
+            <Text style={styles.quoteText}>
+              In short: <Text style={styles.quoteStrong}>{summary}</Text>
             </Text>
           </View>
-        </View>
+        </Card>
+      </FadeIn>
 
-        {/* 4 Pillars Bars */}
-        <View style={styles.pillarsGrid}>
-          <PillarBar label="Money" value={bp.money} showValue={false} />
-          <PillarBar label="Roots" value={bp.roots} showValue={false} />
-          <PillarBar label="Kids" value={bp.kids} showValue={false} />
-          <PillarBar label="Ambition" value={bp.ambition} showValue={false} />
+      <FadeIn delay={160}>
+        <View style={{ gap: 10 }}>
+          <SectionLabel>Your vibes</SectionLabel>
+          <View style={styles.vibes}>
+            {(user?.vibes || []).map((vibe) => (
+              <View key={vibe} style={styles.vibePill}>
+                <Text style={styles.vibeText}>{vibe}</Text>
+              </View>
+            ))}
+            {(user?.vibes || []).length === 0 && <Text style={styles.meta2}>No vibes picked yet.</Text>}
+          </View>
         </View>
+      </FadeIn>
 
-        {/* Synthesis Quote Card */}
-        <View style={styles.archetypeCard}>
-          <Text style={styles.archetypeText}>
-            In short:{' '}
-            <Text style={styles.archetypeBold}>
-              a saver who’d move cities for the right role, wants kids within a few years, and won’t apologise for ambition.
-            </Text>
-          </Text>
-        </View>
-      </View>
+      <FadeIn delay={220}>
+        <Card style={styles.strength}>
+          <ScoreRing score={strength} size={64} label="DONE" />
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={styles.strengthTitle}>{t('Profile {n}% complete', { n: strength })}</Text>
+            <Text style={styles.meta2}>{strengthHint}</Text>
+            {completed && strength < 100 && (
+              <TouchableOpacity onPress={() => openPersonal(nextSection)} accessibilityRole="button">
+                <Text style={styles.completeLink}>{t('Complete my profile')} →</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </Card>
+      </FadeIn>
 
-      {/* Your Vibes Section */}
-      <View style={styles.vibesSection}>
-        <Text style={styles.vibesHeader}>YOUR VIBES</Text>
-        <View style={styles.vibesPillsRow}>
-          {(user?.vibes || [
-            'Temple mornings',
-            'Cooking together',
-            'Quiet weekends',
-            'Dogs everywhere',
-          ]).map((vibe, idx) => (
-            <View key={idx} style={styles.vibePill}>
-              <Text style={styles.vibePillText}>{vibe}</Text>
+      <FadeIn delay={280}>
+        <Card padding={6}>
+          {links.map((l, idx) => (
+            <View key={l.screen}>
+              {idx > 0 && <Divider style={{ marginHorizontal: 14 }} />}
+              <TouchableOpacity activeOpacity={0.8} onPress={() => (l.screen === 'personal-details' ? openPersonal() : setCurrentScreen(l.screen))} style={styles.linkRow}>
+                <IconBadge icon={l.icon} size={38} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={styles.linkTitle}>{t(l.label)}</Text>
+                  <Text style={styles.meta2}>{l.sub}</Text>
+                </View>
+                <ChevronRight size={18} color={colors.textLight} />
+              </TouchableOpacity>
             </View>
           ))}
-        </View>
-      </View>
+        </Card>
+      </FadeIn>
 
-      {/* Profile Strength Card */}
-      <View style={styles.strengthCard}>
-        <View style={styles.strengthInfo}>
-          <Text style={styles.strengthTitle}>Profile strength</Text>
-          <Text style={styles.strengthDesc}>Add one more photo to reach 100%</Text>
+      <FadeIn delay={340}>
+        <View style={{ gap: 8 }}>
+          {error && <Text style={[styles.meta2, { color: colors.accent, textAlign: 'center' }]}>{error}</Text>}
+          <Button
+            label={finishing ? 'One moment…' : completed ? 'Explore Aligned Matches' : 'Finish & see my matches'}
+            disabled={finishing}
+            onPress={handleExplore}
+          />
+          <SignOutButton style={{ marginTop: 6 }} />
         </View>
-        <Text style={styles.strengthScore}>{bp.profileStrength || 86}%</Text>
-      </View>
-
-      {/* See Matches Action */}
-      <TouchableOpacity
-        activeOpacity={0.88}
-        onPress={() => setCurrentScreen('feed')}
-        style={styles.feedBtn}
-      >
-        <Text style={styles.feedBtnText}>Explore Aligned Matches</Text>
-      </TouchableOpacity>
-    </ScrollView>
+      </FadeIn>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  scrollContainer: {
-    minHeight: '100%',
-    backgroundColor: theme.colors.bg,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
+  completeLink: {
+    fontFamily: fonts.sans,
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: colors.accent,
+    marginTop: 4,
   },
-  topHeader: {
-    display: 'flex',
+  topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  title: {
-    fontFamily: theme.fonts.serif,
-    fontSize: 30,
-    color: theme.colors.textPrimary,
+    marginTop: 4,
   },
   editBtn: {
-    fontFamily: theme.fonts.sans,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: colors.accentSoft,
+  },
+  editText: {
+    fontFamily: fonts.sans,
     fontSize: 13,
-    fontWeight: '700',
-    color: theme.colors.accent,
+    fontWeight: '800',
+    color: colors.accent,
   },
-  mainCard: {
-    backgroundColor: theme.colors.card,
-    borderWidth: 1,
-    borderColor: theme.colors.cardBorder,
-    borderRadius: 20,
-    padding: 18,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
-  },
-  userRow: {
-    display: 'flex',
+  identity: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
   },
-  userAvatar: {
-    width: 62,
-    height: 62,
-    borderRadius: 99,
-    borderWidth: 1,
-    borderColor: '#E7DACA',
+  name: {
+    fontFamily: fonts.sans,
+    fontWeight: '800',
+    fontSize: 24,
+    color: colors.onDark,
+    letterSpacing: -0.4,
   },
-  userDetails: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 3,
+  verifiedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  userName: {
-    fontFamily: theme.fonts.serif,
-    fontSize: 22,
-    color: theme.colors.textPrimary,
-  },
-  userSub: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11.5,
-    color: theme.colors.textMuted,
-  },
-  pillarsGrid: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 2,
-  },
-  archetypeCard: {
-    backgroundColor: theme.colors.cardSecondary,
-    borderRadius: 13,
-    padding: 13,
-  },
-  archetypeText: {
-    fontFamily: theme.fonts.sans,
+  meta: {
+    fontFamily: fonts.sans,
     fontSize: 12.5,
-    lineHeight: 18,
-    color: '#4B3833',
+    color: 'rgba(255,246,238,0.7)',
   },
-  archetypeBold: {
-    fontWeight: '700',
+  quote: {
+    flexDirection: 'row',
+    gap: 10,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
-  vibesSection: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
+  quoteText: {
+    flex: 1,
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    lineHeight: 21,
+    color: 'rgba(255,246,238,0.7)',
   },
-  vibesHeader: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 10,
-    letterSpacing: 1.2,
-    color: '#96806F',
-    fontWeight: '500',
+  quoteStrong: {
+    fontFamily: fonts.sans,
+    fontWeight: '800',
+    fontSize: 13.6,
+    color: colors.onDark,
+    letterSpacing: -0.4,
   },
-  vibesPillsRow: {
-    display: 'flex',
+  vibes: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 7,
+    gap: 8,
   },
   vibePill: {
-    backgroundColor: theme.colors.card,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: theme.colors.cardBorder,
-    paddingVertical: 9,
-    paddingHorizontal: 13,
-    borderRadius: 99,
+    borderColor: colors.cardBorder,
   },
-  vibePillText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#4B3833',
+  vibeText: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textPrimary,
   },
-  strengthCard: {
-    backgroundColor: theme.colors.card,
-    borderWidth: 1,
-    borderColor: theme.colors.cardBorder,
-    borderRadius: 16,
-    padding: 15,
-    display: 'flex',
+  strength: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  strengthInfo: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 2,
+    gap: 16,
   },
   strengthTitle: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 13,
-    fontWeight: '700',
-    color: theme.colors.textPrimary,
-  },
-  strengthDesc: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11.5,
-    color: theme.colors.textSubtle,
-  },
-  strengthScore: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 18,
-    fontWeight: '700',
-    color: theme.colors.accent,
-  },
-  feedBtn: {
-    backgroundColor: theme.colors.accent,
-    borderRadius: 14,
-    paddingVertical: 16,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-  },
-  feedBtnText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 14.5,
+    fontFamily: fonts.sans,
+    fontSize: 16,
     fontWeight: '800',
-    color: theme.colors.white,
+    color: colors.textPrimary,
+  },
+  meta2: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 14,
+  },
+  linkTitle: {
+    fontFamily: fonts.sans,
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
   },
 });

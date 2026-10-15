@@ -1,104 +1,90 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { theme } from '../../theme/tokens';
 import { Check } from 'lucide-react';
+import { theme } from '../../theme/tokens';
 
-export const ALL_VIBES = [
-  'Temple mornings',
-  'Trekking',
-  'Cooking together',
-  'Big joint family',
-  'Quiet weekends',
-  'Nightlife',
-  'Dogs everywhere',
-  'Festivals, loud',
-  'Vegetarian home',
-  'Filter coffee & book',
-  'Early gym sessions',
-  'Art & theater',
-];
+const { colors, fonts, gradients } = theme;
 
-export const VibeTileGrid = ({ selectedVibes = [], onToggleVibe }) => {
-  return (
-    <View style={styles.grid}>
-      {ALL_VIBES.map((vibe, idx) => {
-        const isSelected = selectedVibes.includes(vibe);
-        return (
-          <TouchableOpacity
-            key={idx}
-            activeOpacity={0.85}
-            onPress={() => onToggleVibe(vibe)}
-            style={[
-              styles.tile,
-              isSelected ? styles.tileSelected : styles.tileUnselected,
-            ]}
-          >
-            {isSelected && (
-              <View style={styles.checkIconBadge}>
-                <Check size={12} color={theme.colors.white} strokeWidth={3} />
-              </View>
-            )}
-            <Text
-              style={[
-                styles.tileText,
-                isSelected ? styles.tileTextSelected : styles.tileTextUnselected,
-              ]}
-            >
-              {vibe}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-};
+import { VIBE_ART, ALL_VIBES } from '@shared/constants';
+
+export { ALL_VIBES };
+
+export const VibeTileGrid = ({ selectedVibes = [], onToggleVibe }) => (
+  <View style={styles.grid}>
+    {ALL_VIBES.map((vibe) => {
+      const [emoji, from, to] = VIBE_ART[vibe];
+      const isSelected = selectedVibes.includes(vibe);
+      return (
+        <TouchableOpacity
+          key={vibe}
+          activeOpacity={0.88}
+          onPress={() => onToggleVibe(vibe)}
+          style={[
+            styles.tile,
+            { backgroundImage: `linear-gradient(150deg, ${from} 0%, ${to} 100%)` },
+            isSelected && styles.tileSelected,
+          ]}
+        >
+          <Text style={styles.emoji}>{emoji}</Text>
+          <Text style={styles.label}>{vibe}</Text>
+          <View style={[styles.check, isSelected && styles.checkOn]}>
+            {isSelected && <Check size={10} color={colors.white} strokeWidth={3} />}
+          </View>
+        </TouchableOpacity>
+      );
+    })}
+  </View>
+);
 
 const styles = StyleSheet.create({
   grid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr 1fr',
-    gap: 9,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   tile: {
-    aspectRatio: 1,
-    borderRadius: 14,
-    padding: 10,
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'flex-end',
+    width: 'calc(25% - 6px)',
+    aspectRatio: 0.82,
+    borderRadius: 16,
+    padding: 7,
+    justifyContent: 'space-between',
+    borderWidth: 2,
+    borderColor: 'transparent',
     position: 'relative',
-    overflow: 'hidden',
+    transitionProperty: 'transform, box-shadow',
+    transitionDuration: '180ms',
   },
   tileSelected: {
-    backgroundColor: theme.colors.accent,
+    borderColor: colors.accent,
+    boxShadow: '0 10px 24px rgba(168, 30, 60, 0.28)',
+    transform: [{ scale: 1.03 }],
   },
-  tileUnselected: {
-    backgroundColor: theme.colors.cardSecondary,
-    borderWidth: 1,
-    borderColor: theme.colors.cardBorder,
+  emoji: {
+    fontSize: 24,
   },
-  checkIconBadge: {
+  label: {
+    fontFamily: fonts.sans,
+    fontSize: 10.5,
+    lineHeight: 13,
+    letterSpacing: -0.2,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  check: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 6,
+    right: 6,
     width: 18,
     height: 18,
-    borderRadius: 99,
-    backgroundColor: 'rgba(255, 248, 242, 0.25)',
-    display: 'flex',
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: 'rgba(35,20,15,0.18)',
+    backgroundColor: 'rgba(255,255,255,0.6)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tileText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11.5,
-    fontWeight: '700',
-    lineHeight: 14,
-  },
-  tileTextSelected: {
-    color: theme.colors.white,
-  },
-  tileTextUnselected: {
-    color: theme.colors.textPrimary,
+  checkOn: {
+    backgroundImage: gradients.primary,
+    borderColor: 'transparent',
   },
 });

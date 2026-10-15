@@ -1,299 +1,266 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { Plus, EyeOff, SearchX, BadgeCheck, Star, X } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
-import { ShieldCheck, Plus } from 'lucide-react';
+import {
+  OnboardingScreen, TopBar, FadeIn, Eyebrow, Heading, Accent, Button, Card, Toggle, IconBadge, Badge, Divider,
+} from '../../components/ui/kit';
+
+const { colors, fonts, radii } = theme;
+const MAX_PHOTOS = 6;
 
 export const PhotoVerificationScreen = () => {
-  const { setCurrentScreen, user, setUser } = useApp();
-
+  const { setCurrentScreen, user, updatePrivacy, uploadPhoto, deletePhoto, makePhotoPrimary } = useApp();
   const [blurMutual, setBlurMutual] = useState(user?.photoBlurredUntilMutual ?? true);
   const [hideSearch, setHideSearch] = useState(user?.hideFromSearchEngines ?? true);
+  const [uploading, setUploading] = useState(false);
+  const [busyId, setBusyId] = useState(null);
+  const [error, setError] = useState(null);
+  const fileInput = useRef(null);
+  const photos = user?.photos || [];
 
-  const handleContinue = () => {
-    setUser((prev) => ({
-      ...prev,
-      photoBlurredUntilMutual: blurMutual,
-      hideFromSearchEngines: hideSearch,
-    }));
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    const res = await uploadPhoto(file);
+    setUploading(false);
+    if (!res.ok) setError(res.error);
+  };
+
+  const runPhotoAction = async (id, action) => {
+    setBusyId(id);
+    setError(null);
+    const res = await action(id);
+    setBusyId(null);
+    if (!res.ok) setError(res.error);
+  };
+
+  const handleContinue = async () => {
+    const res = await updatePrivacy({ photoBlurredUntilMutual: blurMutual, hideFromSearchEngines: hideSearch });
+    if (!res.ok) return setError(res.error);
     setCurrentScreen('blueprint-summary');
   };
 
-  const photos = user?.photos || [
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
-    'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80',
+  const settings = [
+    { icon: EyeOff, title: 'Blur until mutual interest', sub: 'Seen only after you both say yes', value: blurMutual, set: setBlurMutual },
+    { icon: SearchX, title: 'Hide from search engines', sub: 'Recommended', value: hideSearch, set: setHideSearch },
   ];
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.headerGroup}>
-        <Text style={styles.title}>Photos, on your{'\n'}terms</Text>
-        <Text style={styles.subtitle}>
-          Blurred by default. They unblur only when you both say yes.
-        </Text>
-      </View>
+    <OnboardingScreen
+      top={<TopBar onBack={() => setCurrentScreen(user?.onboarding?.completed ? 'blueprint-summary' : 'vibes')} />}
+      footer={
+        <>
+          {error ? (
+            <Text style={styles.error}>{error}</Text>
+          ) : (
+            photos.length === 0 && <Text style={styles.hint}>Add at least one photo to continue</Text>
+          )}
+          <Button label="Continue" disabled={photos.length === 0 || uploading} onPress={handleContinue} />
+        </>
+      }
+    >
+      <FadeIn>
+        <View style={styles.header}>
+          <Eyebrow>Photos & verification</Eyebrow>
+          <Heading size={32}>
+            Photos, on <Accent>your terms</Accent>
+          </Heading>
+        </View>
+      </FadeIn>
 
-      {/* 3x1 Photo Upload Grid */}
-      <View style={styles.photoGrid}>
-        <View style={styles.photoSlot}>
-          <Image source={{ uri: photos[0] }} style={styles.photoImg} />
-          <View style={styles.primaryBadge}>
-            <Text style={styles.primaryBadgeText}>PRIMARY</Text>
+      <FadeIn delay={60}>
+        <View style={styles.grid}>
+          {photos.map((photo, i) => (
+            <View key={photo.id} style={styles.tile}>
+              <Image source={{ uri: photo.url }} style={styles.img} />
+              {i === 0 ? (
+                <Badge label="Main" tone="glass" style={styles.tileBadge} />
+              ) : (
+                <TouchableOpacity
+                  onPress={() => runPhotoAction(photo.id, makePhotoPrimary)}
+                  style={[styles.tileBtn, { left: 6 }]}
+                  accessibilityLabel="Make main photo"
+                >
+                  <Star size={13} color={colors.white} />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                onPress={() => runPhotoAction(photo.id, deletePhoto)}
+                style={[styles.tileBtn, { right: 6 }]}
+                accessibilityLabel="Remove photo"
+              >
+                <X size={13} color={colors.white} />
+              </TouchableOpacity>
+              {busyId === photo.id && (
+                <View style={styles.tileBusy}>
+                  <ActivityIndicator color={colors.white} />
+                </View>
+              )}
+            </View>
+          ))}
+          {photos.length < MAX_PHOTOS && (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              disabled={uploading}
+              onPress={() => fileInput.current?.click()}
+              style={[styles.tile, styles.addSlot]}
+            >
+              {uploading ? (
+                <ActivityIndicator color={colors.accent} />
+              ) : (
+                <>
+                  <Plus size={22} color={colors.accent} />
+                  <Text style={styles.addText}>{photos.length ? 'Add' : 'Add photo'}</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+        <input ref={fileInput} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
+      </FadeIn>
+
+      <FadeIn delay={120}>
+        <Card padding={4}>
+          {settings.map((s, idx) => (
+            <View key={s.title}>
+              {idx > 0 && <Divider style={{ marginHorizontal: 12 }} />}
+              <View style={styles.row}>
+                <IconBadge icon={s.icon} size={34} />
+                <View style={{ flex: 1, gap: 1 }}>
+                  <Text style={styles.rowTitle}>{s.title}</Text>
+                  <Text style={styles.rowSub}>{s.sub}</Text>
+                </View>
+                <Toggle value={s.value} onChange={s.set} />
+              </View>
+            </View>
+          ))}
+        </Card>
+      </FadeIn>
+
+      <FadeIn delay={180}>
+        <Card variant="dark" style={styles.idCard} padding={14}>
+          <BadgeCheck size={20} color={colors.gold} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={styles.idTitle}>{user?.verified ? 'ID verified' : 'ID verification — coming soon'}</Text>
+            <Text style={styles.idText}>One-time ID check. We store a hash, never the document.</Text>
           </View>
-        </View>
-
-        <View style={styles.photoSlot}>
-          <Image source={{ uri: photos[1] }} style={styles.photoImg} />
-        </View>
-
-        <TouchableOpacity style={styles.addPhotoSlot}>
-          <Plus size={24} color="#C0B0A0" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Privacy Settings Card */}
-      <View style={styles.privacyCard}>
-        <View style={styles.settingRow}>
-          <Text style={styles.settingTitle}>Blur until mutual interest</Text>
-          <TouchableOpacity
-            onPress={() => setBlurMutual((b) => !b)}
-            style={blurMutual ? styles.toggleActive : styles.toggleInactive}
-          >
-            <View style={[styles.thumb, !blurMutual && styles.thumbInactive]} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.divider} />
-
-        <View style={styles.settingRow}>
-          <View style={styles.settingTextGroup}>
-            <Text style={styles.settingTitle}>Hide from search engines</Text>
-            <Text style={styles.settingSub}>Recommended</Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => setHideSearch((h) => !h)}
-            style={hideSearch ? styles.toggleActive : styles.toggleInactive}
-          >
-            <View style={[styles.thumb, !hideSearch && styles.thumbInactive]} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* ID Verification Card */}
-      <View style={styles.idCard}>
-        <View style={styles.idIconBox}>
-          <ShieldCheck size={20} color={theme.colors.white} />
-        </View>
-        <View style={styles.idInfo}>
-          <Text style={styles.idTitle}>Get the verified badge</Text>
-          <Text style={styles.idDesc}>
-            One-time ID check. We store a hash, never the document.
-          </Text>
-        </View>
-      </View>
-
-      {/* Action */}
-      <TouchableOpacity
-        activeOpacity={0.88}
-        onPress={handleContinue}
-        style={styles.continueBtn}
-      >
-        <Text style={styles.continueBtnText}>Continue</Text>
-      </TouchableOpacity>
-    </View>
+        </Card>
+      </FadeIn>
+    </OnboardingScreen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.bg,
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
+  header: {
+    gap: 8,
   },
-  headerGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
-  },
-  title: {
-    fontFamily: theme.fonts.serif,
-    fontSize: 30,
-    lineHeight: 32,
-    color: theme.colors.textPrimary,
-  },
-  subtitle: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 13,
-    color: theme.colors.textSecondary,
-    lineHeight: 18,
-  },
-  photoGrid: {
-    display: 'flex',
+  grid: {
     flexDirection: 'row',
-    gap: 9,
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  photoSlot: {
-    flex: 1,
-    aspectRatio: 3 / 4,
-    borderRadius: 16,
+  tile: {
+    width: 'calc(33.333% - 6px)',
+    aspectRatio: 0.8,
+    borderRadius: radii.md,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#E7DACA',
+    backgroundColor: colors.accentSoft,
     position: 'relative',
   },
-  photoImg: {
+  img: {
     width: '100%',
     height: '100%',
   },
-  primaryBadge: {
+  tileBadge: {
     position: 'absolute',
-    bottom: 8,
-    left: 8,
-    backgroundColor: 'rgba(255, 253, 249, 0.85)',
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-    borderRadius: 4,
+    left: 6,
+    bottom: 6,
   },
-  primaryBadgeText: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 8.5,
-    fontWeight: '600',
-    color: '#8A756A',
+  tileBtn: {
+    position: 'absolute',
+    top: 6,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(20,8,6,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  addPhotoSlot: {
-    flex: 1,
-    aspectRatio: 3 / 4,
-    borderRadius: 16,
+  tileBusy: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(20,8,6,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addSlot: {
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: '#DDCDB9',
-    display: 'flex',
+    borderColor: 'rgba(168, 30, 60, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.cardSecondary,
+    gap: 4,
   },
-  privacyCard: {
-    backgroundColor: theme.colors.card,
-    borderWidth: 1,
-    borderColor: theme.colors.cardBorder,
-    borderRadius: 16,
-    padding: 16,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 12,
+  addText: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.accent,
   },
-  settingRow: {
-    display: 'flex',
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
   },
-  settingTextGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 2,
-  },
-  settingTitle: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 13.5,
+  rowTitle: {
+    fontFamily: fonts.sans,
+    fontSize: 14.5,
     fontWeight: '700',
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
   },
-  settingSub: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11,
-    color: theme.colors.textSubtle,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#F0E7DA',
-  },
-  toggleActive: {
-    width: 44,
-    height: 26,
-    borderRadius: 99,
-    backgroundColor: theme.colors.accent,
-    padding: 3,
-    display: 'flex',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-  },
-  toggleInactive: {
-    width: 44,
-    height: 26,
-    borderRadius: 99,
-    backgroundColor: '#E7DACA',
-    padding: 3,
-    display: 'flex',
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-  },
-  thumb: {
-    width: 20,
-    height: 20,
-    borderRadius: 99,
-    backgroundColor: theme.colors.white,
-  },
-  thumbInactive: {
-    backgroundColor: theme.colors.card,
+  rowSub: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.textSecondary,
   },
   idCard: {
-    backgroundColor: theme.colors.cardSecondary,
-    borderWidth: 1,
-    borderColor: theme.colors.borderLight,
-    borderRadius: 16,
-    padding: 14,
-    display: 'flex',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 13,
-  },
-  idIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
-    backgroundColor: theme.colors.accent,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  idInfo: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 2,
+    gap: 12,
   },
   idTitle: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 13,
-    fontWeight: '700',
-    color: theme.colors.textPrimary,
-  },
-  idDesc: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11.5,
-    lineHeight: 15,
-    color: theme.colors.textSecondary,
-  },
-  continueBtn: {
-    marginTop: 'auto',
-    backgroundColor: theme.colors.accent,
-    borderRadius: 14,
-    paddingVertical: 17,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  continueBtnText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 15,
+    fontFamily: fonts.sans,
+    fontSize: 14.5,
     fontWeight: '800',
-    color: theme.colors.white,
+    color: colors.onDark,
+  },
+  idText: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    lineHeight: 17,
+    color: 'rgba(255,246,238,0.72)',
+  },
+  hint: {
+    fontFamily: fonts.sans,
+    fontSize: 12.5,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  error: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.accent,
+    textAlign: 'center',
   },
 });

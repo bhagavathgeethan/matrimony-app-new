@@ -1,177 +1,125 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { Wallet, MapPin, Baby, Briefcase, Clock } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
+import { OnboardingScreen, StepBar, FadeIn, Eyebrow, Heading, Accent, Button } from '../../components/ui/kit';
+
+const { colors, fonts, gradients } = theme;
+
+const PILLARS = [
+  ['01', Wallet, 'Money philosophy', 'Saving, spending, joint or separate'],
+  ['02', MapPin, 'Roots & geography', 'Same city as parents, or the world'],
+  ['03', Baby, 'Kids & parenting', 'Whether, when, and who slows down'],
+  ['04', Briefcase, 'Career ambition', 'How much work is allowed to take'],
+];
 
 export const BlueprintIntroScreen = () => {
   const { setCurrentScreen } = useApp();
 
   return (
-    <View style={styles.container}>
-      {/* Step Header */}
-      <View style={styles.headerGroup}>
-        <Text style={styles.stepTag}>STEP 03 / 04 · BLUEPRINT</Text>
-        <Text style={styles.title}>
-          Four questions that{'\n'}decide the{' '}
-          <Text style={styles.titleItalic}>next 40 years</Text>
-        </Text>
-        <Text style={styles.subtitle}>
-          Most marriages don’t strain over hobbies. They strain over money, where you live, kids, and whose career bends.
-        </Text>
+    <OnboardingScreen
+      dark
+      background={gradients.hero}
+      top={<StepBar step={4} total={5} dark />}
+      footer={
+        <>
+          <View style={styles.timeRow}>
+            <Clock size={13} color="rgba(255,246,238,0.6)" />
+            <Text style={styles.timeText}>About 4 minutes · revise any answer later</Text>
+          </View>
+          <Button label="Begin" variant="gold" onPress={() => setCurrentScreen('blueprint-q1')} />
+        </>
+      }
+    >
+      <FadeIn>
+        <View style={styles.header}>
+          <Eyebrow color={colors.gold}>Step 04 / 05 · Blueprint</Eyebrow>
+          <Heading size={36} color={colors.onDark}>
+            Four questions for the <Accent color={colors.gold}>next 40 years</Accent>
+          </Heading>
+          <Text style={styles.lede}>
+            Marriages rarely strain over hobbies. They strain over money, where you live, kids, and whose career bends.
+          </Text>
+        </View>
+      </FadeIn>
+
+      <View style={{ gap: 8 }}>
+        {PILLARS.map(([num, Icon, title, desc], i) => (
+          <FadeIn key={num} delay={100 + i * 70}>
+            <View style={styles.pillar}>
+              <View style={styles.pillarIcon}>
+                <Icon size={18} color={colors.gold} />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.pillarTitle}>{title}</Text>
+                <Text style={styles.pillarDesc}>{desc}</Text>
+              </View>
+              <Text style={styles.pillarNum}>{num}</Text>
+            </View>
+          </FadeIn>
+        ))}
       </View>
-
-      {/* 4 Pillars List */}
-      <View style={styles.pillarsList}>
-        <View style={styles.pillarCard}>
-          <Text style={styles.pillarNumber}>01</Text>
-          <View style={styles.pillarInfo}>
-            <Text style={styles.pillarTitle}>Money philosophy</Text>
-            <Text style={styles.pillarDesc}>Saving, spending, joint or separate</Text>
-          </View>
-        </View>
-
-        <View style={styles.pillarCard}>
-          <Text style={styles.pillarNumber}>02</Text>
-          <View style={styles.pillarInfo}>
-            <Text style={styles.pillarTitle}>Roots & geography</Text>
-            <Text style={styles.pillarDesc}>Same city as parents, or the world</Text>
-          </View>
-        </View>
-
-        <View style={styles.pillarCard}>
-          <Text style={styles.pillarNumber}>03</Text>
-          <View style={styles.pillarInfo}>
-            <Text style={styles.pillarTitle}>Kids & parenting</Text>
-            <Text style={styles.pillarDesc}>Whether, when, and who slows down</Text>
-          </View>
-        </View>
-
-        <View style={styles.pillarCard}>
-          <Text style={styles.pillarNumber}>04</Text>
-          <View style={styles.pillarInfo}>
-            <Text style={styles.pillarTitle}>Career ambition</Text>
-            <Text style={styles.pillarDesc}>How much work is allowed to take</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Footer */}
-      <View style={styles.footerGroup}>
-        <Text style={styles.timeNote}>About 4 minutes. You can revise any answer later.</Text>
-        <TouchableOpacity
-          activeOpacity={0.88}
-          onPress={() => setCurrentScreen('blueprint-q1')}
-          style={styles.beginBtn}
-        >
-          <Text style={styles.beginBtnText}>Begin</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+    </OnboardingScreen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.bg,
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 18,
-  },
-  headerGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-  },
-  stepTag: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 10.5,
-    letterSpacing: 1.2,
-    color: '#96806F',
-    fontWeight: '500',
-  },
-  title: {
-    fontFamily: theme.fonts.serif,
-    fontSize: 32,
-    lineHeight: 34,
-    color: theme.colors.textPrimary,
-  },
-  titleItalic: {
-    fontStyle: 'italic',
-    color: theme.colors.accent,
-  },
-  subtitle: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 13,
-    color: theme.colors.textSecondary,
-    lineHeight: 19,
-  },
-  pillarsList: {
-    display: 'flex',
-    flexDirection: 'column',
+  header: {
     gap: 10,
+    marginBottom: 2,
   },
-  pillarCard: {
-    backgroundColor: theme.colors.card,
-    borderWidth: 1,
-    borderColor: theme.colors.cardBorder,
-    borderRadius: 16,
-    padding: 14,
-    display: 'flex',
+  lede: {
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    lineHeight: 21,
+    color: 'rgba(255,246,238,0.75)',
+  },
+  pillar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
-  pillarNumber: {
-    width: 22,
-    fontFamily: theme.fonts.mono,
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.colors.accent,
-  },
-  pillarInfo: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 3,
-  },
-  pillarTitle: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 14,
-    fontWeight: '700',
-    color: theme.colors.textPrimary,
-  },
-  pillarDesc: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11.5,
-    color: theme.colors.textSubtle,
-  },
-  footerGroup: {
-    marginTop: 'auto',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-  },
-  timeNote: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11.5,
-    color: theme.colors.textSubtle,
-    textAlign: 'center',
-  },
-  beginBtn: {
-    backgroundColor: theme.colors.accent,
-    borderRadius: 14,
-    paddingVertical: 17,
-    display: 'flex',
+  pillarIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: 'rgba(201,162,92,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  beginBtnText: {
-    fontFamily: theme.fonts.sans,
+  pillarTitle: {
+    fontFamily: fonts.sans,
     fontSize: 15,
+    fontWeight: '700',
+    color: colors.onDark,
+  },
+  pillarDesc: {
+    fontFamily: fonts.sans,
+    fontSize: 12.5,
+    color: 'rgba(255,246,238,0.65)',
+  },
+  pillarNum: {
+    fontFamily: fonts.sans,
     fontWeight: '800',
-    color: theme.colors.white,
+    fontSize: 18,
+    color: 'rgba(201,162,92,0.6)',
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  timeText: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: 'rgba(255,246,238,0.6)',
   },
 });

@@ -1,18 +1,24 @@
 {
   "name": "matrimony-backend",
   "version": "1.0.0",
-  "description": "Node.js REST & WebSocket backend for values-led, DPDP-compliant Matrimony App",
+  "description": "Sangam backend: REST + WebSocket API over PostgreSQL",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "node src/server.js",
-    "test": "node test/api.test.js"
+    "migrate": "node src/db/migrate.js",
+    "test": "node --test --test-concurrency=1 test/api.test.js test/integration.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "multer": "^2.4.0",
     "pg": "^8.23.0",
+    "sharp": "^0.34.5",
     "ws": "^8.17.1"
+  },
+  "devDependencies": {
+    "embedded-postgres": "^17.5.0-beta.15"
   }
 }

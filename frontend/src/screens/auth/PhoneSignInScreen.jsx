@@ -1,293 +1,191 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { Check } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
-import { ChevronLeft, Check } from 'lucide-react';
+import { OnboardingScreen, TopBar, FadeIn, Eyebrow, Heading, Accent, Body, Button, Card } from '../../components/ui/kit';
+import { Lockup } from '../../components/brand/Logo';
+
+const { colors, fonts, radii } = theme;
 
 export const PhoneSignInScreen = () => {
-  const { setCurrentScreen, user, setUser } = useApp();
-  const [phoneNumber, setPhoneNumber] = useState('98765 43210');
+  const { setCurrentScreen, sendOtp } = useApp();
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [consentSms, setConsentSms] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState(null);
+  const digits = phoneNumber.replace(/\D/g, '');
+  const canSend = consentSms && digits.length === 10 && !sending;
 
-  const handleSendOtp = () => {
-    // Navigate to OTP verify
-    setCurrentScreen('otp');
+  const handleSend = async () => {
+    setSending(true);
+    setError(null);
+    const res = await sendOtp(digits);
+    setSending(false);
+    if (res.ok) setCurrentScreen('otp');
+    else setError(res.error);
   };
 
   return (
-    <View style={styles.container}>
-      {/* Back Nav */}
-      <TouchableOpacity onPress={() => setCurrentScreen('welcome')} style={styles.backBtn}>
-        <ChevronLeft size={22} color={theme.colors.textPrimary} />
-      </TouchableOpacity>
+    <OnboardingScreen
+      top={<TopBar onBack={() => setCurrentScreen('welcome')} title={<Lockup size={30} />} />}
+      footer={
+        <>
+          {error && <Text style={styles.error}>{error}</Text>}
+          <Button label={sending ? 'Sending…' : 'Send OTP'} disabled={!canSend} onPress={handleSend} />
+          <Text style={styles.footer}>Parents: use the invite link your child sent you.</Text>
+        </>
+      }
+    >
+      <FadeIn>
+        <View style={styles.header}>
+          <Eyebrow>Sign in</Eyebrow>
+          <Heading size={34}>
+            Your number, <Accent>your account</Accent>
+          </Heading>
+          <Body size={14}>One profile per verified phone. It keeps the platform real.</Body>
+        </View>
+      </FadeIn>
 
-      {/* Header */}
-      <View style={styles.headerGroup}>
-        <Text style={styles.title}>Your number,{'\n'}your account</Text>
-        <Text style={styles.subtitle}>
-          One profile per verified phone. It keeps the platform real.
-        </Text>
-      </View>
-
-      {/* Phone Input Group */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>MOBILE NUMBER</Text>
-        <View style={styles.phoneRow}>
-          <View style={styles.countryCodeBox}>
-            <Text style={styles.countryCodeText}>+91</Text>
-          </View>
-          <View style={styles.phoneInputBox}>
+      <FadeIn delay={80}>
+        <Card style={{ gap: 12 }} padding={16}>
+          <Text style={styles.label}>Mobile number</Text>
+          <View style={styles.phoneRow}>
+            <View style={styles.countryCode}>
+              <Text style={styles.flag}>🇮🇳</Text>
+              <Text style={styles.countryText}>+91</Text>
+            </View>
             <TextInput
               value={phoneNumber}
               onChangeText={setPhoneNumber}
               keyboardType="phone-pad"
+              maxLength={11}
+              placeholder="98765 43210"
+              placeholderTextColor={colors.textLight}
               style={styles.phoneInput}
-              placeholder="Enter mobile number"
             />
-            <View style={styles.activeCursor} />
           </View>
-        </View>
+          <TouchableOpacity activeOpacity={0.85} onPress={() => setConsentSms((c) => !c)} style={styles.consentRow}>
+            <View style={[styles.checkbox, consentSms && styles.checkboxOn]}>
+              {consentSms && <Check size={13} color={colors.white} strokeWidth={3} />}
+            </View>
+            <Text style={styles.consentText}>
+              Send me an OTP by SMS. I consent to processing my number for authentication only.
+            </Text>
+          </TouchableOpacity>
+        </Card>
+      </FadeIn>
 
-        {/* SMS Consent Card */}
-        <TouchableOpacity
-          onPress={() => setConsentSms((c) => !c)}
-          style={styles.consentCard}
-        >
-          <View style={[styles.checkbox, consentSms && styles.checkboxActive]}>
-            {consentSms && <Check size={12} color={theme.colors.white} strokeWidth={3} />}
-          </View>
-          <Text style={styles.consentText}>
-            Send me an OTP by SMS. Standard rates apply. I consent to processing my number for authentication only.
-          </Text>
-        </TouchableOpacity>
-
-        {/* Send OTP Button */}
-        <TouchableOpacity
-          activeOpacity={0.88}
-          onPress={handleSendOtp}
-          style={styles.sendOtpBtn}
-        >
-          <Text style={styles.sendOtpBtnText}>Send OTP</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* OR Divider */}
-      <View style={styles.dividerRow}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>OR</Text>
-        <View style={styles.dividerLine} />
-      </View>
-
-      {/* Social Logins */}
-      <View style={styles.socialGroup}>
-        <TouchableOpacity
-          onPress={() => setCurrentScreen('consent')}
-          style={styles.socialBtn}
-        >
-          <Text style={styles.socialBtnText}>Continue with Google</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setCurrentScreen('consent')}
-          style={styles.socialBtn}
-        >
-          <Text style={styles.socialBtnText}>Continue with Apple</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Footer Helper */}
-      <Text style={styles.footerNote}>
-        Parents: use the invite link your child sent you.
-      </Text>
-    </View>
+    </OnboardingScreen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.bg,
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 18,
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 99,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
-  },
-  title: {
-    fontFamily: theme.fonts.serif,
-    fontSize: 32,
-    lineHeight: 34,
-    color: theme.colors.textPrimary,
-  },
-  subtitle: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 13.5,
-    color: theme.colors.textSecondary,
-    lineHeight: 19,
-  },
-  inputGroup: {
-    display: 'flex',
-    flexDirection: 'column',
+  header: {
     gap: 10,
   },
-  inputLabel: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 10,
-    letterSpacing: 1.2,
-    color: '#96806F',
-    fontWeight: '500',
+  label: {
+    fontFamily: fonts.sans,
+    fontWeight: '700',
+    fontSize: 11,
+    letterSpacing: 1.6,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
   },
   phoneRow: {
-    display: 'flex',
     flexDirection: 'row',
-    gap: 9,
+    gap: 10,
   },
-  countryCodeBox: {
-    backgroundColor: theme.colors.card,
-    borderWidth: 1,
-    borderColor: theme.colors.cardBorder,
-    borderRadius: 13,
-    paddingVertical: 15,
-    paddingHorizontal: 14,
-    display: 'flex',
+  countryCode: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    borderRadius: radii.md,
+    backgroundColor: colors.cardSecondary,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
   },
-  countryCodeText: {
-    fontFamily: theme.fonts.sans,
+  flag: {
+    fontSize: 16,
+  },
+  countryText: {
+    fontFamily: fonts.sans,
     fontSize: 16,
     fontWeight: '700',
-    color: theme.colors.textPrimary,
-  },
-  phoneInputBox: {
-    flex: 1,
-    backgroundColor: theme.colors.card,
-    borderWidth: 1.5,
-    borderColor: theme.colors.accent,
-    borderRadius: 13,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
+    color: colors.textPrimary,
   },
   phoneInput: {
     flex: 1,
-    fontFamily: theme.fonts.sans,
-    fontSize: 16,
-    fontWeight: '700',
-    color: theme.colors.textPrimary,
-    borderWidth: 0,
-    outline: 'none',
-  },
-  activeCursor: {
-    width: 2,
-    height: 18,
-    backgroundColor: theme.colors.accent,
-    marginLeft: 2,
-  },
-  consentCard: {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    backgroundColor: theme.colors.cardSecondary,
+    height: 52,
+    paddingHorizontal: 14,
+    borderRadius: radii.md,
+    backgroundColor: colors.cardSecondary,
     borderWidth: 1,
-    borderColor: theme.colors.borderLight,
-    borderRadius: 12,
-    padding: 12,
+    borderColor: colors.cardBorder,
+    fontFamily: fonts.sans,
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    color: colors.textPrimary,
+    outlineStyle: 'none',
+  },
+  consentRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'flex-start',
   },
   checkbox: {
-    width: 16,
-    height: 16,
-    borderRadius: 5,
+    width: 22,
+    height: 22,
+    borderRadius: 7,
     borderWidth: 1.5,
-    borderColor: theme.colors.accent,
-    marginTop: 2,
-    display: 'flex',
+    borderColor: colors.cardBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxActive: {
-    backgroundColor: theme.colors.accent,
+  checkboxOn: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   consentText: {
     flex: 1,
-    fontFamily: theme.fonts.sans,
-    fontSize: 11.5,
-    lineHeight: 16,
-    color: theme.colors.textSecondary,
+    fontFamily: fonts.sans,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: colors.textSecondary,
   },
-  sendOtpBtn: {
-    backgroundColor: theme.colors.accent,
-    borderRadius: 14,
-    paddingVertical: 17,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendOtpBtnText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 15,
-    fontWeight: '800',
-    color: theme.colors.white,
-  },
-  dividerRow: {
-    display: 'flex',
+  orRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 2,
+    gap: 10,
   },
-  dividerLine: {
+  orLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#EFE4D4',
+    backgroundColor: colors.cardBorder,
   },
-  dividerText: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 10,
-    color: '#A8927F',
+  orText: {
+    fontFamily: fonts.sans,
+    fontWeight: '600',
+    fontSize: 12,
+    color: colors.textMuted,
   },
-  socialGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 9,
+  socialRow: {
+    flexDirection: 'row',
+    gap: 10,
   },
-  socialBtn: {
-    backgroundColor: theme.colors.card,
-    borderWidth: 1,
-    borderColor: theme.colors.cardBorder,
-    borderRadius: 13,
-    paddingVertical: 15,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
+  error: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.accent,
+    textAlign: 'center',
   },
-  socialBtnText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: theme.colors.textPrimary,
-  },
-  footerNote: {
-    marginTop: 'auto',
-    fontFamily: theme.fonts.sans,
-    fontSize: 11.5,
-    color: theme.colors.textSubtle,
+  footer: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.textMuted,
     textAlign: 'center',
   },
 });

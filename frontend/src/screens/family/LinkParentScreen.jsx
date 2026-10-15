@@ -1,295 +1,353 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { Check, X, Plus, ShieldCheck, Link2, RotateCw, Trash2 } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
-import { Check, X, Plus } from 'lucide-react';
+import { Screen, TopBar, FadeIn, Eyebrow, Heading, Accent, Body, Button, Card, Divider, Badge, Chip, Toggle } from '../../components/ui/kit';
+
+const { colors, fonts, gradients, radii } = theme;
+
+const STATUS_LABEL = { linked: 'Linked', invited: 'Invite sent' };
+const RELATIONS = ['Mother', 'Father', 'Sibling', 'Guardian'];
+const CAN = ['See profiles you forward, with scores', 'Mark approval or raise a concern'];
+const CANNOT = ['Browse or search other members', 'Message anyone, ever', 'See your chats or contact details'];
 
 export const LinkParentScreen = () => {
-  const { familyLinks, setCurrentScreen } = useApp();
+  const { familyLinks, addFamilyMember, resendFamilyInvite, removeFamilyMember, setCurrentScreen, setFamilyManage } = useApp();
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState('');
+  const [relation, setRelation] = useState('Mother');
+  const [phone, setPhone] = useState('');
+  const [busy, setBusy] = useState(null);
+  const [message, setMessage] = useState(null);
+  const [error, setError] = useState(null);
+
+  const run = async (key, fn, success) => {
+    setBusy(key);
+    setError(null);
+    setMessage(null);
+    const res = await fn();
+    setBusy(null);
+    if (!res.ok) setError(res.error);
+    else if (success) setMessage(success);
+    return res;
+  };
+
+  const handleAdd = async () => {
+    const res = await run('add', () => addFamilyMember({ name: name.trim(), relation, phone }), `Invite sent to ${name.trim()} by SMS`);
+    if (res.ok) {
+      setAdding(false);
+      setName('');
+      setPhone('');
+    }
+  };
+
+  const copyLink = async (link) => {
+    try {
+      await navigator.clipboard.writeText(link.portalUrl);
+      setMessage(`${link.name}’s private link copied`);
+    } catch {
+      setMessage(link.portalUrl);
+    }
+  };
+
+  const confirmRemove = (link) => {
+    if (window.confirm(`Remove ${link.name}? Their link stops working and shared cards disappear from their view.`)) {
+      run(link.id, () => removeFamilyMember(link.id), `${link.name} removed`);
+    }
+  };
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <View style={styles.headerGroup}>
-        <Text style={styles.title}>Bring family in —{'\n'}on a leash</Text>
-        <Text style={styles.subtitle}>
-          A parent account can only see what you forward. No search, no chat, no browsing.
-        </Text>
-      </View>
+    <Screen>
+      <TopBar onBack={() => setCurrentScreen('family-tracker')} />
 
-      {/* Linked Parents Box */}
-      <View style={styles.parentsCard}>
-        {/* Amma (Linked) */}
-        <View style={styles.parentRow}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarChar}>A</Text>
-          </View>
-          <View style={styles.parentInfo}>
-            <Text style={styles.parentName}>Amma · +91 98••• ••210</Text>
-            <Text style={styles.parentStatus}>Linked · 2 profiles shared</Text>
-          </View>
-          <TouchableOpacity style={styles.manageBtn}>
-            <Text style={styles.manageBtnText}>Manage</Text>
-          </TouchableOpacity>
+      <FadeIn>
+        <View style={styles.header}>
+          <Eyebrow>Family access</Eyebrow>
+          <Heading>
+            Bring family in —{'\n'}
+            <Accent>on your terms</Accent>
+          </Heading>
+          <Body>A family member only sees what you forward. No search, no chat, no browsing.</Body>
         </View>
+      </FadeIn>
 
-        <View style={styles.divider} />
+      <FadeIn delay={80}>
+        <Card padding={6}>
+          {familyLinks.map((link, idx) => (
+            <View key={link.id}>
+              {idx > 0 && <Divider style={{ marginHorizontal: 14 }} />}
+              <View style={styles.row}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{link.avatarChar}</Text>
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={styles.name}>
+                    {link.name}
+                    {link.relation ? <Text style={styles.phone}>{` · ${link.relation}`}</Text> : null}
+                  </Text>
+                  <Text style={styles.status}>
+                    {`${STATUS_LABEL[link.status] || link.status} · ${link.sharedProfilesCount} profile${
+                      link.sharedProfilesCount === 1 ? '' : 's'
+                    } shared · ${link.phoneMasked}`}
+                  </Text>
+                </View>
+                <Badge label={link.status === 'linked' ? 'Active' : 'Pending'} tone={link.status === 'linked' ? 'success' : 'gold'} />
+              </View>
+              <View style={[styles.row, { paddingTop: 0 }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.name}>Can edit my personal details</Text>
+                  <Text style={styles.status}>From their link — never your name, photos or chats</Text>
+                </View>
+                <Toggle value={Boolean(link.canManage)} onChange={(v) => setFamilyManage(link.id, v)} />
+              </View>
+              <View style={styles.actions}>
+                <TouchableOpacity onPress={() => copyLink(link)} style={styles.action}>
+                  <Link2 size={14} color={colors.accent} />
+                  <Text style={styles.actionText}>Copy link</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  disabled={busy === `resend-${link.id}`}
+                  onPress={() => run(`resend-${link.id}`, () => resendFamilyInvite(link.id), `Invite re-sent to ${link.name}`)}
+                  style={styles.action}
+                >
+                  <RotateCw size={14} color={colors.accent} />
+                  <Text style={styles.actionText}>Resend SMS</Text>
+                </TouchableOpacity>
+                <TouchableOpacity disabled={busy === link.id} onPress={() => confirmRemove(link)} style={styles.action}>
+                  <Trash2 size={14} color={colors.textMuted} />
+                  <Text style={[styles.actionText, { color: colors.textMuted }]}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
 
-        {/* Appa (Invite) */}
-        <View style={styles.parentRow}>
-          <View style={styles.addAvatarCircle}>
-            <Plus size={18} color="#C0B0A0" />
-          </View>
-          <View style={styles.parentInfo}>
-            <Text style={styles.parentName}>Invite Appa</Text>
-          </View>
-          <TouchableOpacity style={styles.sendLinkBtn}>
-            <Text style={styles.sendLinkBtnText}>Send link</Text>
-          </TouchableOpacity>
+          {familyLinks.length > 0 && <Divider style={{ marginHorizontal: 14 }} />}
+
+          {adding ? (
+            <View style={styles.form}>
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder="Their name (e.g. Amma)"
+                placeholderTextColor={colors.textLight}
+                style={styles.input}
+              />
+              <View style={styles.chips}>
+                {RELATIONS.map((r) => (
+                  <Chip key={r} label={r} active={relation === r} onPress={() => setRelation(r)} />
+                ))}
+              </View>
+              <TextInput
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+                placeholder="Their mobile number"
+                placeholderTextColor={colors.textLight}
+                style={styles.input}
+              />
+              <View style={styles.formButtons}>
+                <Button small variant="secondary" label="Cancel" style={{ flex: 1 }} onPress={() => setAdding(false)} />
+                <Button
+                  small
+                  label={busy === 'add' ? 'Sending…' : 'Send invite'}
+                  style={{ flex: 2 }}
+                  disabled={!name.trim() || phone.replace(/\D/g, '').length < 10 || busy === 'add'}
+                  onPress={handleAdd}
+                />
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity onPress={() => setAdding(true)} style={styles.row}>
+              <View style={styles.addAvatar}>
+                <Plus size={18} color={colors.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.name}>Add a family member</Text>
+                <Text style={styles.status}>They get a private link by SMS — no app or account needed</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        </Card>
+        {(message || error) && (
+          <Text style={[styles.feedback, error && { color: colors.accent }]}>{error || message}</Text>
+        )}
+      </FadeIn>
+
+      <FadeIn delay={160}>
+        <View style={{ gap: 10 }}>
+          <Card style={[styles.matrixCol, { backgroundColor: colors.successSoft, borderColor: 'transparent' }]}>
+            <Text style={[styles.matrixHead, { color: colors.success }]}>A family member can</Text>
+            {CAN.map((t) => (
+              <View key={t} style={styles.matrixItem}>
+                <Check size={14} color={colors.success} strokeWidth={3} />
+                <Text style={styles.matrixText}>{t}</Text>
+              </View>
+            ))}
+          </Card>
+          <Card style={[styles.matrixCol, { backgroundColor: colors.accentSoft, borderColor: 'transparent' }]}>
+            <Text style={[styles.matrixHead, { color: colors.accent }]}>A family member cannot</Text>
+            {CANNOT.map((t) => (
+              <View key={t} style={styles.matrixItem}>
+                <X size={14} color={colors.accent} strokeWidth={3} />
+                <Text style={styles.matrixText}>{t}</Text>
+              </View>
+            ))}
+          </Card>
         </View>
-      </View>
+      </FadeIn>
 
-      {/* Can vs Cannot Permission Matrix */}
-      <View style={styles.matrixCard}>
-        <Text style={styles.matrixHeader}>A PARENT CAN</Text>
-        <View style={styles.matrixItems}>
-          <View style={styles.matrixItemRow}>
-            <View style={styles.canCheckDot} />
-            <Text style={styles.canItemText}>See profiles you forward, with scores</Text>
+      <FadeIn delay={220}>
+        <View style={{ gap: 12 }}>
+          <View style={styles.revoke}>
+            <ShieldCheck size={14} color={colors.success} />
+            <Text style={styles.revokeText}>Remove anyone, any time — their link stops working instantly.</Text>
           </View>
-          <View style={styles.matrixItemRow}>
-            <View style={styles.canCheckDot} />
-            <Text style={styles.canItemText}>Mark approval or raise a concern</Text>
-          </View>
+          <Button label="Done" onPress={() => setCurrentScreen('family-tracker')} />
         </View>
-
-        <Text style={[styles.matrixHeader, { paddingTop: 6 }]}>A PARENT CANNOT</Text>
-        <View style={styles.matrixItems}>
-          <View style={styles.matrixItemRow}>
-            <View style={styles.cannotDot} />
-            <Text style={styles.cannotItemText}>Browse or search other members</Text>
-          </View>
-          <View style={styles.matrixItemRow}>
-            <View style={styles.cannotDot} />
-            <Text style={styles.cannotItemText}>Message anyone, ever</Text>
-          </View>
-          <View style={styles.matrixItemRow}>
-            <View style={styles.cannotDot} />
-            <Text style={styles.cannotItemText}>See your chats or contact details</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Footer */}
-      <View style={styles.footerGroup}>
-        <Text style={styles.revokeNotice}>Revoke access instantly, any time.</Text>
-        <TouchableOpacity
-          activeOpacity={0.88}
-          onPress={() => setCurrentScreen('family-tracker')}
-          style={styles.doneBtn}
-        >
-          <Text style={styles.doneBtnText}>Done</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+      </FadeIn>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  scrollContainer: {
-    minHeight: '100%',
-    backgroundColor: theme.colors.bg,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
+  header: {
+    gap: 12,
+    marginTop: 4,
   },
-  headerGroup: {
-    display: 'flex',
-    flexDirection: 'column',
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 14,
+  },
+  avatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundImage: gradients.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontFamily: fonts.sans,
+    fontWeight: '800',
+    fontSize: 18,
+    color: colors.white,
+  },
+  addAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(168, 30, 60, 0.4)',
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  name: {
+    fontFamily: fonts.sans,
+    fontSize: 15.5,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  phone: {
+    fontWeight: '500',
+    color: colors.textMuted,
+  },
+  status: {
+    fontFamily: fonts.sans,
+    fontSize: 12.5,
+    color: colors.textSecondary,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+    paddingLeft: 74,
+  },
+  action: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: colors.cardSecondary,
+  },
+  actionText: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.accent,
+  },
+  form: {
+    padding: 14,
+    gap: 10,
+  },
+  input: {
+    height: 46,
+    paddingHorizontal: 14,
+    borderRadius: radii.md,
+    backgroundColor: colors.cardSecondary,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    fontFamily: fonts.sans,
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    outlineStyle: 'none',
+  },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 6,
   },
-  title: {
-    fontFamily: theme.fonts.serif,
-    fontSize: 30,
-    lineHeight: 32,
-    color: theme.colors.textPrimary,
+  formButtons: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  subtitle: {
-    fontFamily: theme.fonts.sans,
+  feedback: {
+    fontFamily: fonts.sans,
     fontSize: 13,
-    color: theme.colors.textSecondary,
-    lineHeight: 18,
-  },
-  parentsCard: {
-    backgroundColor: theme.colors.card,
-    borderWidth: 1,
-    borderColor: theme.colors.cardBorder,
-    borderRadius: 18,
-    padding: 16,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 12,
-  },
-  parentRow: {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  avatarCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: '#F0E7DA',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarChar: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#8A756A',
-  },
-  addAvatarCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: '#DDCDB9',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  parentInfo: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 2,
-  },
-  parentName: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 14,
-    fontWeight: '700',
-    color: theme.colors.textPrimary,
-  },
-  parentStatus: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11,
     fontWeight: '600',
-    color: theme.colors.accent,
+    color: colors.success,
+    textAlign: 'center',
+    marginTop: 10,
   },
-  manageBtn: {
-    backgroundColor: theme.colors.cardSecondary,
-    borderWidth: 1,
-    borderColor: theme.colors.cardBorder,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 99,
-  },
-  manageBtnText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: theme.colors.textSecondary,
-  },
-  sendLinkBtn: {
-    backgroundColor: theme.colors.accent,
-    paddingVertical: 8,
-    paddingHorizontal: 13,
-    borderRadius: 99,
-  },
-  sendLinkBtnText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: theme.colors.white,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#F0E7DA',
-  },
-  matrixCard: {
-    backgroundColor: theme.colors.cardSecondary,
-    borderWidth: 1,
-    borderColor: theme.colors.borderLight,
-    borderRadius: 18,
-    padding: 16,
-    display: 'flex',
-    flexDirection: 'column',
+  matrixCol: {
     gap: 10,
+    padding: 16,
   },
-  matrixHeader: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 10,
-    letterSpacing: 1.2,
-    color: '#96806F',
-    fontWeight: '500',
+  matrixHead: {
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
   },
-  matrixItems: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-  },
-  matrixItemRow: {
-    display: 'flex',
+  matrixItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-  canCheckDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 4,
-    backgroundColor: theme.colors.accent,
+  matrixText: {
+    flex: 1,
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    color: colors.textPrimary,
   },
-  canItemText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 12.5,
-    fontWeight: '500',
-    color: '#4B3833',
-  },
-  cannotDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 4,
-    backgroundColor: '#E7DACA',
-  },
-  cannotItemText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 12.5,
-    fontWeight: '500',
-    color: '#96806F',
-  },
-  footerGroup: {
-    marginTop: 'auto',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-    paddingTop: 8,
-  },
-  revokeNotice: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11.5,
-    color: '#96806F',
-    textAlign: 'center',
-  },
-  doneBtn: {
-    backgroundColor: theme.colors.accent,
-    borderRadius: 14,
-    paddingVertical: 17,
-    display: 'flex',
+  revoke: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
   },
-  doneBtnText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 15,
-    fontWeight: '800',
-    color: theme.colors.white,
+  revokeText: {
+    fontFamily: fonts.sans,
+    fontSize: 12.5,
+    color: colors.textSecondary,
   },
 });

@@ -1,366 +1,223 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Check, TrendingUp, Plane, Home, Sparkles } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
-import { ChevronLeft } from 'lucide-react';
+import { OnboardingScreen, TopBar, StepBar, FadeIn, Eyebrow, Heading, Button } from '../../components/ui/kit';
+
+const { colors, fonts, gradients, radii } = theme;
+
+const OPTIONS = [
+  { title: 'Straight into investments', desc: 'The plan doesn’t change for a windfall', score: 72, icon: TrendingUp },
+  { title: 'Split it — half saved, half enjoyed', desc: 'A trip, and the rest to the fund', score: 55, icon: Plane },
+  { title: 'Family first — parents, siblings', desc: 'Obligations before personal goals', score: 65, icon: Home },
+  { title: 'Spend it on living well now', desc: 'Life is short and money returns', score: 30, icon: Sparkles },
+];
 
 export const BlueprintQuestionScreen = () => {
   const { setCurrentScreen, updateBlueprint } = useApp();
-
   const [selectedOption, setSelectedOption] = useState(0);
   const [dealbreakerAcceptsDiff, setDealbreakerAcceptsDiff] = useState('yes');
 
-  const options = [
-    {
-      title: 'Straight into investments',
-      desc: 'The plan doesn’t change for a windfall',
-      score: 72,
-    },
-    {
-      title: 'Split it — half saved, half enjoyed',
-      desc: 'A trip, and the rest to the fund',
-      score: 55,
-    },
-    {
-      title: 'Family first — parents, siblings',
-      desc: 'Obligations before personal goals',
-      score: 65,
-    },
-    {
-      title: 'Spend it on living well now',
-      desc: 'Life is short and money returns',
-      score: 30,
-    },
-  ];
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
 
-  const handleNext = () => {
-    updateBlueprint({
-      money: options[selectedOption].score,
+  const handleNext = async () => {
+    setSaving(true);
+    setError(null);
+    const res = await updateBlueprint({
+      money: OPTIONS[selectedOption].score,
       moneyFlexibility: dealbreakerAcceptsDiff === 'yes' ? 'open' : 'firm',
     });
-    // Navigate to Blueprint Tuner
+    setSaving(false);
+    if (!res.ok) return setError(res.error);
     setCurrentScreen('blueprint-tuner');
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-      {/* Top Header with Progress Bar */}
-      <View style={styles.topBar}>
-        <TouchableOpacity
-          onPress={() => setCurrentScreen('blueprint-intro')}
-          style={styles.backBtn}
-        >
-          <ChevronLeft size={22} color={theme.colors.textPrimary} />
-        </TouchableOpacity>
-        <View style={styles.progressBarTrack}>
-          <View style={styles.progressBarFill} />
+    <OnboardingScreen
+      top={
+        <>
+          <TopBar
+            onBack={() => setCurrentScreen('blueprint-intro')}
+            title={<View style={{ flex: 1, marginHorizontal: 14 }}><StepBar step={1} total={4} /></View>}
+            right={<Text style={styles.counter}>1 / 4</Text>}
+          />
+        </>
+      }
+      footer={
+        <>
+          {error && <Text style={styles.error}>{error}</Text>}
+          <Button label={saving ? 'Saving…' : 'Next question'} disabled={saving} onPress={handleNext} />
+        </>
+      }
+    >
+      <FadeIn>
+        <View style={styles.header}>
+          <Eyebrow>Money philosophy</Eyebrow>
+          <Heading size={32}>A ₹3 lakh bonus lands. What actually happens?</Heading>
         </View>
-        <Text style={styles.progressCounter}>1/4</Text>
-      </View>
+      </FadeIn>
 
-      {/* Question Header */}
-      <View style={styles.headerGroup}>
-        <Text style={styles.pillarTag}>MONEY PHILOSOPHY</Text>
-        <Text style={styles.questionTitle}>
-          A ₹3 lakh bonus lands. What actually happens?
-        </Text>
-      </View>
-
-      {/* Options List */}
-      <View style={styles.optionsList}>
-        {options.map((opt, idx) => {
-          const isSelected = selectedOption === idx;
+      <View style={{ gap: 8 }}>
+        {OPTIONS.map((opt, idx) => {
+          const selected = selectedOption === idx;
+          const Icon = opt.icon;
           return (
-            <TouchableOpacity
-              key={idx}
-              activeOpacity={0.88}
-              onPress={() => setSelectedOption(idx)}
-              style={[
-                styles.optionCard,
-                isSelected ? styles.optionCardActive : styles.optionCardInactive,
-              ]}
-            >
-              <View
-                style={[
-                  styles.radioDot,
-                  isSelected ? styles.radioDotActive : styles.radioDotInactive,
-                ]}
-              />
-              <View style={styles.optionDetails}>
-                <Text
-                  style={[
-                    styles.optionTitle,
-                    isSelected ? styles.optionTitleActive : styles.optionTitleInactive,
-                  ]}
-                >
-                  {opt.title}
-                </Text>
-                <Text
-                  style={[
-                    styles.optionDesc,
-                    isSelected ? styles.optionDescActive : styles.optionDescInactive,
-                  ]}
-                >
-                  {opt.desc}
-                </Text>
-              </View>
-            </TouchableOpacity>
+            <FadeIn key={opt.title} delay={60 + idx * 50}>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => setSelectedOption(idx)}
+                style={[styles.option, selected && styles.optionSelected]}
+              >
+                <View style={[styles.optionIcon, selected && styles.optionIconSelected]}>
+                  <Icon size={17} color={selected ? colors.white : colors.accent} />
+                </View>
+                <View style={{ flex: 1, gap: 1 }}>
+                  <Text style={[styles.optionTitle, selected && { color: colors.white }]}>{opt.title}</Text>
+                  <Text style={[styles.optionDesc, selected && { color: 'rgba(255,255,255,0.75)' }]}>{opt.desc}</Text>
+                </View>
+                <View style={[styles.radio, selected && styles.radioSelected]}>
+                  {selected && <Check size={12} color={colors.accent} strokeWidth={3} />}
+                </View>
+              </TouchableOpacity>
+            </FadeIn>
           );
         })}
       </View>
 
-      {/* Dealbreaker Card */}
-      <View style={styles.dealbreakerCard}>
-        <Text style={styles.dealbreakerText}>
-          Could you live with someone who answered differently?
-        </Text>
-        <View style={styles.dealbreakerButtons}>
-          <TouchableOpacity
-            onPress={() => setDealbreakerAcceptsDiff('yes')}
-            style={[
-              styles.dealbreakerBtn,
-              dealbreakerAcceptsDiff === 'yes'
-                ? styles.dealbreakerBtnActive
-                : styles.dealbreakerBtnInactive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.dealbreakerBtnText,
-                dealbreakerAcceptsDiff === 'yes'
-                  ? styles.dealbreakerBtnTextActive
-                  : styles.dealbreakerBtnTextInactive,
-              ]}
-            >
-              Yes
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => setDealbreakerAcceptsDiff('no')}
-            style={[
-              styles.dealbreakerBtn,
-              dealbreakerAcceptsDiff === 'no'
-                ? styles.dealbreakerBtnActive
-                : styles.dealbreakerBtnInactive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.dealbreakerBtnText,
-                dealbreakerAcceptsDiff === 'no'
-                  ? styles.dealbreakerBtnTextActive
-                  : styles.dealbreakerBtnTextInactive,
-              ]}
-            >
-              No
-            </Text>
-          </TouchableOpacity>
+      <FadeIn delay={300}>
+        <View style={styles.deal}>
+          <Text style={styles.dealQ}>Could you live with someone who answered differently?</Text>
+          <View style={styles.segment}>
+            {[['yes', 'Yes'], ['no', 'No']].map(([key, label]) => {
+              const active = dealbreakerAcceptsDiff === key;
+              return (
+                <TouchableOpacity
+                  key={key}
+                  onPress={() => setDealbreakerAcceptsDiff(key)}
+                  style={[styles.segmentBtn, active && styles.segmentBtnActive]}
+                >
+                  <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
-      </View>
-
-      {/* Action */}
-      <TouchableOpacity
-        activeOpacity={0.88}
-        onPress={handleNext}
-        style={styles.nextBtn}
-      >
-        <Text style={styles.nextBtnText}>Next question</Text>
-      </TouchableOpacity>
-    </ScrollView>
+      </FadeIn>
+    </OnboardingScreen>
   );
 };
 
 const styles = StyleSheet.create({
-  scrollContainer: {
-    minHeight: '100%',
-    backgroundColor: theme.colors.bg,
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
+  error: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.accent,
+    textAlign: 'center',
   },
-  topBar: {
-    display: 'flex',
+  counter: {
+    width: 40,
+    textAlign: 'right',
+    fontFamily: fonts.sans,
+    fontWeight: '700',
+    fontSize: 12,
+    color: colors.textMuted,
+  },
+  header: {
+    gap: 8,
+  },
+  option: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: radii.md,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
-  backBtn: {
-    width: 32,
-    height: 32,
-    display: 'flex',
+  optionSelected: {
+    backgroundImage: gradients.primary,
+    borderColor: 'transparent',
+    boxShadow: '0 12px 26px rgba(168, 30, 60, 0.28)',
+  },
+  optionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  progressBarTrack: {
-    flex: 1,
-    height: 5,
-    borderRadius: 99,
-    backgroundColor: '#EFE4D4',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    width: '25%',
-    backgroundColor: theme.colors.accent,
-    borderRadius: 99,
-  },
-  progressCounter: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 11,
-    color: '#96806F',
-    fontWeight: '500',
-  },
-  headerGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
-  },
-  pillarTag: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 10.5,
-    letterSpacing: 1.2,
-    color: theme.colors.accent,
-    fontWeight: '600',
-  },
-  questionTitle: {
-    fontFamily: theme.fonts.serif,
-    fontSize: 29,
-    lineHeight: 32,
-    color: theme.colors.textPrimary,
-  },
-  optionsList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
-  },
-  optionCard: {
-    borderRadius: 16,
-    padding: 15,
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 13,
-  },
-  optionCardActive: {
-    backgroundColor: theme.colors.accent,
-  },
-  optionCardInactive: {
-    backgroundColor: theme.colors.card,
-    borderWidth: 1,
-    borderColor: theme.colors.cardBorder,
-  },
-  radioDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 99,
-  },
-  radioDotActive: {
-    borderWidth: 2,
-    borderColor: theme.colors.white,
-    backgroundColor: theme.colors.white,
-  },
-  radioDotInactive: {
-    borderWidth: 2,
-    borderColor: '#DDCDB9',
-  },
-  optionDetails: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 3,
+  optionIconSelected: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
   },
   optionTitle: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 14,
+    fontFamily: fonts.sans,
+    fontSize: 14.5,
     fontWeight: '700',
-  },
-  optionTitleActive: {
-    color: theme.colors.white,
-  },
-  optionTitleInactive: {
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
   },
   optionDesc: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11.5,
-    lineHeight: 16,
-  },
-  optionDescActive: {
-    color: 'rgba(255, 248, 242, 0.85)',
-  },
-  optionDescInactive: {
-    color: '#96806F',
-  },
-  dealbreakerCard: {
-    backgroundColor: theme.colors.cardSecondary,
-    borderWidth: 1,
-    borderColor: theme.colors.borderLight,
-    borderRadius: 14,
-    padding: 13,
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  dealbreakerText: {
-    flex: 1,
-    fontFamily: theme.fonts.sans,
+    fontFamily: fonts.sans,
     fontSize: 12.5,
-    fontWeight: '600',
-    color: '#4B3833',
-    lineHeight: 17,
+    color: colors.textSecondary,
   },
-  dealbreakerButtons: {
-    display: 'flex',
-    flexDirection: 'row',
-    gap: 6,
-  },
-  dealbreakerBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 99,
-  },
-  dealbreakerBtnActive: {
-    backgroundColor: theme.colors.accent,
-  },
-  dealbreakerBtnInactive: {
-    backgroundColor: theme.colors.card,
-    borderWidth: 1,
-    borderColor: theme.colors.cardBorder,
-  },
-  dealbreakerBtnText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 11.5,
-    fontWeight: '700',
-  },
-  dealbreakerBtnTextActive: {
-    color: theme.colors.white,
-  },
-  dealbreakerBtnTextInactive: {
-    color: theme.colors.textSecondary,
-  },
-  nextBtn: {
-    marginTop: 'auto',
-    backgroundColor: theme.colors.accent,
-    borderRadius: 14,
-    paddingVertical: 17,
-    display: 'flex',
+  radio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: colors.cardBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  nextBtnText: {
-    fontFamily: theme.fonts.sans,
-    fontSize: 15,
-    fontWeight: '800',
-    color: theme.colors.white,
+  radioSelected: {
+    backgroundColor: colors.white,
+    borderColor: colors.white,
+  },
+  deal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: radii.md,
+    backgroundColor: colors.cardSecondary,
+  },
+  dealQ: {
+    flex: 1,
+    fontFamily: fonts.sans,
+    fontWeight: '700',
+    fontSize: 13.5,
+    lineHeight: 19,
+    color: colors.textPrimary,
+  },
+  segment: {
+    flexDirection: 'row',
+    padding: 3,
+    borderRadius: 12,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  segmentBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 9,
+  },
+  segmentBtnActive: {
+    backgroundColor: colors.surfaceDark,
+  },
+  segmentText: {
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  segmentTextActive: {
+    color: colors.onDark,
   },
 });

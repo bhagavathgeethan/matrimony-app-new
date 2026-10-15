@@ -1,27 +1,35 @@
 const { Pool } = require('pg');
-require('dotenv').config();
+const env = require('./env');
 
-// PostgreSQL connection config
+// Single connection pool, configured only from DATABASE_URL
 const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'Stu@123',
-  host: process.env.DB_HOST || '187.127.178.200',
-  port: parseInt(process.env.DB_PORT || '5444', 10),
-  database: process.env.DB_NAME || 'ab_matrimony',
+  connectionString: env.DATABASE_URL,
+  ssl: env.DATABASE_SSL ? { rejectUnauthorized: false } : undefined,
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
-});
-
-pool.on('connect', () => {
-  // Connected
 });
 
 pool.on('error', (err) => {
   console.error('Unexpected error on idle PostgreSQL client', err);
 });
 
-module.exports = {
-  query: (text, params) => pool.query(text, params),
-  pool,
-};
+const query = (text, params) => pool.query(text, params);
+
+// Runs fn(client) inside BEGIN/COMMIT, rolling back on any error
+async function transaction(fn) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = { pool, query, transaction };

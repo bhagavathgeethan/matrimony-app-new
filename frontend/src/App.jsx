@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { AppProvider, useApp } from './context/AppContext';
 import { IOSDeviceFrame } from './components/common/IOSDeviceFrame';
+import { LoadingScreen } from './components/brand/LoadingScreen';
 import { WelcomeScreen } from './screens/auth/WelcomeScreen';
 import { PhoneSignInScreen } from './screens/auth/PhoneSignInScreen';
 import { OTPVerifyScreen } from './screens/auth/OTPVerifyScreen';
@@ -21,6 +22,16 @@ import { ChatThreadScreen } from './screens/chat/ChatThreadScreen';
 import { LinkParentScreen } from './screens/family/LinkParentScreen';
 import { PrivacyErasureScreen } from './screens/privacy/PrivacyErasureScreen';
 import { ParentPortalScreen } from './screens/family/ParentPortalScreen';
+import { NotificationsScreen } from './screens/main/NotificationsScreen';
+import { PersonalOnboardingScreen } from './screens/onboarding/PersonalOnboardingScreen';
+import { PersonalDetailsScreen } from './screens/main/PersonalDetailsScreen';
+import { DailyPicksScreen } from './screens/engage/DailyPicksScreen';
+import { ShortlistScreen } from './screens/engage/ShortlistScreen';
+import { PremiumScreen } from './screens/engage/PremiumScreen';
+import { VerificationScreen } from './screens/engage/VerificationScreen';
+import { StoriesScreen } from './screens/engage/StoriesScreen';
+import { SafetyScreen } from './screens/engage/SafetyScreen';
+import { PreferencesScreen } from './screens/engage/PreferencesScreen';
 
 const ScreenRouter = () => {
   const { currentScreen } = useApp();
@@ -37,6 +48,24 @@ const ScreenRouter = () => {
         return <DPDPConsentScreen />;
       case 'basics':
         return <BasicsIntentScreen />;
+      case 'personal':
+        return <PersonalOnboardingScreen />;
+      case 'personal-details':
+        return <PersonalDetailsScreen />;
+      case 'daily':
+        return <DailyPicksScreen />;
+      case 'shortlist':
+        return <ShortlistScreen />;
+      case 'premium':
+        return <PremiumScreen />;
+      case 'verification':
+        return <VerificationScreen />;
+      case 'stories':
+        return <StoriesScreen />;
+      case 'safety':
+        return <SafetyScreen />;
+      case 'preferences':
+        return <PreferencesScreen />;
       case 'blueprint-intro':
         return <BlueprintIntroScreen />;
       case 'blueprint-q1':
@@ -61,6 +90,8 @@ const ScreenRouter = () => {
         return <ChatThreadScreen />;
       case 'link-parent':
         return <LinkParentScreen />;
+      case 'notifications':
+        return <NotificationsScreen />;
       case 'privacy':
         return <PrivacyErasureScreen />;
       case 'parent-portal':
@@ -73,10 +104,61 @@ const ScreenRouter = () => {
   return <IOSDeviceFrame>{renderActiveScreen()}</IOSDeviceFrame>;
 };
 
+// Shows the branded loading screen until data has loaded and the logo animation has played
+const MIN_SPLASH_MS = 2200;
+const SplashGate = ({ children }) => {
+  const { isLoading } = useApp();
+  const [minElapsed, setMinElapsed] = useState(false);
+  const [phase, setPhase] = useState('showing'); // showing → leaving → done
+
+  useEffect(() => {
+    const t = setTimeout(() => setMinElapsed(true), MIN_SPLASH_MS);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (phase === 'showing' && !isLoading && minElapsed) setPhase('leaving');
+  }, [phase, isLoading, minElapsed]);
+
+  // Separate effect so the phase change above can't cancel the unmount timer
+  useEffect(() => {
+    if (phase !== 'leaving') return undefined;
+    const t = setTimeout(() => setPhase('done'), 450);
+    return () => clearTimeout(t);
+  }, [phase]);
+
+  return (
+    <>
+      {children}
+      {phase !== 'done' && <LoadingScreen leaving={phase === 'leaving'} />}
+    </>
+  );
+};
+
+// A family member opening their SMS link lands on /portal/<token>: show only their read-only portal
+const portalToken = (window.location.pathname.match(/^\/portal\/([0-9a-f]{48})\/?$/) || [])[1] || null;
+
+const PortalPage = () => (
+  <View style={{ minHeight: '100vh', backgroundColor: '#F3EDE3', alignItems: 'center' }}>
+    <View style={{ width: '100%', maxWidth: 520, minHeight: '100vh', backgroundColor: '#FBF7F1' }}>
+      <ParentPortalScreen tokenFromUrl={portalToken} />
+    </View>
+  </View>
+);
+
 export default function App() {
+  if (portalToken) {
+    return (
+      <AppProvider>
+        <PortalPage />
+      </AppProvider>
+    );
+  }
   return (
     <AppProvider>
-      <ScreenRouter />
+      <SplashGate>
+        <ScreenRouter />
+      </SplashGate>
     </AppProvider>
   );
 }
