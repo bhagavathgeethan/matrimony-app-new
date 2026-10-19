@@ -1,0 +1,9 @@
+# Build context is the repository root; the backend image only needs backend/ and shared/
+*
+!backend/package.json
+!backend/package-lock.json
+!backend/src
+!shared
+**/node_modules
+**/.env
+**/*.log

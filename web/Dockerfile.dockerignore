@@ -1,0 +1,9 @@
+# Build context is the repository root; the web image only needs web/ and shared/
+*
+!web
+!shared
+**/node_modules
+**/.env
+**/*.log
+web/dist
+web/Dockerfile*
