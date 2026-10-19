@@ -1,0 +1,23 @@
+// Cloudflare Workers config for the 3Knot web app (free plan).
+// Build: npm ci && npm run build   ·   Deploy: npx wrangler deploy   ·   Preview: npx wrangler versions upload
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Must match the Worker's name in the Cloudflare dashboard
+  "name": "3knot-web",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    // Client-side routes (/matches, /portal/<token>, …) load index.html
+    "not_found_handling": "single-page-application",
+    // Only these go to worker/index.js (forwarded to the backend); everything else is served as a static file
+    "run_worker_first": ["/api/*", "/uploads/*", "/ws"]
+  },
+  "vars": {
+    // Public address of the backend (your Cloudflare Tunnel hostname). Can also be set in the dashboard:
+    // Worker → Settings → Variables and Secrets.
+    "BACKEND_URL": "https://api.example.com"
+  },
+  "observability": { "enabled": true }
+}

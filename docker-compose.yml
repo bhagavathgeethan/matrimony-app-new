@@ -1,14 +1,16 @@
-# 3Knot Matrimony on Cloudflare: backend + web containers plus a Cloudflare Tunnel, so the site is served on your
-# Cloudflare domain over HTTPS without opening any ports on this machine.
+# 3Knot Matrimony backend behind a free Cloudflare Tunnel. Runs on your PC or a VPS; the web app itself is hosted on
+# Cloudflare Workers (web/wrangler.jsonc) and forwards /api, /uploads and /ws to this backend.
 #
-#   backend      API, WebSocket and photos            (backend/Dockerfile, port 5000, internal only)
-#   web          the web app on nginx; forwards /api, /uploads and /ws to backend   (web/Dockerfile, port 8080)
-#   cloudflared  Cloudflare Tunnel → web
+#   backend      API, WebSocket and photos (backend/Dockerfile, port 5000)
+#   cloudflared  Cloudflare Tunnel → backend, at your API hostname (e.g. api.example.com)
+#   web          optional: the web app on nginx for running everything here instead of Workers
+#                (docker compose --profile local-web up)
 #
-# 1. Cloudflare dashboard → Zero Trust → Networks → Tunnels → Create a tunnel (type: Cloudflared).
-#    Copy its token. Add a Public Hostname, e.g. app.example.com → Service: HTTP, URL: web:8080
+# 1. Cloudflare dashboard → Zero Trust → Networks → Tunnels → Create a tunnel (type: Cloudflared). Copy its token.
+#    Add a Public Hostname: api.example.com → Service: HTTP, URL: backend:5000
 # 2. Copy .env.example to .env (next to this file) and fill in CLOUDFLARE_TUNNEL_TOKEN and PUBLIC_BASE_URL.
 # 3. docker compose up -d --build
+# 4. On the web Worker, set BACKEND_URL to https://api.example.com
 #
 # The backend reads the rest of its settings (DATABASE_URL, SMS, payments…) from backend/.env.
 
@@ -23,13 +25,27 @@ services:
       - ./backend/.env
     environment:
       PORT: "5000"
-      # Photo URLs and family-portal links are built from this: it must be the public Cloudflare address
-      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?Set PUBLIC_BASE_URL in .env, e.g. https://app.example.com}
+      # Photo URLs and family-portal links start with this: use the web app's public address
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?Set PUBLIC_BASE_URL in .env, e.g. https://3knot.example.com}
     volumes:
       - uploads:/app/backend/uploads
       - uploads-private:/app/backend/uploads-private
+    # For checking on this machine only (http://localhost:5080/api/health); the tunnel is the public way in
+    ports:
+      - "127.0.0.1:${APP_PORT:-5080}:5000"
+
+  cloudflared:
+    image: cloudflare/cloudflared:2025.4.0
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?Set CLOUDFLARE_TUNNEL_TOKEN in .env}
+    depends_on:
+      backend:
+        condition: service_healthy
 
   web:
+    profiles: ["local-web"]
     build:
       context: .
       dockerfile: web/Dockerfile
@@ -40,19 +56,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    # For checking on this machine only (http://localhost:5080); the tunnel is the public way in
     ports:
-      - "127.0.0.1:${APP_PORT:-5080}:8080"
-
-  cloudflared:
-    image: cloudflare/cloudflared:2025.4.0
-    restart: unless-stopped
-    command: tunnel --no-autoupdate run
-    environment:
-      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?Set CLOUDFLARE_TUNNEL_TOKEN in .env}
-    depends_on:
-      web:
-        condition: service_healthy
+      - "127.0.0.1:${WEB_PORT:-5081}:8080"
 
 volumes:
   uploads:

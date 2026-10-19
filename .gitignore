@@ -4,3 +4,4 @@ uploads/
 uploads-private/
 *.log
 web/dist/
+.wrangler/
