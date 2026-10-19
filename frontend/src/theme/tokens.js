@@ -38,7 +38,7 @@ export const theme = {
   },
   // One typeface for the whole app (bundled, so it also works offline in the APK)
   fonts: {
-    sans: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    sans: "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', 'Nirmala UI', 'Noto Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
   },
   radii: {
     sm: 10,

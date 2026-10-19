@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView } from 'react-native';
+import { Portal } from '../common/Portal';
+import { useBackHandler } from '../../services/backButton';
 import { Lock, X, Gauge, MapPin, Image as ImageIcon, Check } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
@@ -7,6 +9,7 @@ import { Capacitor } from '@capacitor/core';
 
 const isNativeApp = Capacitor.isNativePlatform();
 import { Heading, Accent, Body, Button, Toggle, IconBadge, Badge, Divider, SectionLabel } from '../ui/kit';
+import { t } from '@shared/i18n';
 
 const { colors, fonts, radii, gradients, shadows } = theme;
 
@@ -18,7 +21,7 @@ const EXPIRY_OPTIONS = [['7d', '7d'], ['30d', '30d'], ['never', 'Never']];
 
 export const ScopedShareSheet = ({ candidate, batchCandidates = [], onClose, onSend }) => {
   const isBatch = batchCandidates.length > 0;
-  const targetName = isBatch ? `${batchCandidates.length} profiles` : candidate?.firstName || 'Candidate';
+  const targetName = isBatch ? t('{n} profiles', { n: batchCandidates.length }) : candidate?.firstName || t('Candidate');
 
   const { familyLinks, setCurrentScreen, setShowShareModal } = useApp();
   const [recipient, setRecipient] = useState(
@@ -57,16 +60,18 @@ export const ScopedShareSheet = ({ candidate, batchCandidates = [], onClose, onS
     };
     const result = await onSend(payload);
     setSending(false);
-    if (result && !result.ok) setError(result.error || 'Could not share. Please try again.');
+    if (result && !result.ok) setError(result.error || t('Could not share. Please try again.'));
   };
 
   const perms = [
-    ['showBlueprintScore', Gauge, 'Blueprint score & pillars', `${scoreLabel} · four bars`],
-    ['showFirstNameCity', MapPin, 'First name & city', nameCityLabel],
-    ['showPhoto', ImageIcon, 'Photo', permissions.showPhoto ? 'Visible to parents' : 'Blurred until you allow it'],
+    ['showBlueprintScore', Gauge, t('Blueprint score & pillars'), t('{scores} · four bars', { scores: scoreLabel })],
+    ['showFirstNameCity', MapPin, t('First name & city'), nameCityLabel],
+    ['showPhoto', ImageIcon, t('Photo'), permissions.showPhoto ? t('Visible to parents') : t('Blurred until you allow it')],
   ];
 
+  useBackHandler(onClose);
   return (
+    <Portal>
     <View style={styles.overlay}>
       <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
       <View style={[styles.sheet, isNativeApp && { maxWidth: '100%' }]}>
@@ -76,23 +81,23 @@ export const ScopedShareSheet = ({ candidate, batchCandidates = [], onClose, onS
             <View style={{ flex: 1, gap: 8 }}>
               <Heading size={30}>
                 {isBatch ? (
-                  <>Send {batchCandidates.length} profiles <Accent>to family</Accent></>
+                  <>{t('Send {count} profiles', { count: batchCandidates.length })}{' '}<Accent>{t('to family')}</Accent></>
                 ) : (
-                  <>Share {targetName} with <Accent>your family?</Accent></>
+                  <>{t('Share {targetName} with', { targetName })}{' '}<Accent>{t('your family?')}</Accent></>
                 )}
               </Heading>
               <Body size={14}>
                 {isBatch
-                  ? 'Recipients see scores, never contact details.'
-                  : 'They get a read-only card. You stay in control of everything below.'}
+                  ? t('Recipients see scores, never contact details.')
+                  : t('They get a read-only card. You stay in control of everything below.')}
               </Body>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.close} accessibilityLabel="Close">
+            <TouchableOpacity onPress={onClose} style={styles.close} accessibilityLabel={t('Close')}>
               <X size={18} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
-          <SectionLabel>Send to</SectionLabel>
+          <SectionLabel>{t('Send to')}</SectionLabel>
           <View style={{ gap: 8 }}>
             {familyLinks.map((link) => {
               const [statusLabel, note] = RECIPIENT_NOTES[link.status] || RECIPIENT_NOTES.invited;
@@ -109,9 +114,9 @@ export const ScopedShareSheet = ({ candidate, batchCandidates = [], onClose, onS
                   </View>
                   <View style={{ flex: 1, gap: 2 }}>
                     <Text style={styles.recipientName}>
-                      {link.name} · {statusLabel}
+                      {link.name} · {t(statusLabel)}
                     </Text>
-                    <Text style={styles.recipientNote}>{note}</Text>
+                    <Text style={styles.recipientNote}>{t(note)}</Text>
                   </View>
                   <View style={[styles.radio, active && styles.radioActive]}>
                     {active && <Check size={12} color={colors.white} strokeWidth={3} />}
@@ -121,11 +126,11 @@ export const ScopedShareSheet = ({ candidate, batchCandidates = [], onClose, onS
             })}
             {familyLinks.length === 0 && (
               <View style={{ gap: 8 }}>
-                <Body size={13}>Add a family member first — they’ll get a private link by SMS.</Body>
+                <Body size={13}>{t('Add a family member first — they’ll get a private link by SMS.')}</Body>
                 <Button
                   small
                   variant="secondary"
-                  label="Add family member"
+                  label={t('Add family member')}
                   onPress={() => {
                     onClose();
                     setShowShareModal(false);
@@ -136,7 +141,7 @@ export const ScopedShareSheet = ({ candidate, batchCandidates = [], onClose, onS
             )}
           </View>
 
-          <SectionLabel>What they can see</SectionLabel>
+          <SectionLabel>{t('What they can see')}</SectionLabel>
           <View style={styles.permBox}>
             {perms.map(([key, Icon, title, desc], idx) => (
               <View key={key}>
@@ -155,25 +160,25 @@ export const ScopedShareSheet = ({ candidate, batchCandidates = [], onClose, onS
             <View style={styles.permRow}>
               <IconBadge icon={Lock} size={34} tone="neutral" />
               <View style={{ flex: 1, gap: 2 }}>
-                <Text style={[styles.permTitle, { color: colors.textMuted }]}>Phone, email, chats</Text>
-                <Text style={styles.permDesc}>Never shareable</Text>
+                <Text style={[styles.permTitle, { color: colors.textMuted }]}>{t('Phone, email, chats')}</Text>
+                <Text style={styles.permDesc}>{t('Never shareable')}</Text>
               </View>
-              <Badge label="Locked" tone="neutral" icon={Lock} />
+              <Badge label={t('Locked')} tone="neutral" icon={Lock} />
             </View>
           </View>
 
-          <SectionLabel>Add a note (optional)</SectionLabel>
+          <SectionLabel>{t('Add a note (optional)')}</SectionLabel>
           <TextInput
             value={customNote}
             onChangeText={setCustomNote}
             multiline
             style={styles.note}
-            placeholder="Why this one feels right…"
+            placeholder={t('Why this one feels right…')}
             placeholderTextColor={colors.textLight}
           />
 
           <View style={styles.expiryRow}>
-            <Text style={styles.expiryLabel}>Access expires in</Text>
+            <Text style={styles.expiryLabel}>{t('Access expires in')}</Text>
             <View style={styles.segment}>
               {EXPIRY_OPTIONS.map(([value, label]) => (
                 <TouchableOpacity
@@ -181,7 +186,7 @@ export const ScopedShareSheet = ({ candidate, batchCandidates = [], onClose, onS
                   onPress={() => setExpiresIn(value)}
                   style={[styles.segmentBtn, expiresIn === value && styles.segmentBtnActive]}
                 >
-                  <Text style={[styles.segmentText, expiresIn === value && styles.segmentTextActive]}>{label}</Text>
+                  <Text style={[styles.segmentText, expiresIn === value && styles.segmentTextActive]}>{t(label)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -189,14 +194,15 @@ export const ScopedShareSheet = ({ candidate, batchCandidates = [], onClose, onS
 
           {error && <Text style={styles.error}>{error}</Text>}
           <Button
-            label={sending ? 'Sending…' : 'Forward to parent dashboard'}
+            label={sending ? t('Sending…') : t('Forward to parent dashboard')}
             disabled={sending || !recipient}
             onPress={handleSend}
           />
-          <Button label="Not now" variant="ghost" small onPress={onClose} />
+          <Button label={t('Not now')} variant="ghost" small onPress={onClose} />
         </ScrollView>
       </View>
     </View>
+    </Portal>
   );
 };
 

@@ -8,6 +8,7 @@ const env = require('../config/env');
 const db = require('../config/db');
 const storage = require('../services/storage');
 const { httpError, newId } = require('../lib/util');
+const { tx } = require('../lib/i18n');
 const { route } = require('../lib/http');
 
 const router = express.Router();
@@ -67,10 +68,10 @@ async function review(adminId, verificationId, decision, note) {
   const { notify } = require('./notifications');
   await notify(v.user_id, {
     type: 'account',
-    title: decision === 'approved' ? 'You’re verified' : 'Verification needs another try',
+    title: tx(decision === 'approved' ? 'You’re verified' : 'Verification needs another try'),
     body: decision === 'approved'
-      ? 'Your profile now shows the verified badge.'
-      : cleanNote || 'We couldn’t match your selfie to your photos. Please try again in good light.',
+      ? tx('Your profile now shows the verified badge.')
+      : cleanNote || tx('We couldn’t match your selfie to your photos. Please try again in good light.'),
     data: { target: 'verification' },
   });
   // The selfie has done its job once reviewed

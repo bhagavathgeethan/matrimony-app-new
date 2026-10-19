@@ -1,4 +1,4 @@
-// Sangam-specific web components: blueprint slider, vibe grid, family share modal
+// 3Knot-specific web components: blueprint slider, vibe grid, family share modal
 import React, { useState } from 'react';
 import { Check, Lock, Gauge, MapPin, Image as ImageIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -7,6 +7,7 @@ import {
 } from '@shared/constants';
 import { Button, Toggle, IconBadge, Badge, Modal, cx } from './ui';
 import { useStore } from '../store';
+import { t } from '@shared/i18n';
 
 export function BlueprintSlider({ pillar, icon: Icon, value, flexibility = 'open', onChange, onFlexibility }) {
   const band = FLEX_BAND[flexibility];
@@ -15,11 +16,11 @@ export function BlueprintSlider({ pillar, icon: Icon, value, flexibility = 'open
     <div className="card slider-card">
       <div className="row">
         <IconBadge icon={Icon} size={32} />
-        <span className="h3 grow">{pillar.title}</span>
+        <span className="h3 grow">{t(pillar.title)}</span>
         <div className="segment" role="radiogroup" aria-label={`${pillar.title} flexibility`}>
           {['open', 'firm'].map((f) => (
             <button key={f} type="button" className={cx(flexibility === f && 'active')} onClick={() => onFlexibility(f)}>
-              {f === 'open' ? 'Open' : 'Firm'}
+              {f === 'open' ? t('Open') : t('Firm')}
             </button>
           ))}
         </div>
@@ -35,13 +36,13 @@ export function BlueprintSlider({ pillar, icon: Icon, value, flexibility = 'open
           min={0}
           max={100}
           value={value}
-          aria-label={pillar.title}
+          aria-label={t(pillar.title)}
           onChange={(e) => onChange(Number(e.target.value))}
         />
       </div>
       <div className="row between tiny muted">
-        <span>{pillar.low}</span>
-        <span>{pillar.high}</span>
+        <span>{t(pillar.low)}</span>
+        <span>{t(pillar.high)}</span>
       </div>
     </div>
   );
@@ -63,7 +64,7 @@ export function VibeGrid({ selected = [], onToggle }) {
             onClick={() => onToggle(vibe)}
           >
             <span className="vibe-emoji">{emoji}</span>
-            <span className="vibe-label">{vibe}</span>
+            <span className="vibe-label">{t(vibe)}</span>
             <span className="vibe-check">{on && <Check size={12} strokeWidth={3} />}</span>
           </button>
         );
@@ -90,9 +91,9 @@ export function ShareModal({ candidates, onClose, onShared }) {
   const single = candidates.length === 1 ? candidates[0] : null;
 
   const perms = [
-    ['showBlueprintScore', Gauge, 'Blueprint score & pillars', candidates.map((c) => `${c.overlapScores?.overall ?? '—'}%`).join(' · ')],
-    ['showFirstNameCity', MapPin, 'First name & city', single ? `${single.firstName} · ${single.city}` : candidates.map((c) => c.firstName).join(', ')],
-    ['showPhoto', ImageIcon, 'Photo', permissions.showPhoto ? 'Visible to them' : 'Blurred until you allow it'],
+    ['showBlueprintScore', Gauge, t('Blueprint score & pillars'), candidates.map((c) => `${c.overlapScores?.overall ?? '—'}%`).join(' · ')],
+    ['showFirstNameCity', MapPin, t('First name & city'), single ? `${single.firstName} · ${single.city}` : candidates.map((c) => c.firstName).join(', ')],
+    ['showPhoto', ImageIcon, t('Photo'), permissions.showPhoto ? t('Visible to them') : t('Blurred until you allow it')],
   ];
 
   const send = async () => {
@@ -107,12 +108,12 @@ export function ShareModal({ candidates, onClose, onShared }) {
 
   return (
     <Modal
-      title={<>Share {single ? single.firstName : `${candidates.length} profiles`} with <span className="accent">your family?</span></>}
+      title={<>{single ? t('Share {name} with', { name: single.firstName }) : t('Share {n} profiles with', { n: candidates.length })}{' '}<span className="accent">{t('your family?')}</span></>}
       onClose={onClose}
     >
-      <p className="lede" style={{ fontSize: 14.5 }}>They get a read-only card. You stay in control of everything below.</p>
+      <p className="lede" style={{ fontSize: 14.5 }}>{t('They get a read-only card. You stay in control of everything below.')}</p>
 
-      <div className="label">Send to</div>
+      <div className="label">{t('Send to')}</div>
       <div className="stack" style={{ '--gap': '8px' }}>
         {familyLinks.map((link) => {
           const [status, sub] = STATUS_NOTE[link.status] || STATUS_NOTE.invited;
@@ -121,8 +122,8 @@ export function ShareModal({ candidates, onClose, onShared }) {
             <button key={link.id} type="button" className={cx('recipient', active && 'active')} onClick={() => setRecipient(link.id)}>
               <span className="avatar" style={{ width: 40, height: 40, background: active ? 'var(--g-primary)' : undefined, color: active ? '#fff' : undefined }}>{link.avatarChar}</span>
               <span className="grow">
-                <span className="h3" style={{ display: 'block' }}>{link.name} · {status}</span>
-                <span className="small muted">{sub}</span>
+                <span className="h3" style={{ display: 'block' }}>{link.name} · {t(status)}</span>
+                <span className="small muted">{t(sub)}</span>
               </span>
               <span className={cx('checkbox', active && 'on')}>{active && <Check size={13} strokeWidth={3} />}</span>
             </button>
@@ -130,13 +131,13 @@ export function ShareModal({ candidates, onClose, onShared }) {
         })}
         {familyLinks.length === 0 && (
           <div className="card tinted stack" style={{ '--gap': '10px' }}>
-            <span className="small">Add a family member first — they’ll get a private link by SMS.</span>
-            <Button variant="secondary" size="sm" onClick={() => { onClose(); navigate('/family'); }}>Add family member</Button>
+            <span className="small">{t('Add a family member first — they’ll get a private link by SMS.')}</span>
+            <Button variant="secondary" size="sm" onClick={() => { onClose(); navigate('/family'); }}>{t('Add family member')}</Button>
           </div>
         )}
       </div>
 
-      <div className="label">What they can see</div>
+      <div className="label">{t('What they can see')}</div>
       <div className="card flush">
         {perms.map(([key, Icon, title, desc], i) => (
           <React.Fragment key={key}>
@@ -145,7 +146,7 @@ export function ShareModal({ candidates, onClose, onShared }) {
               <IconBadge icon={Icon} size={34} tone={permissions[key] ? undefined : 'neutral'} />
               <span className="grow">
                 <span className="h3" style={{ display: 'block', fontSize: 14.5 }}>{title}</span>
-                <span className="tiny muted">{desc}</span>
+                <span className="tiny muted">{t(desc)}</span>
               </span>
               <Toggle label={title} value={permissions[key]} onChange={() => setPermissions((p) => ({ ...p, [key]: !p[key] }))} />
             </div>
@@ -155,29 +156,29 @@ export function ShareModal({ candidates, onClose, onShared }) {
         <div className="setting-row">
           <IconBadge icon={Lock} size={34} tone="neutral" />
           <span className="grow">
-            <span className="h3 muted" style={{ display: 'block', fontSize: 14.5 }}>Phone, email, chats</span>
-            <span className="tiny muted">Never shareable</span>
+            <span className="h3 muted" style={{ display: 'block', fontSize: 14.5 }}>{t('Phone, email, chats')}</span>
+            <span className="tiny muted">{t('Never shareable')}</span>
           </span>
-          <Badge tone="neutral" icon={Lock}>Locked</Badge>
+          <Badge tone="neutral" icon={Lock}>{t('Locked')}</Badge>
         </div>
       </div>
 
       <label className="field">
-        <span className="label">Add a note (optional)</span>
-        <textarea className="input" value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} placeholder="Why this one feels right…" />
+        <span className="label">{t('Add a note (optional)')}</span>
+        <textarea className="input" value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} placeholder={t('Why this one feels right…')} />
       </label>
 
       <div className="row between">
-        <span className="h3">Access expires in</span>
+        <span className="h3">{t('Access expires in')}</span>
         <div className="segment">
           {SHARE_EXPIRY_OPTIONS.map(([value, label]) => (
-            <button key={value} type="button" className={cx(expiresIn === value && 'active')} onClick={() => setExpiresIn(value)}>{label}</button>
+            <button key={value} type="button" className={cx(expiresIn === value && 'active')} onClick={() => setExpiresIn(value)}>{t(label)}</button>
           ))}
         </div>
       </div>
 
       {error && <div className="error-text center">{error}</div>}
-      <Button block loading={sending} disabled={sending || !recipient} onClick={send}>Forward to family</Button>
+      <Button block loading={sending} disabled={sending || !recipient} onClick={send}>{t('Forward to family')}</Button>
     </Modal>
   );
 }

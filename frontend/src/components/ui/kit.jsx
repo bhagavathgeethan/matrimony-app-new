@@ -3,6 +3,8 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { ChevronLeft } from 'lucide-react';
 import { theme } from '../../theme/tokens';
+import { t } from '@shared/i18n';
+import { useBackHandler } from '../../services/backButton';
 
 const { colors, fonts, gradients, shadows, radii } = theme;
 
@@ -57,13 +59,15 @@ export const OnboardingScreen = ({ top, children, footer, background, dark = fal
   </View>
 );
 
-export const TopBar =({ onBack, title, right, dark = false }) => (
+export const TopBar = ({ onBack, title, right, dark = false }) => {
+  useBackHandler(onBack, 'screen'); // Android Back does what the arrow does
+  return (
   <View style={styles.topBar}>
     {onBack ? (
       <TouchableOpacity
         onPress={onBack}
         style={[styles.backBtn, dark && styles.backBtnDark]}
-        accessibilityLabel="Back"
+        accessibilityLabel={t('Back')}
       >
         <ChevronLeft size={20} color={dark ? colors.onDark : colors.textPrimary} />
       </TouchableOpacity>
@@ -77,7 +81,8 @@ export const TopBar =({ onBack, title, right, dark = false }) => (
     )}
     {right || <View style={{ width: 40 }} />}
   </View>
-);
+  );
+};
 
 export const StepBar = ({ step, total, dark = false }) => (
   <View style={styles.stepBar}>
@@ -218,7 +223,7 @@ export const Toggle = ({ value, onChange, disabled }) => (
 );
 
 // Conic-gradient score ring
-export const ScoreRing = ({ score = 0, size = 72, dark = false, label = 'ALIGNED' }) => {
+export const ScoreRing = ({ score = 0, size = 72, dark = false, label = t('ALIGNED') }) => {
   const inner = size - Math.max(10, size * 0.14);
   return (
     <View

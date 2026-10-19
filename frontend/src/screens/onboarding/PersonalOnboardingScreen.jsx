@@ -5,6 +5,7 @@ import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { OnboardingScreen, StepBar, FadeIn, Eyebrow, Heading, Accent, Button, Card } from '../../components/ui/kit';
 import { FieldControl, changedValues, useDetailsDraft, valuesOf } from '../../components/details/DetailsUI';
+import { t } from '@shared/i18n';
 
 const { colors, fonts } = theme;
 const FIELDS = ONBOARDING_DETAIL_KEYS.map((k) => FIELD_BY_KEY[k]);
@@ -39,17 +40,17 @@ export const PersonalOnboardingScreen = () => {
           {error ? (
             <Text style={styles.error}>{error}</Text>
           ) : (
-            <Text style={styles.notice}>Religion has “Prefer not to say”. Education and occupation are optional.</Text>
+            <Text style={styles.notice}>{t('Religion has “Prefer not to say”. Education and occupation are optional.')}</Text>
           )}
-          <Button label={saving ? 'Saving…' : 'Next — the blueprint'} disabled={!complete || saving} onPress={handleNext} />
+          <Button label={saving ? t('Saving…') : t('Next — the blueprint')} disabled={!complete || saving} onPress={handleNext} />
         </>
       }
     >
       <FadeIn>
         <View style={{ gap: 8 }}>
-          <Eyebrow>Step 03 / 05 · About you</Eyebrow>
+          <Eyebrow>{t('Step 03 / 05 · About you')}</Eyebrow>
           <Heading size={32}>
-            A little <Accent>about you</Accent>
+            {t('A little')}{' '}<Accent>{t('about you')}</Accent>
           </Heading>
         </View>
       </FadeIn>

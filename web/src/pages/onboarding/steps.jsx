@@ -6,7 +6,7 @@ import {
   TrendingUp, Plane, Home, Sparkles, Info, Plus, Star, X, EyeOff, SearchX, BadgeCheck, Check, UserRound, Images, Heart,
 } from 'lucide-react';
 import {
-  GENDERS, TIMELINES, INVOLVEMENT, MONEY_QUESTION, PILLARS, MAX_VIBES, profileStrengthHint,
+  GENDERS, TIMELINES, INVOLVEMENT, MONEY_QUESTION, PILLARS, MAX_VIBES, profileStrengthHint, blueprintSummary,
 } from '@shared/constants';
 import { useStore } from '../../store';
 import { Button, Toggle, IconBadge, Badge, ScoreRing, Meter, Avatar, cx } from '../../components/ui';
@@ -14,6 +14,7 @@ import { BlueprintSlider, VibeGrid } from '../../components/domain';
 import { FieldRow, changedValues, valuesOf } from '../../components/details';
 import { FIELD_BY_KEY, ONBOARDING_DETAIL_KEYS, ONBOARDING_REQUIRED_KEYS, isFilled } from '@shared/profileFields';
 import { StepFooter } from './OnboardingLayout';
+import { t } from '@shared/i18n';
 
 const PILLAR_ICONS = { money: Wallet, roots: MapPin, kids: Baby, ambition: Briefcase };
 const OPTION_ICONS = { invest: TrendingUp, split: Plane, family: Home, spend: Sparkles };
@@ -64,15 +65,15 @@ export function PersonalStep() {
   return (
     <form onSubmit={save} style={{ display: 'contents' }}>
       <div className="ob-content">
-        <Header eyebrow="Step 3 · About you" lede="Just a few details now. Family, education, hobbies and the rest can be added from your profile once you’re in.">
-          A little <span className="accent">about you</span>
+        <Header eyebrow={t('Step 3 · About you')} lede={t('Just a few details now. Family, education, hobbies and the rest can be added from your profile once you’re in.')}>
+          {t('A little')}{' '}<span className="accent">{t('about you')}</span>
         </Header>
         <div className="card fade-in personal-grid">
           {fields.map((f) => <FieldRow key={f.key} field={f} draft={draft} set={set} />)}
         </div>
       </div>
-      <StepFooter hint={error ? <span className="error-text">{error}</span> : <span className="small muted">Religion has a “Prefer not to say” option. Education and occupation are optional.</span>}>
-        <Button type="submit" loading={busy} disabled={!complete || busy}>Next — the blueprint</Button>
+      <StepFooter hint={error ? <span className="error-text">{error}</span> : <span className="small muted">{t('Religion has a “Prefer not to say” option. Education and occupation are optional.')}</span>}>
+        <Button type="submit" loading={busy} disabled={!complete || busy}>{t('Next — the blueprint')}</Button>
       </StepFooter>
     </form>
   );
@@ -108,8 +109,8 @@ export function ConsentStep() {
   return (
     <>
       <div className="ob-content">
-        <Header eyebrow="Step 1 · Consent" lede="Granular, itemised, and reversible any time from Settings.">
-          What you’re <span className="accent">agreeing to</span>
+        <Header eyebrow={t('Step 1 · Consent')} lede={t('Granular, itemised, and reversible any time from Settings.')}>
+          {t('What you’re')}{' '}<span className="accent">{t('agreeing to')}</span>
         </Header>
         <div className="card flush fade-in">
           {items.map((item, i) => (
@@ -119,12 +120,12 @@ export function ConsentStep() {
                 <IconBadge icon={item.icon} tone={item.value ? undefined : 'neutral'} />
                 <div className="grow">
                   <div className="row" style={{ '--gap': '8px' }}>
-                    <span className="h3">{item.title}</span>
-                    {item.required && <Badge tone="gold" icon={Lock}>Required</Badge>}
+                    <span className="h3">{t(item.title)}</span>
+                    {item.required && <Badge tone="gold" icon={Lock}>{t('Required')}</Badge>}
                   </div>
-                  <div className="small muted">{item.desc}</div>
+                  <div className="small muted">{t(item.desc)}</div>
                 </div>
-                <Toggle label={item.title} value={item.value} onChange={item.set} disabled={item.required} />
+                <Toggle label={t(item.title)} value={item.value} onChange={item.set} disabled={item.required} />
               </div>
             </React.Fragment>
           ))}
@@ -132,13 +133,12 @@ export function ConsentStep() {
         <div className="card dark row fade-in" style={{ alignItems: 'flex-start' }}>
           <Scale color="var(--gold)" />
           <div className="small" style={{ lineHeight: 1.6, color: 'rgba(255,246,238,0.8)' }}>
-            <strong style={{ color: '#fff' }}>Your DPDP rights.</strong> Download everything we hold, correct it, or
-            ask for full erasure — completed within 72 hours across every table.
+            <strong style={{ color: '#fff' }}>{t('Your DPDP rights.')}</strong>{' '}{t('Download everything we hold, correct it, or ask for full erasure — completed within 72 hours across every table.')}
           </div>
         </div>
       </div>
       <StepFooter hint={error && <span className="error-text">{error}</span>}>
-        <Button loading={busy} disabled={busy} onClick={save}>{editing ? 'Save consents' : 'Agree & continue'}</Button>
+        <Button loading={busy} disabled={busy} onClick={save}>{editing ? t('Save consents') : t('Agree & continue')}</Button>
       </StepFooter>
     </>
   );
@@ -174,10 +174,10 @@ export function BasicsStep() {
 
   const Chips = ({ label, options, value, onChange }) => (
     <div className="stack" style={{ '--gap': '8px' }}>
-      <span className="label">{label}</span>
+      <span className="label">{t(label)}</span>
       <div className="row wrap" style={{ '--gap': '8px' }}>
         {options.map(([key, text]) => (
-          <button key={key} type="button" className={cx('chip', value === key && 'active')} onClick={() => onChange(key)}>{text}</button>
+          <button key={key} type="button" className={cx('chip', value === key && 'active')} onClick={() => onChange(key)}>{t(text)}</button>
         ))}
       </div>
     </div>
@@ -186,33 +186,33 @@ export function BasicsStep() {
   return (
     <form onSubmit={save} style={{ display: 'contents' }}>
       <div className="ob-content">
-        <Header eyebrow="Step 2 · Basics" lede="The essentials. A few personal details come next; the rest can wait until you’re in.">
-          The short version <span className="accent">of you</span>
+        <Header eyebrow={t('Step 2 · Basics')} lede={t('The essentials. A few personal details come next; the rest can wait until you’re in.')}>
+          {t('The short version')}{' '}<span className="accent">{t('of you')}</span>
         </Header>
         <div className="card stack fade-in">
           <label className="field">
-            <span className="label">First name</span>
-            <input className="input" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Your first name" maxLength={60} />
+            <span className="label">{t('First name')}</span>
+            <input className="input" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder={t('Your first name')} maxLength={60} />
           </label>
           <div className="row wrap" style={{ alignItems: 'stretch' }}>
             <label className="field grow" style={{ minWidth: 180 }}>
-              <span className="label">Born</span>
-              <input className="input" value={born} onChange={(e) => setBorn(e.target.value)} placeholder="e.g. Mar 1997" />
+              <span className="label">{t('Born')}</span>
+              <input className="input" value={born} onChange={(e) => setBorn(e.target.value)} placeholder={t('e.g. Mar 1997')} />
             </label>
             <label className="field grow" style={{ minWidth: 180 }}>
-              <span className="label">Lives in</span>
-              <input className="input" value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Bengaluru" maxLength={80} />
+              <span className="label">{t('Lives in')}</span>
+              <input className="input" value={city} onChange={(e) => setCity(e.target.value)} placeholder={t('e.g. Bengaluru')} maxLength={80} />
             </label>
           </div>
         </div>
-        <Chips label="I am" options={GENDERS} value={gender} onChange={setGender} />
-        <Chips label="Hoping to marry" options={TIMELINES} value={timeline} onChange={setTimeline} />
-        <Chips label="Family involvement" options={INVOLVEMENT.map((v) => [v, v])} value={involvement} onChange={setInvolvement} />
+        <Chips label={t('I am')} options={GENDERS} value={gender} onChange={setGender} />
+        <Chips label={t('Hoping to marry')} options={TIMELINES} value={timeline} onChange={setTimeline} />
+        <Chips label={t('Family involvement')} options={INVOLVEMENT.map((v) => [v, v])} value={involvement} onChange={setInvolvement} />
       </div>
       <StepFooter
-        hint={error ? <span className="error-text">{error}</span> : <span className="row" style={{ '--gap': '6px' }}><Ban size={14} color="var(--accent)" /> No complexion fields. Matching scores use values only.</span>}
+        hint={error ? <span className="error-text">{error}</span> : <span className="row" style={{ '--gap': '6px' }}><Ban size={14} color="var(--accent)" />{' '}{t('No complexion fields. Matching scores use values only.')}</span>}
       >
-        <Button type="submit" loading={busy} disabled={!complete || busy}>Next — about you</Button>
+        <Button type="submit" loading={busy} disabled={!complete || busy}>{t('Next — about you')}</Button>
       </StepFooter>
     </form>
   );
@@ -224,8 +224,8 @@ export function BlueprintIntroStep() {
   return (
     <>
       <div className="ob-content">
-        <Header eyebrow="Step 4 · Blueprint" lede="Marriages rarely strain over hobbies. They strain over money, where you live, kids, and whose career bends.">
-          Four questions for the <span className="accent">next 40 years</span>
+        <Header eyebrow={t('Step 4 · Blueprint')} lede={t('Marriages rarely strain over hobbies. They strain over money, where you live, kids, and whose career bends.')}>
+          {t('Four questions for the')}{' '}<span className="accent">{t('next 40 years')}</span>
         </Header>
         <div className="stack" style={{ '--gap': '10px' }}>
           {PILLARS.map((p, i) => {
@@ -234,8 +234,8 @@ export function BlueprintIntroStep() {
               <div key={p.key} className="card row fade-in" style={{ animationDelay: `${80 + i * 60}ms` }}>
                 <IconBadge icon={Icon} />
                 <div className="grow">
-                  <div className="h3">{p.title}</div>
-                  <div className="small muted">{p.intro}</div>
+                  <div className="h3">{t(p.title)}</div>
+                  <div className="small muted">{t(p.intro)}</div>
                 </div>
                 <span className="h2" style={{ color: 'var(--gold)' }}>0{i + 1}</span>
               </div>
@@ -243,8 +243,8 @@ export function BlueprintIntroStep() {
           })}
         </div>
       </div>
-      <StepFooter hint={<span className="row" style={{ '--gap': '6px' }}><Clock size={14} /> About 4 minutes. You can revise any answer later.</span>}>
-        <Button onClick={() => navigate('/onboarding/blueprint/question')}>Begin</Button>
+      <StepFooter hint={<span className="row" style={{ '--gap': '6px' }}><Clock size={14} />{' '}{t('About 4 minutes. You can revise any answer later.')}</span>}>
+        <Button onClick={() => navigate('/onboarding/blueprint/question')}>{t('Begin')}</Button>
       </StepFooter>
     </>
   );
@@ -271,7 +271,7 @@ export function BlueprintQuestionStep() {
   return (
     <>
       <div className="ob-content">
-        <Header eyebrow="Money philosophy · 1 of 4">{MONEY_QUESTION.title}</Header>
+        <Header eyebrow={t('Money philosophy · 1 of 4')}>{t(MONEY_QUESTION.title)}</Header>
         <div className="option-list" role="radiogroup">
           {MONEY_QUESTION.options.map((o) => {
             const Icon = OPTION_ICONS[o.key];
@@ -280,8 +280,8 @@ export function BlueprintQuestionStep() {
               <button key={o.key} type="button" role="radio" aria-checked={on} className={cx('option', on && 'selected')} onClick={() => setSelected(o.key)}>
                 <IconBadge icon={Icon} size={38} />
                 <span className="grow">
-                  <span className="h3" style={{ display: 'block' }}>{o.title}</span>
-                  <span className="small muted">{o.desc}</span>
+                  <span className="h3" style={{ display: 'block' }}>{t(o.title)}</span>
+                  <span className="small muted">{t(o.desc)}</span>
                 </span>
                 <span className="checkbox" style={on ? { background: '#fff', borderColor: '#fff', color: 'var(--accent)' } : undefined}>
                   {on && <Check size={13} strokeWidth={3} />}
@@ -291,17 +291,17 @@ export function BlueprintQuestionStep() {
           })}
         </div>
         <div className="card tinted row wrap between">
-          <span className="h3">Could you live with someone who answered differently?</span>
+          <span className="h3">{t('Could you live with someone who answered differently?')}</span>
           <div className="segment">
             {[['yes', 'Yes'], ['no', 'No']].map(([k, l]) => (
-              <button key={k} type="button" className={cx(accepts === k && 'active')} onClick={() => setAccepts(k)}>{l}</button>
+              <button key={k} type="button" className={cx(accepts === k && 'active')} onClick={() => setAccepts(k)}>{t(l)}</button>
             ))}
           </div>
         </div>
       </div>
       <StepFooter hint={error && <span className="error-text">{error}</span>}>
-        <Button variant="secondary" onClick={() => navigate('/onboarding/blueprint')}>Back</Button>
-        <Button loading={busy} disabled={busy} onClick={save}>Next question</Button>
+        <Button variant="secondary" onClick={() => navigate('/onboarding/blueprint')}>{t('Back')}</Button>
+        <Button loading={busy} disabled={busy} onClick={save}>{t('Next question')}</Button>
       </StepFooter>
     </>
   );
@@ -329,8 +329,8 @@ export function TunerStep() {
   return (
     <>
       <div className="ob-content">
-        <Header eyebrow="Step 4 · Blueprint" lede="Drag each dial. Firm pillars count as dealbreakers when the gap is large.">
-          Your <span className="accent">shared future</span>
+        <Header eyebrow={t('Step 4 · Blueprint')} lede={t('Drag each dial. Firm pillars count as dealbreakers when the gap is large.')}>
+          {t('Your')}{' '}<span className="accent">{t('shared future')}</span>
         </Header>
         <div className="stack" style={{ '--gap': '10px' }}>
           {PILLARS.map((p) => (
@@ -346,8 +346,8 @@ export function TunerStep() {
           ))}
         </div>
       </div>
-      <StepFooter hint={error ? <span className="error-text">{error}</span> : <span className="row" style={{ '--gap': '6px' }}><Info size={14} color="var(--gold)" /> Gold band = how much difference you’ll accept</span>}>
-        <Button loading={busy} disabled={busy} onClick={save}>Save blueprint</Button>
+      <StepFooter hint={error ? <span className="error-text">{error}</span> : <span className="row" style={{ '--gap': '6px' }}><Info size={14} color="var(--gold)" />{' '}{t('Gold band = how much difference you’ll accept')}</span>}>
+        <Button loading={busy} disabled={busy} onClick={save}>{t('Save blueprint')}</Button>
       </StepFooter>
     </>
   );
@@ -367,11 +367,11 @@ export function VibesStep() {
   return (
     <>
       <div className="ob-content">
-        <Header eyebrow="Step 5 · Vibes" lede="Visual, not verbal — the texture of daily life.">
-          Six that feel like your <span className="accent">Sunday</span>
+        <Header eyebrow={t('Step 5 · Vibes')} lede={t('Visual, not verbal — the texture of daily life.')}>
+          {t('Six that feel like your')}{' '}<span className="accent">{t('Sunday')}</span>
         </Header>
         <div className="row between">
-          <span className="small" style={{ fontWeight: 700 }}>Chosen {count} of {MAX_VIBES}</span>
+          <span className="small" style={{ fontWeight: 700 }}>{t('Chosen {count} of {MAX_VIBES}', { count, MAX_VIBES })}</span>
           <div className="row" style={{ '--gap': '4px' }}>
             {Array.from({ length: MAX_VIBES }, (_, i) => (
               <span key={i} style={{ width: 18, height: 5, borderRadius: 3, background: i < count ? 'var(--g-primary)' : 'var(--border)' }} />
@@ -381,8 +381,8 @@ export function VibesStep() {
         <VibeGrid selected={user?.vibes || []} onToggle={toggle} />
       </div>
       <StepFooter hint={error && <span className="error-text">{error}</span>}>
-        <Button variant="secondary" onClick={() => next('/onboarding/photos')}>Skip</Button>
-        <Button onClick={() => next('/onboarding/photos')}>{user?.onboarding?.completed ? 'Done' : 'Next · photos'}</Button>
+        <Button variant="secondary" onClick={() => next('/onboarding/photos')}>{t('Skip')}</Button>
+        <Button onClick={() => next('/onboarding/photos')}>{user?.onboarding?.completed ? t('Done') : t('Next · photos')}</Button>
       </StepFooter>
     </>
   );
@@ -426,25 +426,25 @@ export function PhotosStep() {
   return (
     <>
       <div className="ob-content">
-        <Header eyebrow="Step 6 · Photos" lede="Blurred by default. They unblur only when you both say yes.">
-          Photos, on <span className="accent">your terms</span>
+        <Header eyebrow={t('Step 6 · Photos')} lede={t('Blurred by default. They unblur only when you both say yes.')}>
+          {t('Photos, on')}{' '}<span className="accent">{t('your terms')}</span>
         </Header>
         <div className="photo-grid">
           {photos.map((p, i) => (
             <div key={p.id} className="photo-tile">
-              <img src={p.url} alt={i === 0 ? 'Main photo' : `Photo ${i + 1}`} />
+              <img src={p.url} alt={i === 0 ? t('Main photo') : t('Photo {n}', { n: i + 1 })} />
               <div className="photo-actions">
-                {i === 0 ? <Badge tone="glass">Main</Badge> : (
-                  <button className="photo-action" onClick={() => photoAction(p.id, makePhotoPrimary)} aria-label="Make main photo"><Star size={14} /></button>
+                {i === 0 ? <Badge tone="glass">{t('Main')}</Badge> : (
+                  <button className="photo-action" onClick={() => photoAction(p.id, makePhotoPrimary)} aria-label={t('Make main photo')}><Star size={14} /></button>
                 )}
-                <button className="photo-action" onClick={() => photoAction(p.id, deletePhoto)} aria-label="Remove photo"><X size={14} /></button>
+                <button className="photo-action" onClick={() => photoAction(p.id, deletePhoto)} aria-label={t('Remove photo')}><X size={14} /></button>
               </div>
               {busyId === p.id && <div className="photo-busy"><span className="spinner light" /></div>}
             </div>
           ))}
           {photos.length < 6 && (
             <button type="button" className="photo-tile photo-add" disabled={uploading} onClick={() => fileInput.current?.click()}>
-              {uploading ? <span className="spinner" /> : <><Plus size={24} />{photos.length ? 'Add photo' : 'Add your first photo'}</>}
+              {uploading ? <span className="spinner" /> : <><Plus size={24} />{photos.length ? t('Add photo') : t('Add your first photo')}</>}
             </button>
           )}
         </div>
@@ -458,8 +458,8 @@ export function PhotosStep() {
               {i > 0 && <div className="divider" style={{ margin: '0 16px' }} />}
               <div className="setting-row">
                 <IconBadge icon={Icon} />
-                <div className="grow"><div className="h3">{title}</div><div className="small muted">{sub}</div></div>
-                <Toggle label={title} value={value} onChange={set} />
+                <div className="grow"><div className="h3">{t(title)}</div><div className="small muted">{t(sub)}</div></div>
+                <Toggle label={t(title)} value={value} onChange={set} />
               </div>
             </React.Fragment>
           ))}
@@ -467,13 +467,13 @@ export function PhotosStep() {
         <div className="card dark row">
           <BadgeCheck color="var(--gold)" />
           <div className="grow">
-            <div className="h3">{user?.verified ? 'ID verified' : 'ID verification — coming soon'}</div>
-            <div className="small" style={{ color: 'rgba(255,246,238,0.72)' }}>One-time ID check. We store a hash, never the document.</div>
+            <div className="h3">{user?.verified ? t('ID verified') : t('ID verification — coming soon')}</div>
+            <div className="small" style={{ color: 'rgba(255,246,238,0.72)' }}>{t('One-time ID check. We store a hash, never the document.')}</div>
           </div>
         </div>
       </div>
-      <StepFooter hint={error ? <span className="error-text">{error}</span> : photos.length === 0 && 'Add at least one photo to continue'}>
-        <Button disabled={photos.length === 0 || uploading} onClick={save}>Continue</Button>
+      <StepFooter hint={error ? <span className="error-text">{error}</span> : photos.length === 0 && t('Add at least one photo to continue')}>
+        <Button disabled={photos.length === 0 || uploading} onClick={save}>{t('Continue')}</Button>
       </StepFooter>
     </>
   );
@@ -495,47 +495,47 @@ export function ReviewStep() {
   };
 
   const editLinks = [
-    [UserRound, 'Basics', '/onboarding/basics'],
-    [Wallet, 'Blueprint', '/onboarding/blueprint/tune'],
-    [Heart, 'Vibes', '/onboarding/vibes'],
-    [Images, 'Photos', '/onboarding/photos'],
+    [UserRound, t('Edit basics'), '/onboarding/basics'],
+    [Wallet, t('Edit blueprint'), '/onboarding/blueprint/tune'],
+    [Heart, t('Edit vibes'), '/onboarding/vibes'],
+    [Images, t('Edit photos'), '/onboarding/photos'],
   ];
 
   return (
     <>
       <div className="ob-content">
-        <Header eyebrow="Step 7 · Review">This is how you’ll <span className="accent">show up</span></Header>
+        <Header eyebrow={t('Step 7 · Review')}>{t('This is how you’ll')}{' '}<span className="accent">{t('show up')}</span></Header>
         <div className="card dark stack fade-in" style={{ padding: 26 }}>
           <div className="row">
             <Avatar src={user?.photos?.[0]?.url} name={user?.firstName} size={68} ring />
             <div>
               <div className="h2">{user?.firstName}{user?.age ? `, ${user.age}` : ''}</div>
-              <div className="small" style={{ color: 'rgba(255,246,238,0.7)' }}>{user?.city} · phone verified</div>
+              <div className="small" style={{ color: 'rgba(255,246,238,0.7)' }}>{t('{city} · phone verified', { city: user?.city || '' })}</div>
             </div>
           </div>
           <div className="stack" style={{ '--gap': '10px' }}>
-            {PILLARS.map((p) => <Meter key={p.key} label={p.label} value={bp[p.key] ?? 0} dark />)}
+            {PILLARS.map((p) => <Meter key={p.key} label={t(p.label)} value={bp[p.key] ?? 0} dark />)}
           </div>
           <div className="card row" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: 'none', alignItems: 'flex-start' }}>
             <Sparkles size={16} color="var(--gold)" />
-            <span style={{ fontWeight: 650, lineHeight: 1.5 }}>{bp.summaryText}</span>
+            <span style={{ fontWeight: 650, lineHeight: 1.5 }}>{blueprintSummary(bp)}</span>
           </div>
         </div>
         <div className="card row">
-          <ScoreRing score={user?.profileStrength ?? 0} size={64} label="DONE" />
+          <ScoreRing score={user?.profileStrength ?? 0} size={64} label={t('DONE')} />
           <div className="grow">
-            <div className="h3">Profile strength</div>
+            <div className="h3">{t('Profile strength')}</div>
             <div className="small muted">{profileStrengthHint(user)}</div>
           </div>
         </div>
         <div className="row wrap" style={{ '--gap': '8px' }}>
           {editLinks.map(([Icon, label, to]) => (
-            <Link key={label} to={to} className="chip"><Icon size={14} /> Edit {label.toLowerCase()}</Link>
+            <Link key={label} to={to} className="chip"><Icon size={14} />{' '}{label}</Link>
           ))}
         </div>
       </div>
       <StepFooter hint={error && <span className="error-text">{error}</span>}>
-        <Button loading={busy} disabled={busy} onClick={finish}>Finish & see my matches</Button>
+        <Button loading={busy} disabled={busy} onClick={finish}>{t('Finish & see my matches')}</Button>
       </StepFooter>
     </>
   );

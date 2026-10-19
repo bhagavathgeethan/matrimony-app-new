@@ -4,11 +4,13 @@ import { BrowserRouter } from 'react-router-dom';
 import '@fontsource-variable/plus-jakarta-sans';
 import './styles/global.css';
 import App from './App.jsx';
+import { languageReady } from '@shared/i18n';
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+// Wait for the saved interface language so the first screen is already translated
+languageReady.then(() => ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
       <App />
     </BrowserRouter>
   </React.StrictMode>
-);
+));

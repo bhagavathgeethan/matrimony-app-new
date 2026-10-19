@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { ChevronRight, Download, Trash2, Eye, UserX, ListChecks, LogOut, Check, MessageCircle, Sparkles, Users, Smartphone, PauseCircle, Moon, Ghost, Lightbulb } from 'lucide-react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { ChevronRight, Download, Trash2, Eye, UserX, ListChecks, LogOut, Check, MessageCircle, Sparkles, Users, Smartphone, PauseCircle, Moon, Ghost, Lightbulb, Crown, EyeOff, Image, MapPinOff } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
-import { Screen, TopBar, FadeIn, Eyebrow, Heading, Accent, Body, Card, Toggle, IconBadge, Divider, Chip } from '../../components/ui/kit';
+import { Screen, TopBar, FadeIn, Eyebrow, Heading, Accent, Body, Card, Toggle, IconBadge, Divider, Chip, Button } from '../../components/ui/kit';
 import { SignOutButton } from '../../components/common/SignOutButton';
-import { t, UI_LANGUAGES, getLanguage, setLanguage } from '@shared/i18n';
+import { PHOTO_VISIBILITY } from '@shared/plans';
+import { t, formatDateTime } from '@shared/i18n';
+import { SelectField } from '../../components/common/Picker';
+import { LanguagePicker } from '../../components/common/LanguagePicker';
 
 const { colors, fonts, gradients, radii } = theme;
 
@@ -16,6 +19,35 @@ const ERASURE_STEPS = [
   'Messages you sent are anonymised to “Former member”',
   'Only a hashed record of the deletion request is retained, for audit',
 ];
+
+// Premium: hide your profile from chosen cities or ages
+const VisibilityRules = ({ user, onSave }) => {
+  const rules = user?.visibilityRules || {};
+  const [cities, setCities] = useState((rules.hideCities || []).join(', '));
+  const [ageMin, setAgeMin] = useState(rules.ageMin ? String(rules.ageMin) : '');
+  const [ageMax, setAgeMax] = useState(rules.ageMax ? String(rules.ageMax) : '');
+  const save = () => onSave({
+    hideCities: cities.split(',').map((c) => c.trim()).filter(Boolean),
+    ...(ageMin ? { ageMin: Number(ageMin) } : {}),
+    ...(ageMax ? { ageMax: Number(ageMax) } : {}),
+  });
+  return (
+    <View style={{ padding: 14, gap: 8 }}>
+      <Text style={styles.rowTitle}>{t('Hide my profile from… (Premium)')}</Text>
+      <TextInput value={cities} onChangeText={setCities} placeholder={t('Cities, comma-separated')} placeholderTextColor={colors.textLight}
+        style={styles.ruleInput} accessibilityLabel={t('Hide from cities')} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Text style={styles.rowValue}>{t('Only ages')}</Text>
+        <TextInput value={ageMin} onChangeText={(text) => setAgeMin(text.replace(/\D/g, '').slice(0, 2))} placeholder="18" keyboardType="number-pad"
+          style={[styles.ruleInput, { width: 64 }]} accessibilityLabel={t('Show to ages from')} />
+        <Text style={styles.rowValue}>to</Text>
+        <TextInput value={ageMax} onChangeText={(text) => setAgeMax(text.replace(/\D/g, '').slice(0, 2))} placeholder="80" keyboardType="number-pad"
+          style={[styles.ruleInput, { width: 64 }]} accessibilityLabel={t('Show to ages up to')} />
+        <Button small variant="secondary" label={t('Save')} onPress={save} />
+      </View>
+    </View>
+  );
+};
 
 export const PrivacyErasureScreen = () => {
   const { setCurrentScreen, user, updatePrivacy, requestErasure, cancelErasure, logout, updateNotificationPrefs, setPaused } = useApp();
@@ -41,29 +73,29 @@ export const PrivacyErasureScreen = () => {
       link.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      alert(`Could not export your data: ${err.message}`);
+      alert(t('Could not export your data: {reason}', { reason: err.message }));
     }
   };
 
   const handleErasure = async () => {
     if (busy) return;
     if (erasureScheduledFor) {
-      if (!window.confirm('Cancel your erasure request and keep your account?')) return;
+      if (!window.confirm(t('Cancel your erasure request and keep your account?'))) return;
       setBusy(true);
       const res = await cancelErasure();
       setBusy(false);
       if (!res.ok) alert(res.error);
       return;
     }
-    if (!window.confirm('Request permanent erasure of your account? You can cancel within 72 hours; after that it cannot be undone.')) return;
+    if (!window.confirm(t('Request permanent erasure of your account? You can cancel within 72 hours; after that it cannot be undone.'))) return;
     setBusy(true);
     const res = await requestErasure();
     setBusy(false);
     if (res.ok) {
-      alert(`${res.data.message}
-Audit receipt: ${res.data.auditReceiptHash}`);
+      alert(`${t(res.data.message)}
+${t('Audit receipt: {hash}', { hash: res.data.auditReceiptHash })}`);
     } else {
-      alert(`Could not register the erasure request: ${res.error}`);
+      alert(t('Could not register the erasure request: {reason}', { reason: res.error }));
     }
   };
 
@@ -86,50 +118,62 @@ Audit receipt: ${res.data.auditReceiptHash}`);
 
       <FadeIn>
         <View style={styles.header}>
-          <Eyebrow>Settings</Eyebrow>
+          <Eyebrow>{t('Settings')}</Eyebrow>
           <Heading>
-            Privacy &{'\n'}
-            <Accent>your data</Accent>
+            {t('Privacy &')}{'\n'}
+            <Accent>{t('your data')}</Accent>
           </Heading>
         </View>
       </FadeIn>
 
       <FadeIn delay={80}>
         <Card padding={6}>
-          <Row icon={Eye} title="Who can see my profile" value="Matches only" />
+          <Row icon={Eye} title={t('Who can see my profile')} value={t('Matches only')} />
           <Divider style={{ marginHorizontal: 14 }} />
           <Row
             icon={UserX}
-            title="Hide from people I know"
+            title={t('Hide from people I know')}
             right={<Toggle value={user?.hideFromContacts ?? true} onChange={(v) => updatePrivacy({ hideFromContacts: v })} />}
           />
           <Divider style={{ marginHorizontal: 14 }} />
-          <Row icon={PauseCircle} title="Pause my profile" right={<Toggle value={Boolean(user?.paused)} onChange={(v) => setPaused(v)} />} />
+          <Row icon={PauseCircle} title={t('Pause my profile')} right={<Toggle value={Boolean(user?.paused)} onChange={(v) => setPaused(v)} />} />
           <Divider style={{ marginHorizontal: 14 }} />
-          <Row icon={Moon} title="Horoscope matching" right={<Toggle value={Boolean(user?.showHoroscope)} onChange={(v) => privacy({ showHoroscope: v })} />} />
+          <Row icon={Moon} title={t('Horoscope matching')} right={<Toggle value={Boolean(user?.showHoroscope)} onChange={(v) => privacy({ showHoroscope: v })} />} />
           <Divider style={{ marginHorizontal: 14 }} />
-          <Row icon={Ghost} title="Incognito browsing (Premium)" right={<Toggle value={Boolean(user?.incognito)} onChange={(v) => privacy({ incognito: v })} />} />
+          <Row icon={Ghost} title={t('Incognito browsing (Premium)')} right={<Toggle value={Boolean(user?.incognito)} onChange={(v) => privacy({ incognito: v })} />} />
+          <Divider style={{ marginHorizontal: 14 }} />
+          <Row icon={Crown} title={t('Show my plan badge (Plus)')} right={<Toggle value={user?.showPremiumBadge !== false} onChange={(v) => privacy({ showPremiumBadge: v })} />} />
+          <Divider style={{ marginHorizontal: 14 }} />
+          <Row icon={EyeOff} title={t('Hide my last seen (Premium)')} right={<Toggle value={Boolean(user?.hideActivity)} onChange={(v) => privacy({ hideActivity: v })} />} />
+          <Divider style={{ marginHorizontal: 14 }} />
+          <View style={{ padding: 14, gap: 8 }}>
+            <Text style={styles.rowTitle}>{t('Who sees my photos clearly (Premium)')}</Text>
+            <SelectField
+              label={t('Who sees my photos clearly')}
+              value={user?.photoVisibility || null}
+              onChange={(k) => privacy({ photoVisibility: k })}
+              options={[[null, t('Standard (blur until mutual, as set above)')], ...PHOTO_VISIBILITY.map(([k, label]) => [k, t(label)])]}
+            />
+          </View>
+          <Divider style={{ marginHorizontal: 14 }} />
+          <VisibilityRules user={user} onSave={(rules) => privacy({ visibilityRules: rules })} />
           {privacyError && <Text style={[styles.rowValue, { color: colors.accent, paddingHorizontal: 14, paddingBottom: 8 }]}>{privacyError}</Text>}
           <Divider style={{ marginHorizontal: 14 }} />
           <Row
             icon={ListChecks}
-            title="Consent settings"
+            title={t('Consent settings')}
             value={`${consentsOn} of 4 on`}
             onPress={() => setCurrentScreen('consent')}
           />
           <Divider style={{ marginHorizontal: 14 }} />
-          <Row icon={Download} title="Download my data" value="JSON · Instant" onPress={handleDownloadData} />
+          <Row icon={Download} title={t('Download my data')} value={t('JSON · Instant')} onPress={handleDownloadData} />
         </Card>
       </FadeIn>
 
       <FadeIn delay={100}>
         <Card padding={14} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-          <Text style={styles.rowTitle}>{t('Language')} · Language</Text>
-          <View style={{ flexDirection: 'row', gap: 6 }} accessibilityRole="radiogroup">
-            {UI_LANGUAGES.map(([code, label]) => (
-              <Chip key={code} label={label} active={getLanguage() === code} onPress={() => setLanguage(code)} />
-            ))}
-          </View>
+          <Text style={[styles.rowTitle, { flex: 1 }]}>{t('Language')}</Text>
+          <LanguagePicker style={{ minWidth: 150 }} />
         </Card>
       </FadeIn>
 
@@ -137,7 +181,7 @@ Audit receipt: ${res.data.auditReceiptHash}`);
         <Card padding={6}>
           <View style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4, gap: 2 }}>
             <Text style={styles.rowTitle}>{t('Notifications')}</Text>
-            <Text style={styles.rowValue}>Security alerts are always sent.</Text>
+            <Text style={styles.rowValue}>{t('Security alerts are always sent.')}</Text>
           </View>
           {[
             [MessageCircle, 'Messages', 'messages'],
@@ -150,7 +194,7 @@ Audit receipt: ${res.data.auditReceiptHash}`);
               <Divider style={{ marginHorizontal: 14 }} />
               <Row
                 icon={icon}
-                title={title}
+                title={t(title)}
                 right={<Toggle value={notifPrefs[key] !== false} onChange={(v) => updateNotificationPrefs({ [key]: v })} />}
               />
             </View>
@@ -165,16 +209,16 @@ Audit receipt: ${res.data.auditReceiptHash}`);
               <Trash2 size={20} color={colors.white} />
             </View>
             <View style={{ flex: 1, gap: 2 }}>
-              <Text style={styles.erasureTitle}>Erase my account</Text>
-              <Text style={styles.erasureSub}>Completed within 72 hours. Irreversible.</Text>
+              <Text style={styles.erasureTitle}>{t('Erase my account')}</Text>
+              <Text style={styles.erasureSub}>{t('Completed within 72 hours. Irreversible.')}</Text>
             </View>
           </View>
-          <Body size={13.5}>Under the DPDP Act you can withdraw consent entirely. Here’s exactly what happens:</Body>
+          <Body size={13.5}>{t('Under the DPDP Act you can withdraw consent entirely. Here’s exactly what happens:')}</Body>
           <View style={{ gap: 10 }}>
             {ERASURE_STEPS.map((step, i) => (
               <View key={step} style={styles.step}>
                 <Text style={styles.stepNum}>{String(i + 1).padStart(2, '0')}</Text>
-                <Text style={styles.stepText}>{step}</Text>
+                <Text style={styles.stepText}>{t(step)}</Text>
               </View>
             ))}
           </View>
@@ -187,8 +231,8 @@ Audit receipt: ${res.data.auditReceiptHash}`);
             {erasureScheduledFor && <Check size={16} color={colors.accent} strokeWidth={3} />}
             <Text style={[styles.eraseText, erasureScheduledFor && { color: colors.accent }]}>
               {erasureScheduledFor
-                ? `Erasure scheduled · ${new Date(erasureScheduledFor).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · Cancel`
-                : 'Request erasure'}
+                ? t('Erasure scheduled · {when} · Cancel', { when: formatDateTime(erasureScheduledFor, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) })
+                : t('Request erasure')}
             </Text>
           </TouchableOpacity>
         </Card>
@@ -202,6 +246,7 @@ Audit receipt: ${res.data.auditReceiptHash}`);
 };
 
 const styles = StyleSheet.create({
+  ruleInput: { minHeight: 44, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.cardBorder, backgroundColor: colors.card, fontFamily: fonts.sans, fontSize: 14, color: colors.textPrimary, outlineStyle: 'none' },
   header: {
     gap: 10,
     marginTop: 4,

@@ -44,11 +44,16 @@ test('dealbreaker penalty lowers the overall score (Nikhil: roots 31 vs 80, firm
 test('archetype summary follows pillar thresholds', () => {
   assert.equal(
     synthesizeArchetype(ananya),
-    'In short: a saver who\'d move cities for the right role, wants kids within a few years, and won\'t apologise for ambition.'
+    'In short: a saver who’d move cities for the right role, wants kids within a few years, and won’t apologise for ambition.'
   );
   assert.equal(
     synthesizeArchetype({ money: 30, roots: 80, kids: 20, ambition: 40 }),
     'In short: a spender who lives for now anchored to family roots, focused on shared partnership, and protects evening work-life balance.'
+  );
+  // Answers near the middle are described as balanced, not pushed to one side
+  assert.equal(
+    synthesizeArchetype({ money: 55, roots: 50, kids: 50, ambition: 50 }),
+    'In short: a balanced saver-spender flexible about where to live, open on when to have kids, and balances career and home.'
   );
 });
 
@@ -93,3 +98,49 @@ test('relative times are computed from timestamps', () => {
   assert.equal(relativeTime(ago(8 * 86400000), now), 'Last week');
   assert.equal(relativeTime(null, now), null);
 });
+
+test('every interface language has the same keys as Tamil and keeps placeholders', () => {
+  const { UI_LANGUAGES, translate } = require('../../shared/i18n.js');
+  require('../src/lib/i18n'); // registers every locale
+  const load = (code) => require(`../../shared/locales/${code}.js`).default;
+  const reference = Object.keys(load('ta')).sort();
+  const slots = (s) => (s.match(/\{\w+\}/g) || []).sort().join();
+  for (const [code] of UI_LANGUAGES.filter(([c]) => c !== 'en')) {
+    const dict = load(code);
+    assert.deepEqual(Object.keys(dict).sort(), reference, `${code} keys differ from ta`);
+    for (const key of reference) {
+      assert.ok(dict[key].trim(), `${code} has an empty translation for "${key}"`);
+      assert.equal(slots(dict[key]), slots(key), `${code} lost a placeholder in "${key}"`);
+    }
+  }
+  assert.equal(translate('hi', 'Your profile is {n}% complete', { n: 40 }), 'आपकी प्रोफ़ाइल 40% पूरी है');
+  assert.equal(translate('hi', 'Untranslated sentence'), 'Untranslated sentence');
+  assert.equal(translate('en', 'Your profile is {n}% complete', { n: 40 }), 'Your profile is 40% complete');
+});
+
+test('every literal t() and tx() string in the apps has a translation', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const root = path.join(__dirname, '..', '..');
+  const ta = require('../../shared/locales/ta.js').default;
+  const files = [];
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) { if (e.name !== 'node_modules' && e.name !== 'locales') walk(p); }
+      else if (/\.(jsx?|mjs)$/.test(e.name)) files.push(p);
+    }
+  };
+  for (const dir of ['web/src', 'frontend/src', 'shared', 'backend/src']) walk(path.join(root, dir));
+  const missing = new Set();
+  const call = /\b(?:t|tx)\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*[,)]/g;
+  for (const file of files) {
+    const src = fs.readFileSync(file, 'utf8');
+    for (const m of src.matchAll(call)) {
+      const key = m[2].replace(/\\n/g, '\n').replace(/\\(.)/g, '$1');
+      if (!(key in ta)) missing.add(`${path.relative(root, file)}: ${key}`);
+    }
+  }
+  assert.deepEqual([...missing], []);
+});
+

@@ -20,6 +20,7 @@ const premium = require('./modules/premium');
 const stories = require('./modules/stories');
 const admin = require('./modules/admin');
 const calls = require('./modules/calls');
+const report = require('./modules/report');
 const { route } = require('./lib/http');
 
 const app = express();
@@ -36,11 +37,12 @@ app.get('/api/health', route(async (req, res) => {
 app.use('/api/auth', auth.router);
 app.use('/api/portal', family.portalRouter);
 app.use('/api/public/stories', stories.publicRouter);
+app.use('/api/public/report', report.publicRouter);
 
 // Signed-in user only
 app.use('/api/me/verification', auth.requireAuth, verification.router);
 app.use('/api/me', auth.requireAuth, profile.router, privacy.router);
-app.use('/api/matches', auth.requireAuth, matches.router);
+app.use('/api/matches', auth.requireAuth, matches.router, report.router);
 app.use('/api/conversations', auth.requireAuth, chat.router);
 app.use('/api/family', auth.requireAuth, family.router);
 app.use('/api/notifications', auth.requireAuth, notifications.router);

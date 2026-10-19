@@ -19,8 +19,8 @@ export function PersonalDetailsPage() {
     <div className="page">
       <div className="page-head">
         <div className="stack" style={{ '--gap': '6px' }}>
-          <Link to="/profile" className="row small muted" style={{ '--gap': '4px' }}><ChevronLeft size={15} /> Profile</Link>
-          <span className="eyebrow">Personal information</span>
+          <Link to="/profile" className="row small muted" style={{ '--gap': '4px' }}><ChevronLeft size={15} />{' '}{t('Profile')}</Link>
+          <span className="eyebrow">{t('Personal information')}</span>
           <h1 className="h1">{t('Personal details')}</h1>
         </div>
       </div>
@@ -32,23 +32,23 @@ export function PersonalDetailsPage() {
 
         <div className="stack">
           <div className="card row">
-            <ScoreRing score={completion?.percent ?? 0} size={68} label="DONE" />
+            <ScoreRing score={completion?.percent ?? 0} size={68} label={t('DONE')} />
             <div className="grow">
-              <div className="h3">Profile {completion?.percent ?? 0}% complete</div>
+              <div className="h3">{t('Profile {n}% complete', { n: completion?.percent ?? 0 })}</div>
               <div className="small muted">{profileStrengthHint(user)}</div>
             </div>
           </div>
           <div className="card stack" style={{ '--gap': '10px' }}>
             {completion?.sections.map((s) => (
               <button key={s.key} className="completion-row" onClick={() => setParams({ edit: s.key })}>
-                <span className="grow">{s.title}</span>
+                <span className="grow">{t(s.title)}</span>
                 <span className="tiny muted">{s.filled}/{s.total}</span>
                 <span className="mini-bar"><span style={{ width: `${(s.filled / s.total) * 100}%` }} className={s.complete ? 'done' : ''} /></span>
               </button>
             ))}
           </div>
           <p className="tiny muted" style={{ padding: '0 6px' }}>
-            Optional fields such as caste, gothram and star are never required and don’t affect matching scores.
+            {t('Optional fields such as caste, gothram and star are never required and don’t affect matching scores.')}
           </p>
         </div>
       </div>

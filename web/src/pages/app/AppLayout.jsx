@@ -9,7 +9,7 @@ import { t } from '@shared/i18n';
 
 export function AppLayout() {
   const { user, conversations, sentRecords, unreadNotifications, logout } = useStore();
-  const unread = conversations.reduce((n, t) => n + (t.unreadCount || 0), 0) + conversations.filter((t) => t.needsMyResponse && !t.unread).length;
+  const unread = conversations.reduce((n, conv) => n + (conv.unreadCount || 0), 0) + conversations.filter((conv) => conv.needsMyResponse && !conv.unread).length;
   const awaiting = sentRecords.filter((r) => r.status === 'awaiting' && !r.expired).length;
 
   const items = [
@@ -26,7 +26,7 @@ export function AppLayout() {
     <div className="app-shell">
       <aside className="sidebar">
         <Brand />
-        <nav className="nav" aria-label="Main">
+        <nav className="nav" aria-label={t('Main')}>
           {items.map(({ to, label, icon: Icon, count }) => (
             <NavLink key={to} to={to} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
               <Icon size={19} />
@@ -35,7 +35,7 @@ export function AppLayout() {
             </NavLink>
           ))}
         </nav>
-        <nav className="nav secondary" aria-label="More">
+        <nav className="nav secondary" aria-label={t('More')}>
           <NavLink to="/notifications" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
             <Bell size={17} />
             {t('Notifications')}
@@ -43,7 +43,7 @@ export function AppLayout() {
           </NavLink>
           <NavLink to="/premium" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
             <Crown size={17} />
-            {t(user?.plan === 'premium' ? 'Premium' : 'Go Premium')}
+            {user?.plan && user.plan !== 'free' ? t('3Knot {planName}', { planName: t(user.planName) }) : t('Go Premium')}
           </NavLink>
           <NavLink to="/safety" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
             <ShieldCheck size={17} />
@@ -70,9 +70,9 @@ export function AppLayout() {
           </NavLink>
           <button
             className="icon-btn sm"
-            aria-label="Sign out"
+            aria-label={t('Sign out')}
             title={t('Sign out')}
-            onClick={() => window.confirm('Sign out of Sangam on this device?') && logout()}
+            onClick={() => window.confirm(t('Sign out of 3Knot on this device?')) && logout()}
           >
             <LogOut size={16} />
           </button>
@@ -82,7 +82,7 @@ export function AppLayout() {
       <main className="main">
         <div className="mobile-topbar">
           <Brand tagline={false} size={28} />
-          <Link to="/notifications" className="icon-btn" aria-label={`Notifications${unreadNotifications ? `, ${unreadNotifications} unread` : ''}`} style={{ position: 'relative' }}>
+          <Link to="/notifications" className="icon-btn" aria-label={unreadNotifications ? t('Notifications, {n} unread', { n: unreadNotifications }) : t('Notifications')} style={{ position: 'relative' }}>
             <Bell size={18} />
             {unreadNotifications > 0 && <span className="bell-count">{unreadNotifications > 99 ? '99+' : unreadNotifications}</span>}
           </Link>
@@ -93,7 +93,7 @@ export function AppLayout() {
       <ToastStack />
       <CallLayer />
 
-      <nav className="bottom-nav" aria-label="Main">
+      <nav className="bottom-nav" aria-label={t('Main')}>
         {items.filter((i) => !i.desktopOnly).map(({ to, label, icon: Icon, count }) => (
           <NavLink key={to} to={to} className={({ isActive }) => (isActive ? 'active' : undefined)}>
             <span className="nav-ico" style={{ position: 'relative' }}>

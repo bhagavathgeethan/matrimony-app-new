@@ -28,11 +28,34 @@ async function isBlockedBetween(a, b) {
   return res.rows.length > 0;
 }
 
-const isPremium = (row) => row?.plan === 'premium' && Boolean(row.premium_until) && new Date(row.premium_until) > new Date();
+const { tierHas, tierLimit } = require('../../../shared/plans.js');
 
+// The tier a member is on right now: their plan while it is paid up and not paused, otherwise 'free'
+function planOf(row) {
+  if (!row || !row.plan || row.plan === 'free' || row.plan_paused_at) return 'free';
+  return row.premium_until && new Date(row.premium_until) > new Date() ? row.plan : 'free';
+}
+// Any paid tier (Plus, Premium or Family)
+const isPremium = (row) => planOf(row) !== 'free';
+// Whether the member's current tier includes a feature (see shared/plans.js)
+const has = (row, feature) => tierHas(planOf(row), feature);
+const limitOf = (row, key) => tierLimit(planOf(row), key);
+
+const PLAN_COLUMNS = 'plan, premium_until, plan_paused_at';
+async function planRow(userId) {
+  return (await db.query(`SELECT ${PLAN_COLUMNS} FROM users WHERE id = $1`, [userId])).rows[0];
+}
 async function premiumFor(userId) {
-  const res = await db.query('SELECT plan, premium_until FROM users WHERE id = $1', [userId]);
-  return isPremium(res.rows[0]);
+  return isPremium(await planRow(userId));
+}
+
+// Throws 403 PREMIUM_REQUIRED unless the member's tier includes the feature
+function requireFeature(row, feature, message) {
+  if (!has(row, feature)) {
+    const { httpError } = require('./util');
+    const { FEATURES, TIER_INFO } = require('../../../shared/plans.js');
+    throw httpError(403, message || `${FEATURES[feature].title} is part of 3Knot ${TIER_INFO[FEATURES[feature].tier].name}`, 'PREMIUM_REQUIRED');
+  }
 }
 
 // Today's date in India (YYYY-MM-DD); daily picks and limits follow the Indian day
@@ -41,4 +64,6 @@ function todayIST(now = new Date()) {
 }
 const hourIST = (now = new Date()) => new Date(now.getTime() + 330 * 60000).getUTCHours();
 
-module.exports = { VISIBLE_USER_SQL, notBlockedSql, isBlockedBetween, isPremium, premiumFor, todayIST, hourIST };
+module.exports = {
+  VISIBLE_USER_SQL, notBlockedSql, isBlockedBetween, isPremium, premiumFor, planOf, has, limitOf, planRow, requireFeature, todayIST, hourIST,
+};

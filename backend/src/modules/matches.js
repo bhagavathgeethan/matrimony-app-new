@@ -7,10 +7,11 @@ const realtime = require('../services/realtime');
 const { computeMatchScore, calculatePillarOverlap } = require('../services/blueprintEngine');
 const { blueprintFromRow, detailValues } = require('./profile');
 const { httpError, ageFrom, relativeTime } = require('../lib/util');
+const { tx } = require('../lib/i18n');
 const { route } = require('../lib/http');
-const { VISIBLE_USER_SQL, notBlockedSql, isPremium, todayIST } = require('../lib/members');
+const { VISIBLE_USER_SQL, notBlockedSql, isPremium, planOf, has, limitOf, requireFeature, todayIST } = require('../lib/members');
 const { preferenceMatch } = require('../../../shared/preferences.js');
-const { activityLabel, PICK_REASONS } = require('../../../shared/engagement.js');
+const { activityLabel, PICK_REASONS, CONVERSATION_PROMPTS } = require('../../../shared/engagement.js');
 const { porutham } = require('../../../shared/porutham.js');
 
 const router = express.Router();
@@ -63,9 +64,21 @@ async function photosByUser(userIds) {
   return map;
 }
 
-// Photos as seen by someone else: blurred copies until mutual interest (if the owner asked for that)
-function visiblePhotos(owner, photos, isMutual) {
-  const blurred = owner.photo_blurred_until_mutual && !isMutual;
+// Photos as seen by someone else. Premium owners choose who sees them clearly (photo_visibility); otherwise
+// photos are blurred until mutual interest if the owner asked for that.
+function photosClearFor(owner, { isMutual = false, viewerVerified = false, score = 0 } = {}) {
+  if (isMutual) return true;
+  const rule = has(owner, 'photoPrivacy') ? owner.photo_visibility : null;
+  if (rule === 'everyone') return true;
+  if (rule === 'verified') return viewerVerified;
+  if (rule === 'aligned') return score >= 80;
+  if (rule === 'accepted') return false;
+  return !owner.photo_blurred_until_mutual;
+}
+
+function visiblePhotos(owner, photos, ctx) {
+  const context = typeof ctx === 'boolean' ? { isMutual: ctx } : ctx || {};
+  const blurred = !photosClearFor(owner, context);
   return {
     photos: (photos || []).map((p) => storage.url(blurred ? p.blur_key : p.storage_key)),
     photoBlurred: blurred,
@@ -79,7 +92,18 @@ function filledDetails(row) {
 
 const personOf = (row) => ({ age: ageFrom(row.birth_year, row.birth_month), details: detailValues(row) });
 
-function toCard(row, viewer, { photos, relation = null, shortlisted = false }) {
+// A premium member's visibility rules can hide them from some viewers (by city or age)
+function visibleTo(row, viewer) {
+  const rules = has(row, 'visibilityRules') ? row.visibility_rules || {} : {};
+  const city = (viewer.city || '').trim().toLowerCase();
+  if (city && (rules.hideCities || []).some((c) => c.trim().toLowerCase() === city)) return false;
+  const age = ageFrom(viewer.birth_year, viewer.birth_month);
+  if (rules.ageMin && age < rules.ageMin) return false;
+  if (rules.ageMax && age > rules.ageMax) return false;
+  return true;
+}
+
+function toCard(row, viewer, { photos, relation = null, shortlisted = false, spotlight = false }) {
   const bp = blueprintFromRow(row.bp);
   const overlapScores = computeMatchScore(viewer.blueprint, bp);
   const mine = new Set(viewer.vibes || []);
@@ -95,9 +119,16 @@ function toCard(row, viewer, { photos, relation = null, shortlisted = false }) {
     quote: row.quote,
     verified: Boolean(row.id_verified_at),
     verifiedDate: row.id_verified_at ? `ID verified ${relativeTime(row.id_verified_at).toLowerCase()}` : 'Phone verified',
-    premium: isPremium(row),
-    activity: activityLabel(row.last_active_at, realtime.isOnline(row.id)),
-    activeRecently: Date.now() - new Date(row.last_active_at).getTime() < 24 * 3600 * 1000,
+    // Plan badge (members on Plus and above may hide it)
+    premium: isPremium(row) && (row.show_premium_badge !== false || !has(row, 'badgeChoice')),
+    tier: isPremium(row) && (row.show_premium_badge !== false || !has(row, 'badgeChoice')) ? planOf(row) : null,
+    spotlight,
+    ...(row.hide_activity && has(row, 'hideActivity')
+      ? { activity: null, activeRecently: false }
+      : {
+          activity: activityLabel(row.last_active_at, realtime.isOnline(row.id)),
+          activeRecently: Date.now() - new Date(row.last_active_at).getTime() < 24 * 3600 * 1000,
+        }),
     managedByFamily: Boolean(details.profileCreatedBy && details.profileCreatedBy !== 'Self'),
     vibes: row.vibes || [],
     tags: sharedVibes.slice(0, 3).map((v) => `Both: ${v}`),
@@ -112,22 +143,32 @@ function toCard(row, viewer, { photos, relation = null, shortlisted = false }) {
     iFitTheirPreferences: preferenceMatch(row.preferences, personOf(viewer)),
     interest: relation ? { status: relation.status, byMe: relation.byMe, conversationId: relation.conversationId } : null,
     shortlisted,
-    ...visiblePhotos(row, photos, isMutual),
+    ...visiblePhotos(row, photos, { isMutual, viewerVerified: Boolean(viewer.id_verified_at), score: overlapScores.overall }),
   };
+}
+
+// Members whose spotlight is on right now
+async function spotlightSet(ids) {
+  if (!ids.length) return new Set();
+  const res = await db.query('SELECT DISTINCT user_id FROM spotlights WHERE ends_at > NOW() AND user_id = ANY($1::uuid[])', [ids]);
+  return new Set(res.rows.map((r) => r.user_id));
 }
 
 // Cards for many rows at once (photos, interest state and shortlist looked up in bulk)
 async function buildCards(viewer, rows) {
   const ids = rows.map((r) => r.id);
-  const [photos, relations, shortlist] = await Promise.all([
+  const [photos, relations, shortlist, spot] = await Promise.all([
     photosByUser(ids),
     relationsFor(viewer.id, ids),
     ids.length
       ? db.query('SELECT candidate_id FROM shortlists WHERE user_id = $1 AND candidate_id = ANY($2::uuid[])', [viewer.id, ids])
       : { rows: [] },
+    spotlightSet(ids),
   ]);
   const listed = new Set(shortlist.rows.map((r) => r.candidate_id));
-  return rows.map((row) => toCard(row, viewer, { photos: photos.get(row.id), relation: relations.get(row.id), shortlisted: listed.has(row.id) }));
+  return rows.map((row) => toCard(row, viewer, {
+    photos: photos.get(row.id), relation: relations.get(row.id), shortlisted: listed.has(row.id), spotlight: spot.has(row.id),
+  }));
 }
 
 async function loadViewer(userId) {
@@ -153,7 +194,7 @@ async function poolRows(viewer, { extraWhere = '', params = [] } = {}) {
        ${extraWhere}`,
     [viewer.id, viewer.gender, ...params]
   );
-  return res.rows;
+  return res.rows.filter((row) => visibleTo(row, viewer));
 }
 
 async function getFeed(userId, filter) {
@@ -161,7 +202,9 @@ async function getFeed(userId, filter) {
   let cards = await buildCards(viewer, await poolRows(viewer));
   if (filter === '80+') cards = cards.filter((c) => c.overlapScores.overall >= 80);
   if (filter === 'verified') cards = cards.filter((c) => c.verified);
-  cards.sort((a, b) => b.overlapScores.overall - a.overlapScores.overall);
+  // Spotlighted members who align strongly (80%+) with the viewer come first
+  const lit = (c) => (c.spotlight && c.overlapScores.overall >= 80 ? 1 : 0);
+  cards.sort((a, b) => lit(b) - lit(a) || b.overlapScores.overall - a.overlapScores.overall);
   return cards;
 }
 
@@ -174,7 +217,7 @@ async function getCandidate(viewerId, candidateId, { requireVisible = true } = {
     [viewerId, candidateId]
   );
   const row = res.rows[0];
-  if (!row) return null;
+  if (!row || (requireVisible && !visibleTo(row, viewer))) return null;
   return (await buildCards(viewer, [row]))[0];
 }
 
@@ -188,34 +231,50 @@ function pickReason(card, viewer) {
   return parts.join(' · ');
 }
 
-// Up to DAILY_PICKS_COUNT people chosen once per (Indian) day: best fit among people you haven't contacted,
-// preferring anyone not picked in the last week
+// People chosen once per (Indian) day: best fit among people you haven't contacted, preferring anyone not picked in
+// the last week. 5 a day (10 on Premium); strongly aligned Premium members get a small boost ("featured").
+async function choosePicks(viewer, day, kept, count) {
+  const rows = await poolRows(viewer, {
+    extraWhere: `AND NOT EXISTS (SELECT 1 FROM conversations c
+                   WHERE (c.user_a = $1 AND c.user_b = u.id) OR (c.user_b = $1 AND c.user_a = u.id))`,
+  });
+  const recent = new Set((await db.query(
+    `SELECT unnest(candidate_ids) AS id FROM daily_picks WHERE user_id = $1 AND day >= $2::date - 7 AND day < $2::date`,
+    [viewer.id, day]
+  )).rows.map((r) => r.id));
+  return rows
+    .filter((row) => !kept.includes(row.id))
+    .map((row) => {
+      const score = computeMatchScore(viewer.blueprint, blueprintFromRow(row.bp)).overall;
+      const featured = has(row, 'featuredPicks') && score >= 80 ? 3 : 0;
+      return { id: row.id, score: score + featured, seen: recent.has(row.id) };
+    })
+    .sort((a, b) => a.seen - b.seen || b.score - a.score)
+    .slice(0, Math.max(0, count - kept.length))
+    .map((x) => x.id);
+}
+
 async function dailyPicks(userId) {
   const viewer = await loadViewer(userId);
   const day = todayIST();
-  let saved = (await db.query('SELECT candidate_ids FROM daily_picks WHERE user_id = $1 AND day = $2', [userId, day])).rows[0];
+  const want = has(viewer, 'extraPicks') ? env.DAILY_PICKS_COUNT * 2 : env.DAILY_PICKS_COUNT;
+  const saved = (await db.query('SELECT candidate_ids FROM daily_picks WHERE user_id = $1 AND day = $2', [userId, day])).rows[0];
+  let ids = saved?.candidate_ids;
   if (!saved) {
-    const rows = await poolRows(viewer, {
-      extraWhere: `AND NOT EXISTS (SELECT 1 FROM conversations c
-                     WHERE (c.user_a = $1 AND c.user_b = u.id) OR (c.user_b = $1 AND c.user_a = u.id))`,
-    });
-    const recent = new Set((await db.query(
-      `SELECT unnest(candidate_ids) AS id FROM daily_picks WHERE user_id = $1 AND day >= $2::date - 7 AND day < $2::date`,
-      [userId, day]
-    )).rows.map((r) => r.id));
-    const scored = rows
-      .map((row) => ({ id: row.id, score: computeMatchScore(viewer.blueprint, blueprintFromRow(row.bp)).overall, seen: recent.has(row.id) }))
-      .sort((a, b) => a.seen - b.seen || b.score - a.score)
-      .slice(0, env.DAILY_PICKS_COUNT);
-    const ids = scored.map((s) => s.id);
+    ids = await choosePicks(viewer, day, [], want);
     await db.query(
-      `INSERT INTO daily_picks (user_id, day, candidate_ids) VALUES ($1, $2, $3::uuid[])
-       ON CONFLICT (user_id, day) DO NOTHING`,
+      `INSERT INTO daily_picks (user_id, day, candidate_ids) VALUES ($1, $2, $3::uuid[]) ON CONFLICT (user_id, day) DO NOTHING`,
       [userId, day, ids]
     );
-    saved = (await db.query('SELECT candidate_ids FROM daily_picks WHERE user_id = $1 AND day = $2', [userId, day])).rows[0];
+    ids = (await db.query('SELECT candidate_ids FROM daily_picks WHERE user_id = $1 AND day = $2', [userId, day])).rows[0].candidate_ids;
+  } else if (ids.length < want) {
+    // Upgraded during the day: top today's picks up to the new size
+    const extra = await choosePicks(viewer, day, ids, want);
+    if (extra.length) {
+      ids = [...ids, ...extra];
+      await db.query('UPDATE daily_picks SET candidate_ids = $3::uuid[] WHERE user_id = $1 AND day = $2', [userId, day, ids]);
+    }
   }
-  const ids = saved.candidate_ids;
   if (!ids.length) return { day, picks: [] };
   const rows = await poolRows(viewer, { extraWhere: 'AND u.id = ANY($3::uuid[])', params: [ids] });
   const cards = await buildCards(viewer, rows);
@@ -256,8 +315,8 @@ async function shortlist(userId) {
 async function recordView(viewerId, candidateId) {
   const card = await getCandidate(viewerId, candidateId);
   if (!card) throw httpError(404, 'Profile not found');
-  const viewer = (await db.query('SELECT incognito, plan, premium_until FROM users WHERE id = $1', [viewerId])).rows[0];
-  if (viewer.incognito && isPremium(viewer)) return { recorded: false };
+  const viewer = (await db.query('SELECT incognito, plan, premium_until, plan_paused_at FROM users WHERE id = $1', [viewerId])).rows[0];
+  if (viewer.incognito && has(viewer, 'incognito')) return { recorded: false };
   await db.query(
     `INSERT INTO profile_views (viewer_id, viewed_id) VALUES ($1, $2)
      ON CONFLICT (viewer_id, viewed_id, viewed_on) DO UPDATE SET viewed_at = NOW()`,
@@ -268,8 +327,8 @@ async function recordView(viewerId, candidateId) {
 
 // Who viewed / shortlisted me: everyone sees the counts, premium members see the people
 async function admirers(userId) {
-  const me = (await db.query('SELECT plan, premium_until FROM users WHERE id = $1', [userId])).rows[0];
-  const premium = isPremium(me);
+  const me = (await db.query('SELECT plan, premium_until, plan_paused_at FROM users WHERE id = $1', [userId])).rows[0];
+  const premium = has(me, 'admirers');
   const [views, lists] = await Promise.all([
     db.query(
       `SELECT pv.viewer_id AS id, MAX(pv.viewed_at) AS at FROM profile_views pv
@@ -335,8 +394,13 @@ async function compare(userId, candidateId) {
     horoscope = porutham(bride, groom) || { unavailable: 'Both of you need a star and raasi in your religious information.' };
   }
   await recordView(userId, candidateId).catch(() => {});
+  // Premium: conversation topics for where you differ most, and the shareable PDF report
+  const deep = has(viewer, 'deepReport');
+  const byGap = [...pillars].sort((a, b) => b.gap - a.gap);
   return {
     candidateId,
+    deepReport: deep,
+    topics: deep ? [...CONVERSATION_PROMPTS[byGap[0].key], ...CONVERSATION_PROMPTS[byGap[1].key]] : null,
     overall: card.overlapScores.overall,
     pillars,
     sharedVibes: (card.vibes || []).filter((v) => (viewer.vibes || []).includes(v)),
@@ -345,6 +409,32 @@ async function compare(userId, candidateId) {
     horoscope,
     horoscopeOptIn: { me: viewer.show_horoscope, them: other.show_horoscope },
   };
+}
+
+// ---------- more like this, rewind ----------
+
+// Premium: people whose blueprint is closest to a given candidate's
+async function similar(userId, candidateId) {
+  const viewer = await loadViewer(userId);
+  requireFeature(viewer, 'extraPicks');
+  const target = (await db.query('SELECT row_to_json(b.*) AS bp FROM blueprints b WHERE user_id = $1', [candidateId])).rows[0];
+  if (!target || !(await getCandidate(userId, candidateId))) throw httpError(404, 'Profile not found');
+  const tb = blueprintFromRow(target.bp);
+  const rows = (await poolRows(viewer, { extraWhere: 'AND u.id <> $3', params: [candidateId] }))
+    .map((row) => ({ row, distance: computeMatchScore(tb, blueprintFromRow(row.bp)).overall }))
+    .sort((a, b) => b.distance - a.distance)
+    .slice(0, 10)
+    .map((x) => x.row);
+  return buildCards(viewer, rows);
+}
+
+// Plus: undo the most recent pass
+async function rewind(userId) {
+  const viewer = await loadViewer(userId);
+  requireFeature(viewer, 'rewind');
+  const last = (await db.query('DELETE FROM match_passes WHERE (user_id, candidate_id) = (SELECT user_id, candidate_id FROM match_passes WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1) RETURNING candidate_id', [userId])).rows[0];
+  if (!last) throw httpError(404, 'There’s nothing to undo');
+  return { candidate: await getCandidate(userId, last.candidate_id) };
 }
 
 // ---------- alerts for newcomers ----------
@@ -371,8 +461,8 @@ async function alertNewMember(newUserId) {
     if (score < env.MATCH_ALERT_THRESHOLD) continue;
     await notify(other.id, {
       type: 'match',
-      title: 'New aligned match',
-      body: `${newcomer.first_name}, ${ageFrom(newcomer.birth_year, newcomer.birth_month)} · ${score}% aligned with you`,
+      title: tx('New aligned match'),
+      body: tx('{name}, {age} · {score}% aligned with you', { name: newcomer.first_name, age: ageFrom(newcomer.birth_year, newcomer.birth_month), score }),
       data: { candidateId: newUserId },
     });
     sent += 1;
@@ -394,6 +484,7 @@ router.get('/', route(async (req, res) => res.json(await getFeed(req.userId, req
 router.get('/daily', route(async (req, res) => res.json(await dailyPicks(req.userId))));
 router.get('/shortlist', route(async (req, res) => res.json(await shortlist(req.userId))));
 router.get('/admirers', route(async (req, res) => res.json(await admirers(req.userId))));
+router.post('/rewind', route(async (req, res) => res.json(await rewind(req.userId))));
 router.get('/:id', route(async (req, res) => {
   const card = await getCandidate(req.userId, req.params.id);
   if (!card) throw httpError(404, 'Profile not found');
@@ -401,11 +492,12 @@ router.get('/:id', route(async (req, res) => {
 }));
 router.get('/:id/compare', route(async (req, res) => res.json(await compare(req.userId, req.params.id))));
 router.post('/:id/view', route(async (req, res) => res.json(await recordView(req.userId, req.params.id))));
+router.get('/:id/similar', route(async (req, res) => res.json(await similar(req.userId, req.params.id))));
 router.post('/:id/pass', route(async (req, res) => res.json(await pass(req.userId, req.params.id))));
 router.post('/:id/shortlist', route(async (req, res) => res.json(await shortlistAdd(req.userId, req.params.id))));
 router.delete('/:id/shortlist', route(async (req, res) => res.json(await shortlistRemove(req.userId, req.params.id))));
 
 module.exports = {
   router, alertNewMember, toCard, buildCards, poolRows, getFeed, getCandidate, loadViewer, relationsFor, mutualSet,
-  photosByUser, visiblePhotos, dailyPicks, admirers, VISIBLE_USER_SQL,
+  photosByUser, visiblePhotos, visibleTo, dailyPicks, admirers, compare, VISIBLE_USER_SQL,
 };

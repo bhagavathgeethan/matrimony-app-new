@@ -3,13 +3,15 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator 
 import { BadgeCheck, TrendingUp, Send, Search, X, SlidersHorizontal, UserX, History, Heart, Bookmark, Bell, BellOff } from 'lucide-react';
 import { Sheet } from '../../components/details/DetailsUI';
 import { Capacitor } from '@capacitor/core';
-import { SEARCH_SORTS, DEFAULT_SEARCH_FILTERS, activeFilterChips } from '@shared/constants';
+import { SEARCH_SORTS, DEFAULT_SEARCH_FILTERS, activeFilterChips, describeSearch } from '@shared/constants';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { ProfileThumbnailRow } from '../../components/feed/ProfileThumbnailRow';
 import { ScopedShareSheet } from '../../components/family/ScopedShareSheet';
 import { SearchFilterSheet } from '../../components/search/SearchFilterSheet';
+import { CandidateSheet } from '../../components/engage/EngageUI';
 import { Screen, FadeIn, Eyebrow, Heading, Body, Chip, Card, Button } from '../../components/ui/kit';
+import { t } from '@shared/i18n';
 
 const isNativeApp = Capacitor.isNativePlatform();
 const { colors, fonts, gradients, shadows } = theme;
@@ -24,7 +26,7 @@ const QUICK = [
 export const ProfileListScreen = () => {
   const {
     user, search, recentSearches, runSearch, loadMoreSearch, applySearch, rememberSearch, clearRecentSearches,
-    setCurrentScreen, setActiveTab, setFocusedCandidateId, shareWithFamily,
+    shareWithFamily, openThreadById,
     savedSearches, loadSavedSearches, saveCurrentSearch, updateSavedSearch, deleteSavedSearch, runSavedSearch,
   } = useApp();
   const [saving, setSaving] = useState(false);
@@ -41,12 +43,13 @@ export const ProfileListScreen = () => {
     setSaveError(null);
   };
   const { filters, results, total, nextOffset, facets, status, error } = search;
-  const seeking = user?.gender === 'man' ? 'Brides' : user?.gender === 'woman' ? 'Grooms' : 'Profiles';
+  const seeking = t(user?.gender === 'man' ? 'Brides' : user?.gender === 'woman' ? 'Grooms' : 'Profiles');
 
   const [q, setQ] = useState(filters.q);
   const [selectedIds, setSelectedIds] = useState([]);
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [viewing, setViewing] = useState(null); // full profile of a result
   const typed = useRef(false);
   const chips = activeFilterChips(filters);
 
@@ -81,7 +84,7 @@ export const ProfileListScreen = () => {
   const toggleSelect = (id) => setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   const selectedCandidates = results.filter((c) => selectedIds.includes(c.id));
   const loading = status === 'loading';
-  const sortLabel = SEARCH_SORTS.find(([k]) => k === filters.sort)?.[1].toLowerCase();
+  const sortLabel = t(SEARCH_SORTS.find(([k]) => k === filters.sort)?.[1] || '');
   const showRecent = recentSearches.length > 0 && !q && chips.length === 0;
 
   return (
@@ -89,9 +92,9 @@ export const ProfileListScreen = () => {
       <Screen tabBar>
         <FadeIn>
           <View style={{ gap: 6, marginTop: 4 }}>
-            <Eyebrow>Search & browse</Eyebrow>
-            <Heading size={36}>{seeking} for you</Heading>
-            <Body size={14}>{loading ? 'Searching…' : `${total} ${total === 1 ? 'profile' : 'profiles'} · ${sortLabel}`}</Body>
+            <Eyebrow>{t('Search & browse')}</Eyebrow>
+            <Heading size={36}>{t('{seeking} for you', { seeking })}</Heading>
+            <Body size={14}>{loading ? t('Searching…') : `${t(total === 1 ? '1 profile' : '{n} profiles', { n: total })} · ${sortLabel}`}</Body>
           </View>
         </FadeIn>
 
@@ -101,22 +104,22 @@ export const ProfileListScreen = () => {
               <Search size={18} color={colors.textMuted} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Name, city, profession, vibe"
+                placeholder={t('Name, city, profession, vibe')}
                 placeholderTextColor={colors.textLight}
                 value={q}
                 maxLength={80}
                 returnKeyType="search"
-                accessibilityLabel="Search profiles"
-                onChangeText={(t) => setQuery(t)}
+                accessibilityLabel={t('Search profiles')}
+                onChangeText={(text) => setQuery(text)}
                 onSubmitEditing={() => setQuery(q, { now: true })}
               />
               {q ? (
-                <TouchableOpacity onPress={() => setQuery('', { now: true })} style={styles.clearBtn} accessibilityLabel="Clear search">
+                <TouchableOpacity onPress={() => setQuery('', { now: true })} style={styles.clearBtn} accessibilityLabel={t('Clear search')}>
                   <X size={15} color={colors.textSecondary} />
                 </TouchableOpacity>
               ) : null}
             </View>
-            <TouchableOpacity onPress={() => setShowFilters(true)} style={styles.filterBtn} accessibilityLabel={`Filters${chips.length ? `, ${chips.length} on` : ''}`}>
+            <TouchableOpacity onPress={() => setShowFilters(true)} style={styles.filterBtn} accessibilityLabel={chips.length ? t('Filters, {n} on', { n: chips.length }) : t('Filters')}>
               <SlidersHorizontal size={19} color={colors.textPrimary} />
               {chips.length > 0 && (
                 <View style={styles.filterCount}>
@@ -130,26 +133,26 @@ export const ProfileListScreen = () => {
         <FadeIn delay={80}>
           <View style={styles.chipRow}>
             {QUICK.map(([label, icon, on, flip]) => (
-              <Chip key={label} label={label} icon={icon} active={on(filters)} onPress={() => apply(flip(filters))} />
+              <Chip key={label} label={t(label)} icon={icon} active={on(filters)} onPress={() => apply(flip(filters))} />
             ))}
           </View>
         </FadeIn>
 
         {savedSearches.length > 0 && (
-          <View style={styles.chipRow} accessibilityLabel="Saved searches">
+          <View style={styles.chipRow} accessibilityLabel={t('Saved searches')}>
             <View style={styles.recentLabel}>
               <Bookmark size={13} color={colors.textMuted} />
-              <Text style={styles.hint}>Saved</Text>
+              <Text style={styles.hint}>{t('Saved')}</Text>
             </View>
             {savedSearches.map((sv) => (
               <View key={sv.id} style={styles.savedChip}>
                 <TouchableOpacity onPress={() => { typed.current = false; setQ(sv.filters.q || ''); runSavedSearch(sv); }}>
                   <Text style={styles.activeChipText}>{sv.name}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => updateSavedSearch(sv.id, { alerts: !sv.alerts })} accessibilityLabel={sv.alerts ? `Turn off alerts for ${sv.name}` : `Turn on alerts for ${sv.name}`}>
+                <TouchableOpacity onPress={() => updateSavedSearch(sv.id, { alerts: !sv.alerts })} accessibilityLabel={sv.alerts ? t('Turn off alerts for {name}', { name: sv.name }) : t('Turn on alerts for {name}', { name: sv.name })}>
                   {sv.alerts ? <Bell size={13} color={colors.accent} /> : <BellOff size={13} color={colors.textMuted} />}
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => deleteSavedSearch(sv.id)} accessibilityLabel={`Delete saved search ${sv.name}`}>
+                <TouchableOpacity onPress={() => deleteSavedSearch(sv.id)} accessibilityLabel={t('Delete saved search {name}', { name: sv.name })}>
                   <X size={13} color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
@@ -159,18 +162,18 @@ export const ProfileListScreen = () => {
 
         {chips.length > 0 && (
           <View style={styles.chipRow}>
-            <TouchableOpacity onPress={() => setSaving(true)} style={styles.activeChip} accessibilityLabel="Save search">
+            <TouchableOpacity onPress={() => setSaving(true)} style={styles.activeChip} accessibilityLabel={t('Save search')}>
               <Bookmark size={12} color={colors.accent} />
-              <Text style={styles.activeChipText}>Save search</Text>
+              <Text style={styles.activeChipText}>{t('Save search')}</Text>
             </TouchableOpacity>
             {chips.map((c) => (
-              <TouchableOpacity key={c.key} onPress={() => apply(c.clear)} style={styles.activeChip} accessibilityLabel={`Remove filter ${c.label}`}>
-                <Text style={styles.activeChipText}>{c.label}</Text>
+              <TouchableOpacity key={c.key} onPress={() => apply(c.clear)} style={styles.activeChip} accessibilityLabel={t('Remove filter {label}', { label: c.label })}>
+                <Text style={styles.activeChipText}>{t(c.label)}</Text>
                 <X size={12} color={colors.accent} />
               </TouchableOpacity>
             ))}
             <TouchableOpacity onPress={() => replaceSearch(DEFAULT_SEARCH_FILTERS)}>
-              <Text style={styles.link}>Clear all</Text>
+              <Text style={styles.link}>{t('Clear all')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -179,23 +182,23 @@ export const ProfileListScreen = () => {
           <View style={styles.chipRow}>
             <View style={styles.recentLabel}>
               <History size={13} color={colors.textMuted} />
-              <Text style={styles.hint}>Recent</Text>
+              <Text style={styles.hint}>{t('Recent')}</Text>
             </View>
             {recentSearches.map((r) => (
-              <Chip key={r.label} label={r.label} onPress={() => replaceSearch(r.filters)} />
+              <Chip key={r.label} label={describeSearch(r.filters)} onPress={() => replaceSearch(r.filters)} />
             ))}
             <TouchableOpacity onPress={clearRecentSearches}>
-              <Text style={styles.link}>Clear</Text>
+              <Text style={styles.link}>{t('Clear')}</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {results.length > 0 && <Text style={styles.selectHint}>Tap ◯ to select for family</Text>}
+        {results.length > 0 && <Text style={styles.selectHint}>{t('Tap ◯ to select for family')}</Text>}
 
         {status === 'error' ? (
           <Card variant="tinted" style={{ gap: 12, alignItems: 'center' }}>
-            <Body style={{ textAlign: 'center' }}>Search didn’t load. {error}</Body>
-            <Button small variant="secondary" label="Try again" onPress={() => runSearch()} />
+            <Body style={{ textAlign: 'center' }}>{t('Search didn’t load. {error}', { error })}</Body>
+            <Button small variant="secondary" label={t('Try again')} onPress={() => runSearch()} />
           </Card>
         ) : loading && results.length === 0 ? (
           <View style={styles.loading}>
@@ -203,9 +206,9 @@ export const ProfileListScreen = () => {
           </View>
         ) : results.length === 0 && status !== 'idle' ? (
           <Card variant="tinted" style={{ gap: 12, alignItems: 'center' }}>
-            <Body style={{ textAlign: 'center' }}>No profiles match this search. Try fewer filters or a different word.</Body>
+            <Body style={{ textAlign: 'center' }}>{t('No profiles match this search. Try fewer filters or a different word.')}</Body>
             {(chips.length > 0 || q) ? (
-              <Button small variant="secondary" label="Clear search" onPress={() => replaceSearch(DEFAULT_SEARCH_FILTERS)} />
+              <Button small variant="secondary" label={t('Clear search')} onPress={() => replaceSearch(DEFAULT_SEARCH_FILTERS)} />
             ) : null}
           </Card>
         ) : (
@@ -216,11 +219,7 @@ export const ProfileListScreen = () => {
                 candidate={candidate}
                 selected={selectedIds.includes(candidate.id)}
                 onToggleSelect={() => toggleSelect(candidate.id)}
-                onPressCard={() => {
-                  setFocusedCandidateId(candidate.id);
-                  setActiveTab('feed');
-                  setCurrentScreen('feed');
-                }}
+                onPressCard={() => setViewing(candidate)}
               />
             ))}
           </View>
@@ -229,7 +228,7 @@ export const ProfileListScreen = () => {
         {nextOffset != null && status !== 'error' && (
           <Button
             variant="secondary"
-            label={status === 'loadingMore' ? 'Loading…' : `Show more (${total - results.length} left)`}
+            label={status === 'loadingMore' ? t('Loading…') : t('Show more ({n} left)', { n: total - results.length })}
             disabled={status === 'loadingMore'}
             onPress={loadMoreSearch}
             style={{ marginTop: 16 }}
@@ -242,15 +241,23 @@ export const ProfileListScreen = () => {
         <View style={styles.batchWrap} pointerEvents="box-none">
           <View style={[styles.batchBar, isNativeApp && { maxWidth: '100%' }]}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.batchTitle}>{selectedCandidates.length} selected</Text>
-              <Text style={styles.batchSub}>Send to family or express interest</Text>
+              <Text style={styles.batchTitle}>{t('{n} selected', { n: selectedCandidates.length })}</Text>
+              <Text style={styles.batchSub}>{t('Send to family or express interest')}</Text>
             </View>
             <TouchableOpacity activeOpacity={0.9} onPress={() => setShowBatchModal(true)} style={styles.sendBtn}>
               <Send size={15} color={colors.surfaceDark} />
-              <Text style={styles.sendText}>Send</Text>
+              <Text style={styles.sendText}>{t('Send')}</Text>
             </TouchableOpacity>
           </View>
         </View>
+      )}
+
+      {viewing && (
+        <CandidateSheet
+          candidate={results.find((r) => r.id === viewing.id) || viewing}
+          onClose={() => setViewing(null)}
+          onOpenThread={(id) => openThreadById(id)}
+        />
       )}
 
       {showBatchModal && (
@@ -270,13 +277,13 @@ export const ProfileListScreen = () => {
 
       {saving && (
         <Sheet
-          title="Save this search"
+          title={t('Save this search')}
           onClose={() => setSaving(false)}
-          footer={<Button label="Save" disabled={!saveName.trim()} onPress={doSave} />}
+          footer={<Button label={t('Save')} disabled={!saveName.trim()} onPress={doSave} />}
         >
-          <TextInput value={saveName} onChangeText={setSaveName} placeholder="Name, e.g. Chennai 80%+" placeholderTextColor={colors.textLight}
-            maxLength={80} style={styles.saveInput} accessibilityLabel="Search name" />
-          <Text style={styles.hint}>We’ll notify you when someone new fits this search.</Text>
+          <TextInput value={saveName} onChangeText={setSaveName} placeholder={t('Name, e.g. Chennai 80%+')} placeholderTextColor={colors.textLight}
+            maxLength={80} style={styles.saveInput} accessibilityLabel={t('Search name')} />
+          <Text style={styles.hint}>{t('We’ll notify you when someone new fits this search.')}</Text>
           {saveError && <Text style={[styles.hint, { color: colors.accent }]}>{saveError}</Text>}
         </Sheet>
       )}

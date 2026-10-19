@@ -5,7 +5,7 @@ import { useStore } from '../../store';
 import { Button } from '../../components/ui';
 import { t } from '@shared/i18n';
 
-// Selfie verification: reviewed by the Sangam team against the profile photos
+// Selfie verification: reviewed by the 3Knot team against the profile photos
 export function VerificationPage() {
   const { user, verification, loadVerification, submitVerification } = useStore();
   const [file, setFile] = useState(null);
@@ -39,41 +39,41 @@ export function VerificationPage() {
   const rejected = v?.request?.status === 'rejected';
   return (
     <div className="page" style={{ maxWidth: 760 }}>
-      <Link to="/profile" className="row small muted" style={{ '--gap': '4px' }}><ChevronLeft size={15} /> Profile</Link>
+      <Link to="/profile" className="row small muted" style={{ '--gap': '4px' }}><ChevronLeft size={15} />{' '}{t('Profile')}</Link>
       <div className="stack" style={{ '--gap': '6px' }}>
-        <span className="eyebrow">Trust</span>
+        <span className="eyebrow">{t('Trust')}</span>
         <h1 className="h1">{t('Get the verified badge')}</h1>
-        <span className="small muted">Take a clear selfie. Our team compares it with your profile photos — it’s never shown to anyone else and is deleted after review.</span>
+        <span className="small muted">{t('Take a clear selfie. Our team compares it with your profile photos — it’s never shown to anyone else and is deleted after review.')}</span>
       </div>
 
       {v?.verified || user?.verified ? (
         <div className="card row" style={{ '--gap': '14px' }}>
           <BadgeCheck size={34} color="var(--success)" />
-          <div><div className="h2">You’re verified</div><div className="small muted">The badge shows on your profile and in search.</div></div>
+          <div><div className="h2">{t('You’re verified')}</div><div className="small muted">{t('The badge shows on your profile and in search.')}</div></div>
         </div>
       ) : pending ? (
         <div className="card row" style={{ '--gap': '14px' }}>
           <Clock size={30} color="var(--gold)" />
-          <div><div className="h2">Selfie under review</div><div className="small muted">Usually within a day. We’ll notify you.</div></div>
+          <div><div className="h2">{t('Selfie under review')}</div><div className="small muted">{t('Usually within a day. We’ll notify you.')}</div></div>
         </div>
       ) : (
         <div className="card stack">
           {rejected && (
             <div className="row small" style={{ '--gap': '8px', color: 'var(--accent)' }}>
-              <RotateCw size={15} /> Last attempt wasn’t approved{v.request.note ? `: ${v.request.note}` : ''}. Please try again.
+              <RotateCw size={15} />{' '}{v.request.note ? t('Last attempt wasn’t approved: {reason}. Please try again.', { reason: v.request.note }) : t('Last attempt wasn’t approved. Please try again.')}
             </div>
           )}
           <ul className="small muted" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.8 }}>
-            <li>Face the camera in good light, no sunglasses or filters</li>
-            <li>Just you in the photo</li>
-            <li>Your profile needs at least one clear photo of you</li>
+            <li>{t('Face the camera in good light, no sunglasses or filters')}</li>
+            <li>{t('Just you in the photo')}</li>
+            <li>{t('Your profile needs at least one clear photo of you')}</li>
           </ul>
-          {preview && <img src={preview} alt="Your selfie" className="selfie-preview" />}
-          <input ref={input} type="file" accept="image/*" capture="user" onChange={pick} style={{ display: 'none' }} aria-label="Selfie" />
+          {preview && <img src={preview} alt={t('Your selfie')} className="selfie-preview" />}
+          <input ref={input} type="file" accept="image/*" capture="user" onChange={pick} style={{ display: 'none' }} aria-label={t('Selfie')} />
           {error && <span className="error-text">{error}</span>}
           <div className="row" style={{ '--gap': '10px' }}>
-            <Button variant="secondary" icon={Camera} onClick={() => input.current?.click()}>{file ? 'Retake' : 'Take a selfie'}</Button>
-            <Button icon={ShieldCheck} loading={busy} disabled={!file || busy} onClick={send}>Submit for review</Button>
+            <Button variant="secondary" icon={Camera} onClick={() => input.current?.click()}>{file ? t('Retake') : t('Take a selfie')}</Button>
+            <Button icon={ShieldCheck} loading={busy} disabled={!file || busy} onClick={send}>{t('Submit for review')}</Button>
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { theme } from '../../theme/tokens';
+import { t } from '@shared/i18n';
 
 const { colors, fonts, gradients, radii } = theme;
 
@@ -37,7 +38,7 @@ export const BlueprintSlider = ({
                 onPress={() => onChangeFlexibility && onChangeFlexibility(key)}
                 style={[styles.segmentBtn, active && styles.segmentBtnActive]}
               >
-                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
+                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{t(label)}</Text>
               </TouchableOpacity>
             );
           })}

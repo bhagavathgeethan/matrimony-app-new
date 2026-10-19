@@ -33,7 +33,7 @@ export const ShortlistScreen = () => {
         <TopBar onBack={() => setCurrentScreen('blueprint-summary')} title={t('Shortlist')} />
         <Heading size={30}>{t('People you’re considering')}</Heading>
         <View style={styles.tabs} accessibilityRole="tablist">
-          {[['shortlist', `Mine (${shortlist.length})`], ['views', `Viewed me (${admirers?.views.count ?? 0})`], ['shortlisted', `Shortlisted me (${admirers?.shortlists.count ?? 0})`]].map(([key, label]) => (
+          {[['shortlist', t('Mine ({n})', { n: shortlist.length })], ['views', t('Viewed me ({n})', { n: admirers?.views.count ?? 0 })], ['shortlisted', t('Shortlisted me ({n})', { n: admirers?.shortlists.count ?? 0 })]].map(([key, label]) => (
             <TouchableOpacity key={key} onPress={() => setTab(key)} style={[styles.tab, tab === key && styles.tabOn]} accessibilityRole="tab" accessibilityState={{ selected: tab === key }}>
               <Text style={[styles.tabText, tab === key && { color: colors.accent }]}>{label}</Text>
             </TouchableOpacity>
@@ -44,16 +44,18 @@ export const ShortlistScreen = () => {
           <Card variant="dark" style={{ gap: 12 }}>
             <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
               <Lock size={18} color={colors.gold} />
-              <Text style={styles.lockTitle}>{count} {count === 1 ? 'person' : 'people'} {tab === 'views' ? 'viewed your profile' : 'shortlisted you'}</Text>
+              <Text style={styles.lockTitle}>{tab === 'views'
+                ? t(count === 1 ? '1 person viewed your profile in the last 30 days' : '{n} people viewed your profile in the last 30 days', { n: count })
+                : t(count === 1 ? '1 person shortlisted you' : '{n} people shortlisted you', { n: count })}</Text>
             </View>
-            <Text style={styles.lockText}>See who they are — and reach out first — with Sangam Premium.</Text>
-            <Button label="See Premium" icon={Crown} onPress={() => setCurrentScreen('premium')} />
+            <Text style={styles.lockText}>{t('See who they are — and reach out first — with 3Knot Premium.')}</Text>
+            <Button label={t('See Premium')} icon={Crown} onPress={() => setCurrentScreen('premium')} />
           </Card>
         ) : !list?.length ? (
           <Card variant="tinted" style={{ alignItems: 'center', gap: 10 }}>
             <Star size={24} color={colors.gold} />
             <Body style={{ textAlign: 'center' }}>
-              {tab === 'shortlist' ? 'Tap the star on any profile to keep it here.' : tab === 'views' ? 'No profile views in the last 30 days.' : 'Nobody has shortlisted you yet.'}
+              {tab === 'shortlist' ? t('Tap the star on any profile to keep it here.') : tab === 'views' ? t('No profile views in the last 30 days.') : t('Nobody has shortlisted you yet.')}
             </Body>
           </Card>
         ) : (

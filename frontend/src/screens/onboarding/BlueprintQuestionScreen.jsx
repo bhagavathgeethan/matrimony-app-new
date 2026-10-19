@@ -4,6 +4,7 @@ import { Check, TrendingUp, Plane, Home, Sparkles } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { OnboardingScreen, TopBar, StepBar, FadeIn, Eyebrow, Heading, Button } from '../../components/ui/kit';
+import { t } from '@shared/i18n';
 
 const { colors, fonts, gradients, radii } = theme;
 
@@ -48,14 +49,14 @@ export const BlueprintQuestionScreen = () => {
       footer={
         <>
           {error && <Text style={styles.error}>{error}</Text>}
-          <Button label={saving ? 'Saving…' : 'Next question'} disabled={saving} onPress={handleNext} />
+          <Button label={saving ? t('Saving…') : t('Next question')} disabled={saving} onPress={handleNext} />
         </>
       }
     >
       <FadeIn>
         <View style={styles.header}>
-          <Eyebrow>Money philosophy</Eyebrow>
-          <Heading size={32}>A ₹3 lakh bonus lands. What actually happens?</Heading>
+          <Eyebrow>{t('Money philosophy')}</Eyebrow>
+          <Heading size={32}>{t('A ₹3 lakh bonus lands. What actually happens?')}</Heading>
         </View>
       </FadeIn>
 
@@ -74,8 +75,8 @@ export const BlueprintQuestionScreen = () => {
                   <Icon size={17} color={selected ? colors.white : colors.accent} />
                 </View>
                 <View style={{ flex: 1, gap: 1 }}>
-                  <Text style={[styles.optionTitle, selected && { color: colors.white }]}>{opt.title}</Text>
-                  <Text style={[styles.optionDesc, selected && { color: 'rgba(255,255,255,0.75)' }]}>{opt.desc}</Text>
+                  <Text style={[styles.optionTitle, selected && { color: colors.white }]}>{t(opt.title)}</Text>
+                  <Text style={[styles.optionDesc, selected && { color: 'rgba(255,255,255,0.75)' }]}>{t(opt.desc)}</Text>
                 </View>
                 <View style={[styles.radio, selected && styles.radioSelected]}>
                   {selected && <Check size={12} color={colors.accent} strokeWidth={3} />}
@@ -88,7 +89,7 @@ export const BlueprintQuestionScreen = () => {
 
       <FadeIn delay={300}>
         <View style={styles.deal}>
-          <Text style={styles.dealQ}>Could you live with someone who answered differently?</Text>
+          <Text style={styles.dealQ}>{t('Could you live with someone who answered differently?')}</Text>
           <View style={styles.segment}>
             {[['yes', 'Yes'], ['no', 'No']].map(([key, label]) => {
               const active = dealbreakerAcceptsDiff === key;
@@ -98,7 +99,7 @@ export const BlueprintQuestionScreen = () => {
                   onPress={() => setDealbreakerAcceptsDiff(key)}
                   style={[styles.segmentBtn, active && styles.segmentBtnActive]}
                 >
-                  <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
+                  <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{t(label)}</Text>
                 </TouchableOpacity>
               );
             })}

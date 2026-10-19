@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Pencil, ShieldCheck, Users, ChevronRight, BadgeCheck, Sparkles, UserRound, Images, Heart, Bell, ClipboardList, SlidersHorizontal, Crown, Sun, Star, BookHeart } from 'lucide-react';
-import { profileStrengthHint } from '@shared/constants';
+import { profileStrengthHint, blueprintSummary } from '@shared/constants';
 import { SignOutButton } from '../../components/common/SignOutButton';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
@@ -17,7 +17,7 @@ export const MyBlueprintSummaryScreen = () => {
   const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState(null);
   const bp = user?.blueprint || {};
-  const summary = (bp.summaryText || '').replace(/^In short:\s*/, '');
+  const summary = blueprintSummary(bp, { prefix: false });
   const strength = user?.profileStrength ?? 0;
   const photoCount = user?.photos?.length || 0;
   const completed = Boolean(user?.onboarding?.completed);
@@ -29,15 +29,15 @@ export const MyBlueprintSummaryScreen = () => {
   };
 
   const links = [
-    { icon: ClipboardList, label: 'Personal details', sub: `${strength}% complete · family, education, hobbies`, screen: 'personal-details' },
-    { icon: UserRound, label: 'Basics', sub: 'Name, city, timeline', screen: 'basics' },
-    { icon: Images, label: 'Photos & privacy', sub: `${photoCount} photo${photoCount === 1 ? '' : 's'}`, screen: 'photos' },
-    { icon: Heart, label: 'Vibes', sub: `${(user?.vibes || []).length} of 6 picked`, screen: 'vibes' },
+    { icon: ClipboardList, label: 'Personal details', sub: t('{n}% complete · family, education, hobbies', { n: strength }), screen: 'personal-details' },
+    { icon: UserRound, label: 'Basics', sub: t('Name, city, timeline'), screen: 'basics' },
+    { icon: Images, label: 'Photos & privacy', sub: t(photoCount === 1 ? '1 photo' : '{n} photos', { n: photoCount }), screen: 'photos' },
+    { icon: Heart, label: 'Vibes', sub: t('{n} of 6 picked', { n: (user?.vibes || []).length }), screen: 'vibes' },
     ...(completed
       ? [
-          { icon: SlidersHorizontal, label: 'Partner preferences & prompts', sub: `${Object.keys(user?.preferences || {}).length} preferences · ${(user?.prompts || []).length} prompts`, screen: 'preferences' },
-          { icon: BadgeCheck, label: 'ID verification', sub: user?.verified ? 'Verified' : 'Get the verified badge', screen: 'verification' },
-          { icon: Crown, label: 'Premium', sub: user?.plan === 'premium' ? 'Active' : 'Unlimited interests and more', screen: 'premium' },
+          { icon: SlidersHorizontal, label: 'Partner preferences & prompts', sub: t('{prefs} preferences · {prompts} prompts', { prefs: Object.keys(user?.preferences || {}).length, prompts: (user?.prompts || []).length }), screen: 'preferences' },
+          { icon: BadgeCheck, label: 'ID verification', sub: t(user?.verified ? 'Verified' : 'Get the verified badge'), screen: 'verification' },
+          { icon: Crown, label: 'Premium', sub: user?.plan && user.plan !== 'free' ? t('3Knot {planName} · active', { planName: t(user.planName) }) : t('Plus, Premium and Family plans'), screen: 'premium' },
           { icon: Sun, label: 'Today’s picks', sub: 'Five curated matches each day', screen: 'daily' },
           { icon: Star, label: 'Shortlist & who viewed you', sub: 'People you’re considering', screen: 'shortlist' },
           { icon: BookHeart, label: 'Success stories', sub: 'Share how you met', screen: 'stories' },
@@ -66,10 +66,10 @@ export const MyBlueprintSummaryScreen = () => {
     <Screen tabBar={completed}>
       <FadeIn>
         <View style={styles.topRow}>
-          <Heading size={34}>My blueprint</Heading>
+          <Heading size={34}>{t('My blueprint')}</Heading>
           <TouchableOpacity onPress={() => setCurrentScreen('blueprint-tuner')} style={styles.editBtn}>
             <Pencil size={14} color={colors.accent} />
-            <Text style={styles.editText}>Edit</Text>
+            <Text style={styles.editText}>{t('Edit')}</Text>
           </TouchableOpacity>
         </View>
       </FadeIn>
@@ -85,22 +85,22 @@ export const MyBlueprintSummaryScreen = () => {
               </Text>
               <View style={styles.verifiedRow}>
                 <BadgeCheck size={14} color={colors.gold} />
-                <Text style={styles.meta}>{user?.city} · {user?.verified ? 'ID verified' : 'phone verified'}</Text>
+                <Text style={styles.meta}>{user?.city} · {user?.verified ? t('ID verified') : t('phone verified')}</Text>
               </View>
             </View>
           </View>
 
           <View style={{ gap: 12 }}>
-            <Meter label="Money" value={bp.money ?? 0} dark />
-            <Meter label="Roots" value={bp.roots ?? 0} dark />
-            <Meter label="Kids" value={bp.kids ?? 0} dark />
-            <Meter label="Ambition" value={bp.ambition ?? 0} dark />
+            <Meter label={t('Money')} value={bp.money ?? 0} dark />
+            <Meter label={t('Roots')} value={bp.roots ?? 0} dark />
+            <Meter label={t('Kids')} value={bp.kids ?? 0} dark />
+            <Meter label={t('Ambition')} value={bp.ambition ?? 0} dark />
           </View>
 
           <View style={styles.quote}>
             <Sparkles size={16} color={colors.gold} />
             <Text style={styles.quoteText}>
-              In short: <Text style={styles.quoteStrong}>{summary}</Text>
+              {t('In short:')}{' '}<Text style={styles.quoteStrong}>{summary}</Text>
             </Text>
           </View>
         </Card>
@@ -108,21 +108,21 @@ export const MyBlueprintSummaryScreen = () => {
 
       <FadeIn delay={160}>
         <View style={{ gap: 10 }}>
-          <SectionLabel>Your vibes</SectionLabel>
+          <SectionLabel>{t('Your vibes')}</SectionLabel>
           <View style={styles.vibes}>
             {(user?.vibes || []).map((vibe) => (
               <View key={vibe} style={styles.vibePill}>
-                <Text style={styles.vibeText}>{vibe}</Text>
+                <Text style={styles.vibeText}>{t(vibe)}</Text>
               </View>
             ))}
-            {(user?.vibes || []).length === 0 && <Text style={styles.meta2}>No vibes picked yet.</Text>}
+            {(user?.vibes || []).length === 0 && <Text style={styles.meta2}>{t('No vibes picked yet.')}</Text>}
           </View>
         </View>
       </FadeIn>
 
       <FadeIn delay={220}>
         <Card style={styles.strength}>
-          <ScoreRing score={strength} size={64} label="DONE" />
+          <ScoreRing score={strength} size={64} label={t('DONE')} />
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={styles.strengthTitle}>{t('Profile {n}% complete', { n: strength })}</Text>
             <Text style={styles.meta2}>{strengthHint}</Text>
@@ -144,7 +144,7 @@ export const MyBlueprintSummaryScreen = () => {
                 <IconBadge icon={l.icon} size={38} />
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={styles.linkTitle}>{t(l.label)}</Text>
-                  <Text style={styles.meta2}>{l.sub}</Text>
+                  <Text style={styles.meta2}>{t(l.sub)}</Text>
                 </View>
                 <ChevronRight size={18} color={colors.textLight} />
               </TouchableOpacity>
@@ -157,7 +157,7 @@ export const MyBlueprintSummaryScreen = () => {
         <View style={{ gap: 8 }}>
           {error && <Text style={[styles.meta2, { color: colors.accent, textAlign: 'center' }]}>{error}</Text>}
           <Button
-            label={finishing ? 'One moment…' : completed ? 'Explore Aligned Matches' : 'Finish & see my matches'}
+            label={finishing ? t('One moment…') : completed ? t('Explore Aligned Matches') : t('Finish & see my matches')}
             disabled={finishing}
             onPress={handleExplore}
           />

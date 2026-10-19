@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Sangam</string>
-    <string name="title_activity_main">Sangam</string>
+    <string name="app_name">3Knot</string>
+    <string name="title_activity_main">3Knot</string>
     <string name="package_name">com.stucompany.matrimony</string>
     <string name="custom_url_scheme">com.stucompany.matrimony</string>
 </resources>

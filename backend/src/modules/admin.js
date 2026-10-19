@@ -5,7 +5,8 @@ const db = require('../config/db');
 const storage = require('../services/storage');
 const verification = require('./verification');
 const stories = require('./stories');
-const { httpError, ageFrom, maskPhone } = require('../lib/util');
+const { httpError, ageFrom, maskPhone, newId } = require('../lib/util');
+const { tx } = require('../lib/i18n');
 const { route } = require('../lib/http');
 const { REPORT_REASONS } = require('../../../shared/engagement.js');
 
@@ -31,7 +32,7 @@ async function stats() {
     one('SELECT COUNT(*)::int AS n FROM users'),
     one('SELECT COUNT(*)::int AS n FROM users WHERE onboarding_completed_at IS NOT NULL'),
     one(`SELECT COUNT(*)::int AS n FROM users WHERE last_active_at > NOW() - INTERVAL '7 days'`),
-    one(`SELECT COUNT(*)::int AS n FROM users WHERE plan = 'premium' AND premium_until > NOW()`),
+    one(`SELECT COUNT(*)::int AS n FROM users WHERE plan <> 'free' AND premium_until > NOW() AND plan_paused_at IS NULL`),
     one('SELECT COUNT(*)::int AS n FROM conversations'),
     one(`SELECT COUNT(*)::int AS n FROM conversations WHERE status = 'accepted'`),
     one(`SELECT COUNT(*)::int AS n FROM reports WHERE status = 'open'`),
@@ -127,6 +128,69 @@ async function selfie(id) {
   return storage.private.read(v.selfie_key);
 }
 
+// ---------- assisted service ----------
+
+async function assistedQueue() {
+  const res = await db.query(
+    `SELECT u.*, r.id AS request_id, r.notes, r.call_time, r.status AS request_status, r.manager_note, r.created_at AS requested_at,
+            (SELECT COUNT(*)::int FROM assisted_recommendations ar WHERE ar.user_id = u.id) AS recommended
+     FROM users u
+     LEFT JOIN LATERAL (SELECT * FROM assisted_requests x WHERE x.user_id = u.id ORDER BY x.created_at DESC LIMIT 1) r ON TRUE
+     WHERE u.assisted_until > NOW() OR r.id IS NOT NULL
+     ORDER BY (r.status = 'new') DESC NULLS LAST, r.created_at DESC NULLS LAST`
+  );
+  return res.rows.map((u) => ({
+    member: memberSummary(u),
+    assistedUntil: u.assisted_until,
+    request: u.request_id ? { id: u.request_id, notes: u.notes, callTime: u.call_time, status: u.request_status, managerNote: u.manager_note, createdAt: u.requested_at } : null,
+    recommended: u.recommended,
+  }));
+}
+
+async function updateAssistedRequest(id, body) {
+  const status = body.status;
+  if (status !== undefined && !['new', 'active', 'closed'].includes(status)) throw httpError(400, 'status must be new, active or closed');
+  const note = typeof body.managerNote === 'string' ? body.managerNote.trim().slice(0, 1000) : undefined;
+  const res = await db.query(
+    `UPDATE assisted_requests SET status = COALESCE($2, status), manager_note = COALESCE($3, manager_note), updated_at = NOW()
+     WHERE id = $1 RETURNING id`,
+    [id, status ?? null, note ?? null]
+  ).catch(() => ({ rows: [] }));
+  if (!res.rows.length) throw httpError(404, 'Request not found');
+  return { id, status };
+}
+
+// The relationship manager hand-picks a member for someone on the assisted service
+async function recommend(adminId, userId, body) {
+  const member = (await db.query('SELECT assisted_until FROM users WHERE id = $1', [userId]).catch(() => ({ rows: [] }))).rows[0];
+  if (!member) throw httpError(404, 'Member not found');
+  if (!(member.assisted_until && new Date(member.assisted_until) > new Date())) throw httpError(400, 'Assisted service isn’t active for this member');
+  const { getCandidate } = require('./matches');
+  const card = await getCandidate(userId, body.candidateId).catch(() => null);
+  if (!card) throw httpError(400, 'That profile isn’t available to this member');
+  const note = typeof body.note === 'string' ? body.note.trim().slice(0, 500) || null : null;
+  await db.query(
+    `INSERT INTO assisted_recommendations (id, user_id, candidate_id, note, created_by) VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (user_id, candidate_id) DO UPDATE SET note = EXCLUDED.note, created_at = NOW()`,
+    [newId(), userId, body.candidateId, note, adminId]
+  );
+  const { notify } = require('./notifications');
+  await notify(userId, {
+    type: 'account',
+    title: tx('Your relationship manager suggests {name}', { name: card.firstName }),
+    body: note || tx('{name}, {age} · {score}% aligned — hand-picked for you.', { name: card.firstName, age: card.age, score: card.overlapScores.overall }),
+    data: { target: 'assisted', candidateId: card.id },
+  });
+  return { recommended: true, candidate: { id: card.id, firstName: card.firstName, score: card.overlapScores.overall } };
+}
+
+// Profiles that suit an assisted member, best fit first (for the manager to choose from)
+async function assistedCandidates(userId) {
+  const { getFeed } = require('./matches');
+  const cards = await getFeed(userId, null).catch(() => []);
+  return cards.slice(0, 30).map((c) => ({ id: c.id, firstName: c.firstName, age: c.age, city: c.city, score: c.overlapScores.overall, photo: c.photos?.[0] || null }));
+}
+
 async function listStories() {
   const res = await db.query(`SELECT * FROM success_stories WHERE status = 'pending_review' ORDER BY created_at`);
   return res.rows.map((r) => ({ id: r.id, title: r.title, story: r.story, names: r.display_names, createdAt: r.created_at }));
@@ -148,6 +212,10 @@ router.post('/verifications/:id', route(async (req, res) => {
   res.json(await verification.review(req.userId, req.params.id, req.body?.decision, req.body?.note));
 }));
 router.get('/stories', route(async (req, res) => res.json(await listStories())));
+router.get('/assisted', route(async (req, res) => res.json(await assistedQueue())));
+router.put('/assisted/requests/:id', route(async (req, res) => res.json(await updateAssistedRequest(req.params.id, req.body || {}))));
+router.get('/assisted/:userId/candidates', route(async (req, res) => res.json(await assistedCandidates(req.params.userId))));
+router.post('/assisted/:userId/recommend', route(async (req, res) => res.json(await recommend(req.userId, req.params.userId, req.body || {}))));
 router.post('/stories/:id', route(async (req, res) => res.json(await stories.review(req.params.id, req.body?.decision))));
 
 module.exports = { router };

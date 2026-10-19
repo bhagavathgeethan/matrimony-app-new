@@ -35,7 +35,7 @@ async function exportData(userId) {
   ]);
   return {
     exportDate: new Date().toISOString(),
-    legalNotice: 'Digital Personal Data Protection (DPDP) Act, 2023 — export of all personal data held by Sangam',
+    legalNotice: 'Digital Personal Data Protection (DPDP) Act, 2023 — export of all personal data held by 3Knot Matrimony',
     profile,
     familyLinks: links.map(({ portalToken, portalUrl, ...rest }) => rest),
     familyShares: shares,

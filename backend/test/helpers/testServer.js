@@ -1,4 +1,4 @@
-// Boots a throwaway real PostgreSQL (embedded-postgres) and the Sangam server against it.
+// Boots a throwaway real PostgreSQL (embedded-postgres) and the 3Knot server against it.
 // Must be required before any src module so env.js picks up the test configuration.
 const os = require('os');
 const fs = require('fs');
@@ -15,6 +15,8 @@ async function startTestStack() {
     password: 'test',
     port,
     persistent: false,
+    // UTF8 like production (the Windows default code page can't store emoji)
+    initdbFlags: ['--encoding=UTF8', '--locale=C'],
     onLog: () => {},
     onError: () => {},
   });
@@ -47,7 +49,12 @@ async function startTestStack() {
     await new Promise((resolve) => server.close(resolve));
     await require('../../src/config/db').pool.end();
     await pg.stop();
-    fs.rmSync(tmp, { recursive: true, force: true });
+    // Windows can hold the data folder briefly after Postgres stops
+    try {
+      fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+    } catch {
+      // left in the temp folder; the OS cleans it up
+    }
   }
 
   return { base, stop, uploadDir: process.env.UPLOAD_DIR, privateDir: process.env.PRIVATE_UPLOAD_DIR, pgUrl: process.env.DATABASE_URL };

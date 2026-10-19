@@ -2,6 +2,7 @@
 // Opt-in, shown separately from the values score, and only a traditional guide — families usually confirm with an astrologer.
 // Plain ES module.
 import { STARS, RAASIS } from './profileFields.js';
+import { t } from './i18n.js';
 
 const GANA = ['D', 'M', 'R', 'M', 'D', 'M', 'D', 'D', 'R', 'R', 'M', 'M', 'D', 'R', 'D', 'R', 'D', 'R', 'R', 'M', 'M', 'D', 'R', 'R', 'M', 'M', 'D'];
 const YONI = [
@@ -31,7 +32,7 @@ const VASYA = [[4, 7], [3, 6], [5], [7, 8], [6], [1, 11], [9, 5], [3], [11], [10
 
 const good = (name, note) => ({ name, result: 'good', note });
 const ok = (name, note) => ({ name, result: 'average', note });
-const bad = (name, note) => ({ name, result: 'not matching', note });
+const bad = (name, note, noteVars) => ({ name, result: 'not matching', note: noteVars ? note.replace('{rajju}', noteVars.rajju) : note, ...(noteVars && { noteKey: note, noteVars }) });
 
 /**
  * bride / groom: { star, raasi } using the labels from profileFields (e.g. 'Rohini', 'Rishabam (Taurus)').
@@ -80,7 +81,7 @@ export function porutham(bride, groom) {
 
   const rajjuG = RAJJU_CYCLE[g % 9];
   const rajjuB = RAJJU_CYCLE[b % 9];
-  items.push(rajjuG === rajjuB ? bad('Rajju', `Both ${rajjuG} — traditionally considered the most important`) : good('Rajju', 'Longevity of the marriage'));
+  items.push(rajjuG === rajjuB ? bad('Rajju', 'Both {rajju} — traditionally considered the most important', { rajju: rajjuG }) : good('Rajju', 'Longevity of the marriage'));
 
   const vedha = VEDHA_PAIRS.some(([x, y]) => (x === STARS[g] && y === STARS[b]) || (x === STARS[b] && y === STARS[g]));
   items.push(vedha ? bad('Vedha', 'Freedom from affliction') : good('Vedha', 'Freedom from affliction'));
@@ -94,5 +95,21 @@ export function porutham(bride, groom) {
     items,
     summary: `${matched}/10 poruthams${rajjuOk ? '' : ' · Rajju does not match'}`,
     disclaimer: 'A traditional guide only. It never changes your values score; many families confirm with an astrologer.',
+  };
+}
+
+// The result above (computed on the server, in English) in the interface language
+export function translatePorutham(h) {
+  if (!h) return h;
+  if (!h.items) return { ...h, unavailable: t(h.unavailable) };
+  return {
+    ...h,
+    summary: t(h.rajjuOk ? '{matched}/{total} poruthams' : '{matched}/{total} poruthams · Rajju does not match', { matched: h.matched, total: h.total }),
+    items: h.items.map((i) => ({
+      ...i,
+      label: t(i.name),
+      note: i.noteKey ? t(i.noteKey, { rajju: t(i.noteVars.rajju) }) : t(i.note),
+    })),
+    disclaimer: t(h.disclaimer),
   };
 }

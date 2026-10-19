@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Check, ChevronLeft } from 'lucide-react';
 import { useStore } from '../../store';
 import { Brand, cx } from '../../components/ui';
+import { t } from '@shared/i18n';
 
 const STEPS = [
   { key: 'consent', label: 'Consent', path: '/onboarding/consent' },
@@ -26,22 +27,22 @@ export function OnboardingLayout() {
       <aside className="ob-rail">
         <Brand dark />
         <div className="stack" style={{ '--gap': '6px' }}>
-          <span className="eyebrow gold">{completed ? 'Edit your profile' : 'Your blueprint'}</span>
-          <div className="h2">{completed ? 'Keep it current' : 'Four minutes to better matches'}</div>
+          <span className="eyebrow gold">{completed ? t('Edit your profile') : t('Your blueprint')}</span>
+          <div className="h2">{completed ? t('Keep it current') : t('Four minutes to better matches')}</div>
         </div>
-        <nav className="ob-steps" aria-label="Onboarding steps">
+        <nav className="ob-steps" aria-label={t('Onboarding steps')}>
           {STEPS.map((s, i) => (
             <div key={s.key} className={cx('ob-step', i === current && 'current', done(s.key) && i !== current && 'done')}>
               <span className="dot">{done(s.key) && i !== current ? <Check size={14} strokeWidth={3} /> : i + 1}</span>
-              {s.label}
+              {t(s.label)}
             </div>
           ))}
         </nav>
         <div style={{ marginTop: 'auto' }}>
           {completed ? (
-            <Link to="/profile" className="btn btn-light sm"><ChevronLeft size={15} /> Back to profile</Link>
+            <Link to="/profile" className="btn btn-light sm"><ChevronLeft size={15} />{' '}{t('Back to profile')}</Link>
           ) : (
-            <button className="small" style={{ color: 'rgba(255,246,238,0.6)' }} onClick={logout}>Sign out</button>
+            <button className="small" style={{ color: 'rgba(255,246,238,0.6)' }} onClick={logout}>{t('Sign out')}</button>
           )}
         </div>
       </aside>
@@ -50,7 +51,7 @@ export function OnboardingLayout() {
         <div className="ob-mobile-top">
           <div className="row between">
             <Brand tagline={false} size={30} />
-            {completed && <Link to="/profile" className="small accent" style={{ fontWeight: 700 }}>Back to profile</Link>}
+            {completed && <Link to="/profile" className="small accent" style={{ fontWeight: 700 }}>{t('Back to profile')}</Link>}
           </div>
           <div className="row" style={{ '--gap': '6px' }}>
             {STEPS.map((s, i) => (
@@ -69,7 +70,7 @@ export function StepFooter({ children, hint }) {
   return (
     <div className="ob-footer">
       <div className="ob-footer-inner">
-        <div className="small muted grow">{hint}</div>
+        <div className="small muted grow">{t(hint)}</div>
         <div className="row">{children}</div>
       </div>
     </div>

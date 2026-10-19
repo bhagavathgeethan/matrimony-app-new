@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { X, MessageCircle, Users, Lock, BadgeCheck, Quote, ClipboardList } from 'lucide-react';
+import { X, MessageCircle, Users, Lock, BadgeCheck, Quote, ClipboardList, Images } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { ScoreRing, Meter, SectionLabel, Card } from '../ui/kit';
 import { InterestButton, ShortlistStar, CardBadges, PromptCards } from '../engage/EngageUI';
@@ -8,7 +8,8 @@ import { t } from '@shared/i18n';
 
 const { colors, fonts, gradients, radii, shadows } = theme;
 
-export const MatchCard = ({ candidate, onPass, onStartChat, onShareWithParents, onViewProfile }) => {
+// onOpenProfile: tapping the portrait opens their full profile; onViewProfile: the "Why we matched" comparison
+export const MatchCard = ({ candidate, onPass, onStartChat, onShareWithParents, onViewProfile, onOpenProfile }) => {
   const scores = candidate.overlapScores || {};
   const photo = candidate.photos?.[0];
   // The server already sends a blurred copy until mutual interest
@@ -16,8 +17,15 @@ export const MatchCard = ({ candidate, onPass, onStartChat, onShareWithParents, 
 
   return (
     <View style={styles.wrap}>
-      {/* Portrait — blurred until mutual interest */}
-      <View style={styles.portrait}>
+      {/* Portrait — blurred until mutual interest; tap for the full profile */}
+      <TouchableOpacity
+        activeOpacity={0.92}
+        disabled={!onOpenProfile}
+        onPress={onOpenProfile}
+        style={styles.portrait}
+        accessibilityRole="button"
+        accessibilityLabel={t('Full profile')}
+      >
         {photo && <Image source={{ uri: photo }} style={[styles.photo, !blurred && styles.photoClear]} resizeMode="cover" />}
         <View style={styles.photoFade} />
 
@@ -25,11 +33,19 @@ export const MatchCard = ({ candidate, onPass, onStartChat, onShareWithParents, 
           <ScoreRing score={scores.overall ?? 0} size={78} dark />
         </View>
 
+        {/* More photos: tapping the portrait opens the profile, where they can all be viewed */}
+        {(candidate.photos?.length || 0) > 1 && (
+          <View style={styles.photoCount}>
+            <Images size={13} color={colors.onDark} />
+            <Text style={styles.privacyText}>{t('{n} photos', { n: candidate.photos.length })}</Text>
+          </View>
+        )}
+
         <View style={styles.identity}>
           {blurred && (
             <View style={styles.privacyPill}>
               <Lock size={11} color={colors.onDark} />
-              <Text style={styles.privacyText}>Photo reveals after mutual interest</Text>
+              <Text style={styles.privacyText}>{t('Photo reveals after mutual interest')}</Text>
             </View>
           )}
           <Text style={styles.name}>
@@ -44,18 +60,18 @@ export const MatchCard = ({ candidate, onPass, onStartChat, onShareWithParents, 
           </View>
           <CardBadges c={{ ...candidate, verified: false }} dark />
         </View>
-      </View>
+      </TouchableOpacity>
 
       {/* Blueprint overlap */}
       <Card style={styles.body}>
-        <SectionLabel right={<Text style={styles.verifiedDate}>{candidate.verifiedDate || 'Verified'}</Text>}>
-          Blueprint overlap
+        <SectionLabel right={<Text style={styles.verifiedDate}>{candidate.verifiedDate || t('Verified')}</Text>}>
+          {t('Blueprint overlap')}
         </SectionLabel>
         <View style={{ gap: 11 }}>
-          <Meter label="Money" value={scores.money ?? 0} />
-          <Meter label="Roots" value={scores.roots ?? 0} />
-          <Meter label="Kids" value={scores.kids ?? 0} />
-          <Meter label="Ambition" value={scores.ambition ?? 0} />
+          <Meter label={t('Money')} value={scores.money ?? 0} />
+          <Meter label={t('Roots')} value={scores.roots ?? 0} />
+          <Meter label={t('Kids')} value={scores.kids ?? 0} />
+          <Meter label={t('Ambition')} value={scores.ambition ?? 0} />
         </View>
 
         {candidate.quote ? (
@@ -67,14 +83,14 @@ export const MatchCard = ({ candidate, onPass, onStartChat, onShareWithParents, 
 
         <PromptCards prompts={candidate.prompts?.slice(0, 1)} />
         {candidate.fitsMyPreferences?.total > 0 && (
-          <Text style={styles.verifiedDate}>Fits {candidate.fitsMyPreferences.met} of your {candidate.fitsMyPreferences.total} preferences</Text>
+          <Text style={styles.verifiedDate}>{t('Fits {met} of your {total} preferences', { met: candidate.fitsMyPreferences.met, total: candidate.fitsMyPreferences.total })}</Text>
         )}
 
         {(candidate.tags || []).length > 0 && (
           <View style={styles.tags}>
             {candidate.tags.map((tag, idx) => (
               <View key={tag} style={[styles.tag, idx === 0 && styles.tagStrong]}>
-                <Text style={[styles.tagText, idx === 0 && styles.tagTextStrong]}>{tag}</Text>
+                <Text style={[styles.tagText, idx === 0 && styles.tagTextStrong]}>{t(tag)}</Text>
               </View>
             ))}
           </View>
@@ -83,7 +99,7 @@ export const MatchCard = ({ candidate, onPass, onStartChat, onShareWithParents, 
 
       {/* Actions */}
       <View style={styles.actions}>
-        <TouchableOpacity activeOpacity={0.85} onPress={onPass} style={styles.roundBtn} accessibilityLabel="Pass">
+        <TouchableOpacity activeOpacity={0.85} onPress={onPass} style={styles.roundBtn} accessibilityLabel={t('Pass')}>
           <X size={22} color={colors.textSecondary} strokeWidth={2.4} />
           <Text style={styles.roundLabel}>{t('Pass')}</Text>
         </TouchableOpacity>
@@ -107,6 +123,18 @@ export const MatchCard = ({ candidate, onPass, onStartChat, onShareWithParents, 
 };
 
 const styles = StyleSheet.create({
+  photoCount: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: 'rgba(20, 8, 12, 0.45)',
+  },
   wrap: {
     gap: 12,
   },

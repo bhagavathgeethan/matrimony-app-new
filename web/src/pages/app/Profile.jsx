@@ -1,9 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Pencil, Sparkles, BadgeCheck, UserRound, Images, Heart, Wallet, ShieldCheck, Users, ChevronRight, ClipboardList, SlidersHorizontal, Crown, BookHeart, Sun, Star } from 'lucide-react';
-import { PILLARS, VIBE_ART, profileStrengthHint } from '@shared/constants';
+import { PILLARS, VIBE_ART, profileStrengthHint, blueprintSummary } from '@shared/constants';
 import { useStore } from '../../store';
 import { Avatar, Meter, ScoreRing, IconBadge } from '../../components/ui';
+import { t, formatDate } from '@shared/i18n';
 
 export function ProfilePage() {
   const { user } = useStore();
@@ -12,29 +13,29 @@ export function ProfilePage() {
 
   const completion = user?.profileCompletion;
   const edits = [
-    [ClipboardList, 'Personal details', `${completion?.percent ?? 0}% complete · family, education, hobbies`, '/profile/details'],
-    [SlidersHorizontal, 'Partner preferences & prompts', `${Object.keys(user?.preferences || {}).length} preferences · ${(user?.prompts || []).length} prompts`, '/profile/preferences'],
-    [BadgeCheck, 'ID verification', user?.verified ? 'Verified' : 'Get the verified badge', '/profile/verification'],
-    [Crown, 'Premium', user?.plan === 'premium' ? `Active until ${new Date(user.premiumUntil).toLocaleDateString('en-IN')}` : 'Unlimited interests and more', '/premium'],
-    [Sun, 'Today’s picks', 'Five curated matches each day', '/today'],
-    [Star, 'Shortlist & who viewed you', 'People you’re considering', '/shortlist'],
-    [BookHeart, 'Success stories', 'Share how you met', '/stories'],
-    [UserRound, 'Basics', `${user?.city || ''} · ${user?.intentTimeline || ''}`, '/onboarding/basics'],
-    [Wallet, 'Blueprint', 'Re-tune your four pillars', '/onboarding/blueprint/tune'],
-    [Heart, 'Vibes', `${(user?.vibes || []).length} of 6 picked`, '/onboarding/vibes'],
-    [Images, 'Photos & privacy', `${photos.length} photo${photos.length === 1 ? '' : 's'}`, '/onboarding/photos'],
-    [Users, 'Family access', 'Who sees what you forward', '/family'],
-    [ShieldCheck, 'Privacy & data', 'Consents, export, erasure', '/settings'],
+    [ClipboardList, t('Personal details'), t('{n}% complete · family, education, hobbies', { n: completion?.percent ?? 0 }), '/profile/details'],
+    [SlidersHorizontal, t('Partner preferences & prompts'), t('{prefs} preferences · {prompts} prompts', { prefs: Object.keys(user?.preferences || {}).length, prompts: (user?.prompts || []).length }), '/profile/preferences'],
+    [BadgeCheck, t('ID verification'), user?.verified ? t('Verified') : t('Get the verified badge'), '/profile/verification'],
+    [Crown, user?.plan !== 'free' ? t('3Knot {planName}', { planName: t(user?.planName) }) : t('Plans & Premium'), user?.plan !== 'free' ? t('Active until {date}', { date: formatDate(user.premiumUntil) }) : t('Plus, Premium and Family plans'), '/premium'],
+    [Sun, t('Today’s picks'), t('Five curated matches each day'), '/today'],
+    [Star, t('Shortlist & who viewed you'), t('People you’re considering'), '/shortlist'],
+    [BookHeart, t('Success stories'), t('Share how you met'), '/stories'],
+    [UserRound, t('Basics'), `${user?.city || ''} · ${t(user?.intentTimeline || '')}`, '/onboarding/basics'],
+    [Wallet, t('Blueprint'), t('Re-tune your four pillars'), '/onboarding/blueprint/tune'],
+    [Heart, t('Vibes'), t('{n} of 6 picked', { n: (user?.vibes || []).length }), '/onboarding/vibes'],
+    [Images, t('Photos & privacy'), t(photos.length === 1 ? '1 photo' : '{n} photos', { n: photos.length }), '/onboarding/photos'],
+    [Users, t('Family access'), t('Who sees what you forward'), '/family'],
+    [ShieldCheck, t('Privacy & data'), t('Consents, export, erasure'), '/settings'],
   ];
 
   return (
     <div className="page">
       <div className="page-head">
         <div className="stack" style={{ '--gap': '6px' }}>
-          <span className="eyebrow">Profile</span>
-          <h1 className="h1">My blueprint</h1>
+          <span className="eyebrow">{t('Profile')}</span>
+          <h1 className="h1">{t('My blueprint')}</h1>
         </div>
-        <Link to="/onboarding/blueprint/tune" className="btn btn-soft sm"><Pencil size={15} /> Edit blueprint</Link>
+        <Link to="/onboarding/blueprint/tune" className="btn btn-soft sm"><Pencil size={15} />{' '}{t('Edit blueprint')}</Link>
       </div>
 
       <div className="family-layout">
@@ -45,35 +46,35 @@ export function ProfilePage() {
               <div>
                 <div className="h1" style={{ color: '#fff' }}>{user?.firstName}{user?.age ? `, ${user.age}` : ''}</div>
                 <div className="row small" style={{ '--gap': '6px', color: 'rgba(255,246,238,0.75)' }}>
-                  <BadgeCheck size={15} color="var(--gold)" /> {user?.city} · {user?.verified ? 'ID verified' : 'phone verified'}
+                  <BadgeCheck size={15} color="var(--gold)" /> {user?.city} · {user?.verified ? t('ID verified') : t('phone verified')}
                 </div>
               </div>
             </div>
             <div className="stack" style={{ '--gap': '11px' }}>
-              {PILLARS.map((p) => <Meter key={p.key} label={p.label} value={bp[p.key] ?? 0} dark />)}
+              {PILLARS.map((p) => <Meter key={p.key} label={t(p.label)} value={bp[p.key] ?? 0} dark />)}
             </div>
             <div className="row" style={{ alignItems: 'flex-start', padding: 16, borderRadius: 16, background: 'rgba(255,255,255,0.08)' }}>
               <Sparkles size={16} color="var(--gold)" style={{ flexShrink: 0, marginTop: 2 }} />
-              <span style={{ fontWeight: 650, lineHeight: 1.5 }}>{bp.summaryText}</span>
+              <span style={{ fontWeight: 650, lineHeight: 1.5 }}>{blueprintSummary(bp)}</span>
             </div>
           </div>
 
           {photos.length > 0 && (
             <div className="card stack">
-              <span className="label">Photos</span>
+              <span className="label">{t('Photos')}</span>
               <div className="photo-grid">
                 {photos.map((p, i) => (
-                  <div key={p.id} className="photo-tile"><img src={p.url} alt={i === 0 ? 'Main photo' : `Photo ${i + 1}`} /></div>
+                  <div key={p.id} className="photo-tile"><img src={p.url} alt={i === 0 ? t('Main photo') : t('Photo {n}', { n: i + 1 })} /></div>
                 ))}
               </div>
             </div>
           )}
 
           <div className="card stack">
-            <span className="label">Your vibes</span>
+            <span className="label">{t('Your vibes')}</span>
             <div className="row wrap" style={{ '--gap': '8px' }}>
-              {(user?.vibes || []).map((v) => <span key={v} className="chip">{VIBE_ART[v]?.[0]} {v}</span>)}
-              {(user?.vibes || []).length === 0 && <span className="small muted">No vibes picked yet.</span>}
+              {(user?.vibes || []).map((v) => <span key={v} className="chip">{VIBE_ART[v]?.[0]} {t(v)}</span>)}
+              {(user?.vibes || []).length === 0 && <span className="small muted">{t('No vibes picked yet.')}</span>}
             </div>
           </div>
         </div>
@@ -81,15 +82,15 @@ export function ProfilePage() {
         <div className="stack">
           <div className="card stack" style={{ '--gap': '14px' }}>
             <div className="row">
-              <ScoreRing score={user?.profileStrength ?? 0} size={68} label="DONE" />
+              <ScoreRing score={user?.profileStrength ?? 0} size={68} label={t('DONE')} />
               <div className="grow">
-                <div className="h3">Profile {user?.profileStrength ?? 0}% complete</div>
+                <div className="h3">{t('Profile {n}% complete', { n: user?.profileStrength ?? 0 })}</div>
                 <div className="small muted">{profileStrengthHint(user)}</div>
               </div>
             </div>
             {(user?.profileStrength ?? 0) < 100 && (
               <Link to={completion?.nextSection ? `/profile/details?edit=${completion.nextSection}` : '/profile/details'} className="btn btn-primary sm">
-                Complete my profile
+                {t('Complete my profile')}
               </Link>
             )}
           </div>

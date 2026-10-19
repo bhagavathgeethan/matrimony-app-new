@@ -1,7 +1,9 @@
-// HTTP + WebSocket client for the Sangam backend, shared by the mobile and web apps.
+// HTTP + WebSocket client for the 3Knot backend, shared by the mobile and web apps.
 // Each app creates one client with its own base URL:
 //   mobile: absolute (e.g. http://localhost:5000/api, set via VITE_API_BASE)
 //   web:    '/api' (same origin — the backend serves the web app)
+
+import { t } from './i18n.js';
 
 const TOKEN_KEY = 'sangam.session';
 
@@ -63,7 +65,7 @@ export function createApiClient({ baseUrl }) {
         res = await fetchWithTimeout(`${API_BASE}${path}`, options);
       } catch {
         if (attempt === (method === 'GET' ? 1 : 0)) {
-          const err = new Error('Can’t reach Sangam. Check your connection and try again.');
+          const err = new Error(t('Can’t reach 3Knot. Check your connection and try again.'));
           err.status = 0;
           throw err;
         }
@@ -72,7 +74,8 @@ export function createApiClient({ baseUrl }) {
     const data = await res.json().catch(() => null);
     if (!res.ok) {
       if (res.status === 401 && auth && unauthorizedHandler) unauthorizedHandler();
-      const err = new Error(data?.error || `Request failed (${res.status})`);
+      // Server messages are English; show them in the interface language
+      const err = new Error(data?.error ? t(data.error) : t('Request failed ({status})', { status: res.status }));
       err.status = res.status;
       err.code = data?.code;
       throw err;
@@ -94,6 +97,7 @@ export function createApiClient({ baseUrl }) {
     updateConsent: (consent) => request('/me/consent', { method: 'PUT', body: consent }),
     updateDetails: (details) => request('/me/details', { method: 'PUT', body: details }),
     updatePrivacy: (settings) => request('/me/privacy', { method: 'PUT', body: settings }),
+    updateLanguage: (language) => request('/me/language', { method: 'PUT', body: { language } }),
     updateVibes: (vibes) => request('/me/vibes', { method: 'PUT', body: { vibes } }),
     updateBlueprint: (blueprint) => request('/me/blueprint', { method: 'PUT', body: blueprint }),
     uploadPhoto: (file) => {
@@ -131,7 +135,8 @@ export function createApiClient({ baseUrl }) {
 
     // Conversations
     getConversations: () => request('/conversations'),
-    openConversation: (candidateId, message) => request('/conversations', { method: 'POST', body: { candidateId, ...(message ? { message } : {}) } }),
+    openConversation: (candidateId, message, isSuper = false) =>
+      request('/conversations', { method: 'POST', body: { candidateId, ...(message ? { message } : {}), ...(isSuper ? { super: true } : {}) } }),
     acceptInterest: (id) => request(`/conversations/${id}/accept`, { method: 'POST' }),
     declineInterest: (id) => request(`/conversations/${id}/decline`, { method: 'POST' }),
     getInterestLimits: () => request('/conversations/limits'),
@@ -166,6 +171,32 @@ export function createApiClient({ baseUrl }) {
     premiumCheckout: (plan) => request('/premium/checkout', { method: 'POST', body: { plan } }),
     premiumConfirm: (paymentId, payload) => request('/premium/confirm', { method: 'POST', body: { paymentId, payload } }),
     getPayments: () => request('/premium/payments'),
+    startTrial: () => request('/premium/trial', { method: 'POST' }),
+    pausePlan: () => request('/premium/pause', { method: 'POST' }),
+    resumePlan: () => request('/premium/resume', { method: 'POST' }),
+    startSpotlight: () => request('/premium/spotlight', { method: 'POST' }),
+    getAssisted: () => request('/premium/assisted'),
+    requestAssisted: (body) => request('/premium/assisted', { method: 'POST', body }),
+    rewind: () => request('/matches/rewind', { method: 'POST' }),
+    getSimilar: (id) => request(`/matches/${id}/similar`),
+    reportLink: (id) => request(`/matches/${id}/report-link`, { method: 'POST' }),
+    sendVoice: (conversationId, blob, durationMs) => {
+      const form = new FormData();
+      const ext = (blob.type || '').includes('mp4') ? 'm4a' : (blob.type || '').includes('ogg') ? 'ogg' : 'webm';
+      form.append('audio', blob, `voice.${ext}`);
+      form.append('durationMs', String(Math.round(durationMs)));
+      return request(`/conversations/${conversationId}/voice`, { method: 'POST', form });
+    },
+    // Voice notes need the session header, so they are fetched as blobs
+    voiceBlob: async (audioPath) => {
+      const res = await fetch(`${API_BASE}${audioPath}`, { headers: { Authorization: `Bearer ${session.get()}` } });
+      if (!res.ok) throw new Error(t('Could not load the voice note'));
+      return res.blob();
+    },
+    shareContact: (conversationId) => request(`/conversations/${conversationId}/contact`, { method: 'POST' }),
+    unshareContact: (conversationId) => request(`/conversations/${conversationId}/contact`, { method: 'DELETE' }),
+    getProposals: () => request('/family/proposals'),
+    answerProposal: (id, approve) => request(`/family/proposals/${id}/${approve ? 'approve' : 'decline'}`, { method: 'POST' }),
 
     // Success stories
     getMyStories: () => request('/stories'),
@@ -191,11 +222,15 @@ export function createApiClient({ baseUrl }) {
       // Selfies need the session header, so they are fetched as blobs
       selfieBlob: async (path) => {
         const res = await fetch(`${API_BASE}${path.replace(/^\/api/, '')}`, { headers: { Authorization: `Bearer ${session.get()}` } });
-        if (!res.ok) throw new Error('Could not load the selfie');
+        if (!res.ok) throw new Error(t('Could not load the selfie'));
         return res.blob();
       },
       stories: () => request('/admin/stories'),
       reviewStory: (id, decision) => request(`/admin/stories/${id}`, { method: 'POST', body: { decision } }),
+      assisted: () => request('/admin/assisted'),
+      assistedCandidates: (userId) => request(`/admin/assisted/${userId}/candidates`),
+      recommend: (userId, candidateId, note) => request(`/admin/assisted/${userId}/recommend`, { method: 'POST', body: { candidateId, note } }),
+      updateAssistedRequest: (id, body) => request(`/admin/assisted/requests/${id}`, { method: 'PUT', body }),
     },
 
     // Search: params are already-validated strings/numbers (see searchParams in constants.js)
@@ -211,6 +246,9 @@ export function createApiClient({ baseUrl }) {
     registerPushToken: (platform, token) => request('/notifications/push-tokens', { method: 'POST', body: { platform, token } }),
     removePushToken: (token) => request('/notifications/push-tokens', { method: 'DELETE', body: { token } }),
 
+    // Family sign-in in the app: a code to the invited number returns the portals it was invited to
+    familySignInSend: (phone) => request('/portal/sign-in/send', { method: 'POST', body: { phone }, auth: false }),
+    familySignInVerify: (phone, code) => request('/portal/sign-in/verify', { method: 'POST', body: { phone, code }, auth: false }),
     // Parent portal (no account; the link token is the credential)
     getParentPortal: (token) => request(`/portal/${encodeURIComponent(token)}`, { auth: false }),
     submitParentFeedback: (token, shareId, decision, note) =>
@@ -219,6 +257,11 @@ export function createApiClient({ baseUrl }) {
         body: { decision, note },
         auth: false,
       }),
+    proposeInterest: (token, shareId, note) =>
+      request(`/portal/${encodeURIComponent(token)}/proposals`, { method: 'POST', body: { shareId, note }, auth: false }),
+    giftCheckout: (token, plan) => request(`/portal/${encodeURIComponent(token)}/gift/checkout`, { method: 'POST', body: { plan }, auth: false }),
+    giftConfirm: (token, paymentId, payload) =>
+      request(`/portal/${encodeURIComponent(token)}/gift/confirm`, { method: 'POST', body: { paymentId, payload }, auth: false }),
     updatePortalDetails: (token, details) =>
       request(`/portal/${encodeURIComponent(token)}/details`, { method: 'PUT', body: details, auth: false }),
   };

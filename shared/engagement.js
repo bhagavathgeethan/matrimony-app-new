@@ -47,11 +47,11 @@ export const REPORT_REASONS = [
 ];
 
 export const SAFETY_TIPS = [
-  ['Keep chats on Sangam', 'Your phone number and email stay private until you choose to share them.'],
+  ['Keep chats on 3Knot', 'Your phone number and email stay private until you choose to share them.'],
   ['Never send money', 'No genuine match will ask for money, gifts, bank details or OTPs — report anyone who does.'],
   ['Video call before meeting', 'Use the in-app video call once you have both accepted interest.'],
   ['Meet in public, tell family', 'For a first meeting pick a busy public place, arrange your own travel and tell someone where you are.'],
-  ['Look for the verified badge', 'Verified members have had a selfie checked by the Sangam team.'],
+  ['Look for the verified badge', 'Verified members have had a selfie checked by the 3Knot team.'],
   ['Trust your instincts', 'If something feels off, block and report. Reports are confidential.'],
 ];
 

@@ -40,8 +40,10 @@ export const AlignedFeedScreen = () => {
     setCurrentScreen,
     setPersonalSection,
     setActiveTab,
+    rewind,
   } = useApp();
   const [viewing, setViewing] = useState(null);
+  const [canUndo, setCanUndo] = useState(false);
   const [hidePrompt, setHidePrompt] = useState(false);
   const percent = user?.profileStrength ?? 0;
 
@@ -57,7 +59,7 @@ export const AlignedFeedScreen = () => {
       return [...candidates].sort((a, b) => shared(b) - shared(a));
     }
     if (filterTab === 'New') {
-      const talkedTo = new Set(conversations.map((t) => t.candidateId));
+      const talkedTo = new Set(conversations.map((conv) => conv.candidateId));
       return candidates.filter((c) => !talkedTo.has(c.id));
     }
     return candidates;
@@ -93,6 +95,7 @@ export const AlignedFeedScreen = () => {
   const handlePass = async () => {
     if (!currentCandidate) return;
     await passCandidate(currentCandidate.id);
+    setCanUndo(true);
     setCandidateIndex((prev) => (feed.length > 1 ? prev % (feed.length - 1) : 0));
   };
 
@@ -111,8 +114,8 @@ export const AlignedFeedScreen = () => {
       <View style={{ gap: 14 }}>
         <View style={styles.titleRow}>
           <View style={{ gap: 4 }}>
-            <Eyebrow>Hi {user?.firstName || 'there'} · today’s matches</Eyebrow>
-            <Heading size={40}>Aligned</Heading>
+            <Eyebrow>{user?.firstName ? t('Hi {name} · today’s matches', { name: user.firstName }) : t('Hi there · today’s matches')}</Eyebrow>
+            <Heading size={40}>{t('Aligned')}</Heading>
           </View>
           <View style={styles.headerRight}>
             {feed.length > 0 && (
@@ -124,7 +127,7 @@ export const AlignedFeedScreen = () => {
             <TouchableOpacity
               onPress={() => setCurrentScreen('notifications')}
               style={styles.bell}
-              accessibilityLabel={`Notifications${unreadNotifications ? `, ${unreadNotifications} unread` : ''}`}
+              accessibilityLabel={unreadNotifications ? t('Notifications, {n} unread', { n: unreadNotifications }) : t('Notifications')}
             >
               <Bell size={19} color={colors.textPrimary} />
               {unreadNotifications > 0 && (
@@ -139,7 +142,7 @@ export const AlignedFeedScreen = () => {
           <View style={styles.completion}>
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={styles.completionTitle}>{t('Your profile is {n}% complete', { n: percent })}</Text>
-              <Text style={styles.completionSub}>Add family, education and hobbies</Text>
+              <Text style={styles.completionSub}>{t('Add family, education and hobbies')}</Text>
             </View>
             <TouchableOpacity
               onPress={() => {
@@ -152,16 +155,31 @@ export const AlignedFeedScreen = () => {
             >
               <Text style={styles.completionBtnText}>{t('Complete')}</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setHidePrompt(true)} accessibilityLabel="Hide for now" style={{ padding: 4 }}>
+            <TouchableOpacity onPress={() => setHidePrompt(true)} accessibilityLabel={t('Hide for now')} style={{ padding: 4 }}>
               <X size={16} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
+        )}
+        {canUndo && user?.planFeatures?.includes('rewind') && (
+          <TouchableOpacity
+            onPress={async () => {
+              const res = await rewind();
+              if (res.ok) {
+                setCanUndo(false);
+                setFocusedCandidateId(res.data.candidate.id);
+              }
+            }}
+            style={styles.undo}
+            accessibilityRole="button"
+          >
+            <Text style={styles.undoText}>{t('↶ Undo pass')}</Text>
+          </TouchableOpacity>
         )}
         <View style={styles.filters}>
           {FILTERS.map(([tab, icon]) => (
             <Chip
               key={tab}
-              label={tab}
+              label={t(tab)}
               icon={icon}
               active={filterTab === tab}
               onPress={() => {
@@ -183,17 +201,17 @@ export const AlignedFeedScreen = () => {
           <Sparkles size={28} color={colors.gold} />
           <Body style={{ textAlign: 'center' }}>
             {dataLoading
-              ? 'Loading your aligned matches…'
+              ? t('Loading your aligned matches…')
               : loadError ||
                 (filterTab === 'New'
-                  ? 'You’ve started a conversation with everyone here.'
-                  : 'No matches yet. As more people complete their blueprint, they’ll appear here.')}
+                  ? t('You’ve started a conversation with everyone here.')
+                  : t('No matches yet. As more people complete their blueprint, they’ll appear here.'))}
           </Body>
           {filterTab !== 'Blueprint' && !dataLoading && (
-            <Button label="Show all matches" variant="secondary" small onPress={() => setFilterTab('Blueprint')} />
+            <Button label={t('Show all matches')} variant="secondary" small onPress={() => setFilterTab('Blueprint')} />
           )}
           {filterTab === 'Blueprint' && !dataLoading && (
-            <Button label="Refresh" variant="secondary" small onPress={loadAppData} />
+            <Button label={t('Refresh')} variant="secondary" small onPress={loadAppData} />
           )}
         </Card>
       </Screen>
@@ -211,7 +229,8 @@ export const AlignedFeedScreen = () => {
             onPass={handlePass}
             onStartChat={handleStartChat}
             onShareWithParents={handleShareWithParents}
-            onViewProfile={() => setViewing(currentCandidate)}
+            onViewProfile={() => setViewing({ candidate: currentCandidate, tab: 'why' })}
+            onOpenProfile={() => setViewing({ candidate: currentCandidate, tab: 'about' })}
           />
         </FadeIn>
 
@@ -226,7 +245,7 @@ export const AlignedFeedScreen = () => {
               <Text style={styles.peekName}>
                 {nextCandidate.firstName}, {nextCandidate.age}
               </Text>
-              <Text style={styles.peekCity}>{nextCandidate.city} · next in your feed</Text>
+              <Text style={styles.peekCity}>{t('{city} · next in your feed', { city: nextCandidate.city })}</Text>
             </View>
             <Text style={styles.peekScore}>{nextCandidate.overlapScores?.overall ?? '—'}%</Text>
             <ChevronRight size={18} color={colors.textLight} />
@@ -234,7 +253,7 @@ export const AlignedFeedScreen = () => {
         )}
       </Screen>
 
-      {viewing && <CandidateSheet candidate={viewing} onClose={() => setViewing(null)} onOpenThread={(id) => openThreadById(id)} />}
+      {viewing && <CandidateSheet candidate={viewing.candidate} initialTab={viewing.tab} onClose={() => setViewing(null)} onOpenThread={(id) => openThreadById(id)} />}
 
       {showShareModal && (
         <ScopedShareSheet
@@ -254,6 +273,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 4,
   },
+  undo: { alignSelf: 'flex-start', paddingVertical: 7, paddingHorizontal: 12, borderRadius: 999, backgroundColor: colors.goldSoft },
+  undoText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '700', color: '#8A6A2E' },
   completion: {
     flexDirection: 'row',
     alignItems: 'center',

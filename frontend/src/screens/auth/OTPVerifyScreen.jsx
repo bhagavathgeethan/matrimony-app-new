@@ -4,6 +4,7 @@ import { ShieldCheck } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { OnboardingScreen, TopBar, FadeIn, Eyebrow, Heading, Accent, Body, Button, Card } from '../../components/ui/kit';
+import { t } from '@shared/i18n';
 
 const { colors, fonts, radii } = theme;
 const RESEND_SECONDS = 30;
@@ -37,8 +38,8 @@ export const OTPVerifyScreen = () => {
 
   useEffect(() => {
     if (secondsLeft <= 0) return undefined;
-    const t = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
   }, [secondsLeft]);
 
   const boxes = Array.from({ length: 6 }, (_, i) => code[i] || '');
@@ -48,19 +49,19 @@ export const OTPVerifyScreen = () => {
     <OnboardingScreen
       top={<TopBar onBack={() => setCurrentScreen('phone')} />}
       footer={
-        <Button label={verifying ? 'Verifying…' : 'Verify'} disabled={code.length !== 6 || verifying} onPress={() => handleVerify()} />
+        <Button label={verifying ? t('Verifying…') : t('Verify')} disabled={code.length !== 6 || verifying} onPress={() => handleVerify()} />
       }
     >
       <FadeIn>
         <View style={styles.header}>
-          <Eyebrow>Verification</Eyebrow>
+          <Eyebrow>{t('Verification')}</Eyebrow>
           <Heading size={34}>
-            Enter the <Accent>6-digit code</Accent>
+            {t('Enter the')}{' '}<Accent>{t('6-digit code')}</Accent>
           </Heading>
           <Body size={14}>
-            Sent to <Text style={styles.phone}>{pendingPhone}</Text> ·{' '}
+            {t('Sent to')}{' '}<Text style={styles.phone}>{pendingPhone}</Text> ·{' '}
             <Text style={styles.link} onPress={() => setCurrentScreen('phone')}>
-              Change
+              {t('Change')}
             </Text>
           </Body>
         </View>
@@ -78,25 +79,25 @@ export const OTPVerifyScreen = () => {
           <TextInput
             ref={inputRef}
             value={code}
-            onChangeText={(t) => {
-              const next = t.replace(/\D/g, '').slice(0, 6);
+            onChangeText={(text) => {
+              const next = text.replace(/\D/g, '').slice(0, 6);
               setCode(next);
               if (next.length === 6) handleVerify(next);
             }}
             keyboardType="number-pad"
             autoFocus
             style={styles.hiddenInput}
-            accessibilityLabel="One-time code"
+            accessibilityLabel={t('One-time code')}
           />
         </TouchableOpacity>
       </FadeIn>
 
       <View style={styles.resendRow}>
         {secondsLeft > 0 ? (
-          <Text style={styles.resendWait}>Resend in 0:{String(secondsLeft).padStart(2, '0')}</Text>
+          <Text style={styles.resendWait}>{t('Resend in 0:{s}', { s: String(secondsLeft).padStart(2, '0') })}</Text>
         ) : (
           <Text style={styles.link} onPress={handleResend}>
-            Resend code
+            {t('Resend code')}
           </Text>
         )}
       </View>
@@ -104,7 +105,7 @@ export const OTPVerifyScreen = () => {
       {error && <Text style={styles.error}>{error}</Text>}
       {devCode && (
         <View style={styles.devCode}>
-          <Text style={styles.devCodeText}>Test SMS · your code is {devCode}</Text>
+          <Text style={styles.devCodeText}>{t('Test SMS · your code is {devCode}', { devCode })}</Text>
         </View>
       )}
 
@@ -112,9 +113,9 @@ export const OTPVerifyScreen = () => {
         <Card variant="gold" style={styles.whyCard} padding={14}>
           <ShieldCheck size={18} color="#8A6A2E" />
           <View style={{ flex: 1, gap: 2 }}>
-            <Text style={styles.whyTitle}>Why we verify</Text>
+            <Text style={styles.whyTitle}>{t('Why we verify')}</Text>
             <Text style={styles.whyText}>
-              One verified number per profile, so nobody can run five accounts and waste your family’s time.
+              {t('One verified number per profile, so nobody can run five accounts and waste your family’s time.')}
             </Text>
           </View>
         </Card>

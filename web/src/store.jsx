@@ -1,10 +1,10 @@
-// Web binding for the shared Sangam store (../../shared/store.js): React context + URL routing
+// Web binding for the shared 3Knot store (../../shared/store.js): React context + URL routing
 import React, { createContext, useContext, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { createApiClient } from '@shared/api';
 import { createSangamStore } from '@shared/store';
 import { createCallManager } from '@shared/calls';
-import { getLanguage, subscribeLanguage } from '@shared/i18n';
+import { getLanguage, subscribeLanguage, notificationText } from '@shared/i18n';
 
 // Same origin by default: the backend serves this app and its API together
 export const client = createApiClient({ baseUrl: import.meta.env.VITE_API_BASE || '/api' });
@@ -44,6 +44,7 @@ const PATHS = {
   conversations: '/messages',
   verification: '/profile/verification',
   premium: '/premium',
+  assisted: '/premium/assisted',
   stories: '/stories',
   'blueprint-intro': '/onboarding/blueprint',
   'blueprint-q1': '/onboarding/blueprint/question',
@@ -92,7 +93,8 @@ export function StoreProvider({ children }) {
     // Browser notification when a live notification arrives while this tab is in the background
     store.setOnSystemNotification((n) => {
       if (!document.hidden || !('Notification' in window) || Notification.permission !== 'granted') return;
-      const shown = new Notification(n.title, { body: n.body, tag: n.id, icon: '/favicon.svg' });
+      const text = notificationText(n);
+      const shown = new Notification(text.title, { body: text.body, tag: n.id, icon: '/favicon.svg' });
       shown.onclick = () => {
         window.focus();
         store.actions.openNotification(n);

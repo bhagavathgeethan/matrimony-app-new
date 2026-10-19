@@ -12,6 +12,7 @@ const realtime = require('../services/realtime');
 const { canCall } = require('./chat');
 const { notify } = require('./notifications');
 const { route } = require('../lib/http');
+const { tx } = require('../lib/i18n');
 
 const router = express.Router();
 const RELAYED = new Set(['call:invite', 'call:accept', 'call:decline', 'call:end', 'call:offer', 'call:answer', 'call:ice']);
@@ -55,8 +56,8 @@ async function handle(userId, msg) {
     if (!realtime.isOnline(other)) {
       await notify(other, {
         type: 'call',
-        title: `${from.name} is calling you`,
-        body: payload.kind === 'audio' ? 'Voice call on Sangam' : 'Video call on Sangam',
+        title: tx('{name} is calling you', { name: from.name }),
+        body: tx(payload.kind === 'audio' ? 'Voice call on 3Knot' : 'Video call on 3Knot'),
         data: { conversationId: msg.conversationId, callId: msg.callId, senderName: from.name },
       });
     }
@@ -65,8 +66,8 @@ async function handle(userId, msg) {
   if (msg.type === 'call:end' && msg.reason === 'missed') {
     await notify(other, {
       type: 'call',
-      title: `Missed ${payload.kind === 'audio' ? 'voice' : 'video'} call from ${from.name}`,
-      body: 'Call them back from your chat.',
+      title: tx(payload.kind === 'audio' ? 'Missed voice call from {name}' : 'Missed video call from {name}', { name: from.name }),
+      body: tx('Call them back from your chat.'),
       data: { conversationId: msg.conversationId, senderName: from.name },
       groupKey: `call:${msg.conversationId}`,
     });

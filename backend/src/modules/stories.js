@@ -2,6 +2,7 @@
 const express = require('express');
 const db = require('../config/db');
 const { httpError, newId } = require('../lib/util');
+const { tx } = require('../lib/i18n');
 const { route, optionalString } = require('../lib/http');
 
 const router = express.Router();
@@ -35,7 +36,7 @@ async function submit(userId, body) {
   if (!c || (c.user_a !== userId && c.user_b !== userId)) throw httpError(404, 'Conversation not found');
   if (c.status !== 'accepted') throw httpError(400, 'Stories can be shared once you have both accepted interest');
   const partnerId = c.user_a === userId ? c.user_b : c.user_a;
-  if (!partnerId) throw httpError(410, 'Your partner has left Sangam');
+  if (!partnerId) throw httpError(410, 'Your partner has left 3Knot');
   const open = await db.query(
     `SELECT 1 FROM success_stories WHERE conversation_id = $1 AND status IN ('pending_partner', 'pending_review', 'published')`,
     [c.id]
@@ -52,8 +53,8 @@ async function submit(userId, body) {
   const { notify } = require('./notifications');
   await notify(partnerId, {
     type: 'account',
-    title: `${nameOf(userId)} wants to share your story`,
-    body: 'Confirm to let the Sangam team publish it — or decline, no questions asked.',
+    title: tx('{name} wants to share your story', { name: nameOf(userId) }),
+    body: tx('Confirm to let the 3Knot team publish it — or decline, no questions asked.'),
     data: { target: 'stories', storyId: row.id },
   });
   return toDto(row, userId);
@@ -87,7 +88,7 @@ async function review(id, decision) {
   if (decision === 'published') {
     const { notify } = require('./notifications');
     for (const uid of [r.submitted_by, r.partner_id]) {
-      await notify(uid, { type: 'account', title: 'Your story is live', body: 'Thank you for sharing it with the Sangam community.', data: { target: 'stories' } });
+      await notify(uid, { type: 'account', title: tx('Your story is live'), body: tx('Thank you for sharing it with the 3Knot community.'), data: { target: 'stories' } });
     }
   }
   return { id, status: decision };

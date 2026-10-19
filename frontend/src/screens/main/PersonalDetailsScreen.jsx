@@ -28,9 +28,9 @@ export const PersonalDetailsScreen = () => {
 
         <FadeIn>
           <Card style={styles.progress} padding={16}>
-            <ScoreRing score={percent} size={64} label="DONE" />
+            <ScoreRing score={percent} size={64} label={t('DONE')} />
             <View style={{ flex: 1, gap: 4 }}>
-              <Text style={styles.progressTitle}>Profile {percent}% complete</Text>
+              <Text style={styles.progressTitle}>{t('Profile {percent}% complete', { percent })}</Text>
               <Text style={styles.progressHint}>{profileStrengthHint(user)}</Text>
             </View>
           </Card>
@@ -38,20 +38,20 @@ export const PersonalDetailsScreen = () => {
 
         {percent < 100 && completion?.nextSection && (
           <TouchableOpacity onPress={() => setEditing(completion.nextSection)} style={styles.cta} accessibilityRole="button">
-            <Text style={styles.ctaText}>Complete next section</Text>
+            <Text style={styles.ctaText}>{t('Complete next section')}</Text>
           </TouchableOpacity>
         )}
 
         <FadeIn delay={80}>
           <View style={{ gap: 6, marginTop: 18 }}>
-            <Eyebrow color={colors.success}>Personal information</Eyebrow>
-            <Heading size={26}>About you</Heading>
+            <Eyebrow color={colors.success}>{t('Personal information')}</Eyebrow>
+            <Heading size={26}>{t('About you')}</Heading>
           </View>
           <Card style={{ marginTop: 10 }} padding={18}>
             <DetailsSections person={user} own onEdit={setEditing} />
           </Card>
           <Text style={styles.footnote}>
-            Caste, gothram, star and similar fields are optional and never affect matching scores.
+            {t('Caste, gothram, star and similar fields are optional and never affect matching scores.')}
           </Text>
         </FadeIn>
       </Screen>

@@ -6,6 +6,7 @@ import { CALL_END_TEXT, formatDuration } from '@shared/calls';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { Avatar } from '../ui/kit';
+import { t } from '@shared/i18n';
 
 const { colors, fonts, gradients, shadows } = theme;
 
@@ -21,14 +22,14 @@ const VideoEl = ({ stream, muted, style }) => {
 const Timer = ({ since }) => {
   const [, tick] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => tick((n) => n + 1), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(timer);
   }, []);
   return <Text style={styles.status}>{formatDuration(Date.now() - since)}</Text>;
 };
 
 const CallButton = ({ onPress, label, bg, children }) => (
-  <TouchableOpacity onPress={onPress} style={[styles.callBtn, { backgroundColor: bg }]} accessibilityRole="button" accessibilityLabel={label}>
+  <TouchableOpacity onPress={onPress} style={[styles.callBtn, { backgroundColor: bg }]} accessibilityRole="button" accessibilityLabel={t(label)}>
     {children}
   </TouchableOpacity>
 );
@@ -37,18 +38,18 @@ export const CallOverlay = () => {
   const { call, calls } = useApp();
   if (!call || call.status === 'idle') return null;
   const video = call.kind === 'video';
-  const name = call.peer?.name || 'Your match';
+  const name = call.peer?.name || t('Your match');
 
   if (call.status === 'incoming') {
     return (
-      <View style={styles.incoming} accessibilityRole="alert" accessibilityLabel={`Incoming ${video ? 'video' : 'voice'} call from ${name}`}>
+      <View style={styles.incoming} accessibilityRole="alert" accessibilityLabel={t(video ? 'Incoming video call from {name}' : 'Incoming voice call from {name}', { name })}>
         <Avatar name={name} size={48} ring />
         <View style={{ flex: 1 }}>
           <Text style={styles.name}>{name}</Text>
-          <Text style={styles.status}>Incoming {video ? 'video' : 'voice'} call…</Text>
+          <Text style={styles.status}>{t(video ? 'Incoming video call…' : 'Incoming voice call…')}</Text>
         </View>
-        <CallButton onPress={() => calls.decline()} label="Decline call" bg="#D6334F"><PhoneOff size={20} color={colors.white} /></CallButton>
-        <CallButton onPress={() => calls.accept()} label="Accept call" bg={colors.success}>
+        <CallButton onPress={() => calls.decline()} label={t('Decline call')} bg="#D6334F"><PhoneOff size={20} color={colors.white} /></CallButton>
+        <CallButton onPress={() => calls.accept()} label={t('Accept call')} bg={colors.success}>
           {video ? <Video size={20} color={colors.white} /> : <Phone size={20} color={colors.white} />}
         </CallButton>
       </View>
@@ -57,12 +58,12 @@ export const CallOverlay = () => {
 
   const status = call.status === 'active' && call.startedAt
     ? <Timer since={call.startedAt} />
-    : <Text style={styles.status}>{{ outgoing: 'Ringing…', connecting: 'Connecting…', active: 'Connected', ended: call.error || CALL_END_TEXT[call.endReason] || 'Call ended' }[call.status]}</Text>;
+    : <Text style={styles.status}>{t({ outgoing: 'Ringing…', connecting: 'Connecting…', active: 'Connected', ended: call.error || CALL_END_TEXT[call.endReason] || 'Call ended' }[call.status])}</Text>;
 
   return (
-    <View style={styles.screen} accessibilityLabel={`Call with ${name}`}>
+    <View style={styles.screen} accessibilityLabel={t('Call with {name}', { name })}>
       {video && call.remoteStream && call.status === 'active'
-        ? <VideoEl stream={call.remoteStream} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        ? <VideoEl stream={call.remoteStream} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         : <View style={styles.placeholder}><Avatar name={name} size={110} ring /></View>}
       {!video && call.remoteStream && <VideoEl stream={call.remoteStream} style={{ display: 'none' }} />}
       {video && call.localStream && !call.cameraOff && (
@@ -74,15 +75,15 @@ export const CallOverlay = () => {
       </View>
       {call.status !== 'ended' && (
         <View style={styles.controls}>
-          <CallButton onPress={() => calls.toggleMute()} label={call.muted ? 'Unmute' : 'Mute'} bg="rgba(255,255,255,0.16)">
+          <CallButton onPress={() => calls.toggleMute()} label={call.muted ? t('Unmute') : t('Mute')} bg="rgba(255,255,255,0.16)">
             {call.muted ? <MicOff size={20} color={colors.white} /> : <Mic size={20} color={colors.white} />}
           </CallButton>
           {video && (
-            <CallButton onPress={() => calls.toggleCamera()} label={call.cameraOff ? 'Turn camera on' : 'Turn camera off'} bg="rgba(255,255,255,0.16)">
+            <CallButton onPress={() => calls.toggleCamera()} label={call.cameraOff ? t('Turn camera on') : t('Turn camera off')} bg="rgba(255,255,255,0.16)">
               {call.cameraOff ? <VideoOff size={20} color={colors.white} /> : <Video size={20} color={colors.white} />}
             </CallButton>
           )}
-          <CallButton onPress={() => calls.hangup()} label="End call" bg="#D6334F"><PhoneOff size={20} color={colors.white} /></CallButton>
+          <CallButton onPress={() => calls.hangup()} label={t('End call')} bg="#D6334F"><PhoneOff size={20} color={colors.white} /></CallButton>
         </View>
       )}
     </View>

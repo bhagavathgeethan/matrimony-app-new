@@ -4,6 +4,7 @@ import { Users, Check, AlertTriangle, Hourglass, Settings2, Quote, ChevronDown, 
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { Screen, FadeIn, Eyebrow, Heading, Card, Badge, Button, Body, Avatar } from '../../components/ui/kit';
+import { t } from '@shared/i18n';
 
 const { colors, fonts, radii } = theme;
 
@@ -15,7 +16,11 @@ const STATUS = {
 };
 
 export const SentFamilyResponsesScreen = () => {
-  const { sentRecords, setCurrentScreen, familyVotes, loadFamilyVotes } = useApp();
+  const { sentRecords, setCurrentScreen, familyVotes, loadFamilyVotes, proposals, loadProposals, answerProposal } = useApp();
+  useEffect(() => {
+    loadProposals();
+  }, [loadProposals]);
+  const pendingProposals = proposals.filter((p) => p.status === 'pending');
   useEffect(() => {
     loadFamilyVotes();
   }, [loadFamilyVotes, sentRecords]);
@@ -34,8 +39,8 @@ export const SentFamilyResponsesScreen = () => {
       <FadeIn>
         <View style={styles.titleRow}>
           <View style={{ gap: 4, flex: 1 }}>
-            <Eyebrow>Family co-pilot</Eyebrow>
-            <Heading size={38}>Sent to family</Heading>
+            <Eyebrow>{t('Family co-pilot')}</Eyebrow>
+            <Heading size={38}>{t('Sent to family')}</Heading>
           </View>
           <TouchableOpacity onPress={() => setCurrentScreen('link-parent')} style={styles.manage}>
             <Settings2 size={18} color={colors.accent} />
@@ -52,18 +57,34 @@ export const SentFamilyResponsesScreen = () => {
           ].map(([label, n], i) => (
             <View key={label} style={[styles.stat, i > 0 && styles.statDivider]}>
               <Text style={styles.statNum}>{n}</Text>
-              <Text style={styles.statLabel}>{label}</Text>
+              <Text style={styles.statLabel}>{t(label)}</Text>
             </View>
           ))}
         </Card>
         <Text style={styles.statsCaption}>
-          {counts.shared} shared · {counts.awaiting} awaiting a response
+          {t('{shared} shared · {awaiting} awaiting a response', { shared: counts.shared, awaiting: counts.awaiting })}
         </Text>
       </FadeIn>
 
+      {pendingProposals.length > 0 && (
+        <Card style={{ gap: 12, marginBottom: 12 }}>
+          <Text style={styles.recordMeta}>{t('SUGGESTED BY FAMILY')}</Text>
+          {pendingProposals.map((p) => (
+            <View key={p.id} style={{ gap: 6 }}>
+              <Text style={styles.recordName}>{t('{familyName} suggests {candidateName}, {candidateAge}', { familyName: p.familyName, candidateName: p.candidateName, candidateAge: p.candidateAge })}</Text>
+              {p.note ? <Text style={styles.recordMeta}>{t('“{note}” — sent with your interest if you approve', { note: p.note })}</Text> : null}
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <Button small variant="secondary" label={t('Decline')} onPress={() => answerProposal(p.id, false)} style={{ flex: 1 }} />
+                <Button small label={t('Send interest')} onPress={() => answerProposal(p.id, true)} style={{ flex: 1 }} />
+              </View>
+            </View>
+          ))}
+        </Card>
+      )}
+
       {familyVotes.length > 0 && (
         <Card style={{ gap: 12, marginBottom: 12 }}>
-          <Text style={styles.recordMeta}>FAMILY VOTES</Text>
+          <Text style={styles.recordMeta}>{t('FAMILY VOTES')}</Text>
           {familyVotes.map((v) => (
             <View key={v.candidateId} style={{ gap: 4 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -74,7 +95,7 @@ export const SentFamilyResponsesScreen = () => {
                 <AlertTriangle size={14} color={colors.warning} /><Text style={styles.recordMeta}>{v.tally.concern_raised}</Text>
               </View>
               <Text style={styles.recordMeta}>
-                {v.votes.map((x) => `${x.name}: ${{ approved: 'yes', unsure: 'unsure', concern_raised: 'concern', awaiting: 'waiting' }[x.status]}`).join(' · ')}
+                {v.votes.map((x) => `${x.name}: ${t({ approved: 'yes', unsure: 'unsure', concern_raised: 'concern', awaiting: 'waiting' }[x.status])}`).join(' · ')}
               </Text>
             </View>
           ))}
@@ -94,18 +115,18 @@ export const SentFamilyResponsesScreen = () => {
                       {record.candidateName}, {record.candidateAge}
                     </Text>
                     <Text style={styles.recordMeta}>
-                      Sent to {record.recipientParentName} · {record.sentAt}
-                      {record.expired ? ' · access expired' : ''}
+                      {t('Sent to {recipientParentName} · {sentAt}', { recipientParentName: record.recipientParentName, sentAt: t(record.sentAt) })}
+                      {record.expired ? t(' · access expired') : ''}
                     </Text>
                   </View>
                   {record.overlapScore != null && <Text style={styles.recordScore}>{record.overlapScore}%</Text>}
                 </View>
 
                 <View style={styles.statusRow}>
-                  <Badge label={record.statusBadge || 'AWAITING REVIEW'} tone={st.tone} icon={st.icon} />
+                  <Badge label={t(record.statusBadge || 'AWAITING REVIEW')} tone={st.tone} icon={st.icon} />
                 </View>
                 {record.status === 'awaiting' ? (
-                  <Text style={styles.awaiting}>{record.feedbackNote}</Text>
+                  <Text style={styles.awaiting}>{t(record.feedbackNote)}</Text>
                 ) : (
                   <View style={styles.feedback}>
                     <Quote size={14} color={colors.textLight} />
@@ -119,7 +140,7 @@ export const SentFamilyResponsesScreen = () => {
         {expired.length > 0 && (
           <TouchableOpacity onPress={() => setShowExpired((v) => !v)} style={styles.expiredToggle}>
             <Text style={styles.expiredText}>
-              {showExpired ? 'Hide' : 'Show'} {expired.length} expired share{expired.length === 1 ? '' : 's'}
+              {t(showExpired ? (expired.length === 1 ? 'Hide 1 expired share' : 'Hide {n} expired shares') : (expired.length === 1 ? 'Show 1 expired share' : 'Show {n} expired shares'), { n: expired.length })}
             </Text>
             {showExpired ? (
               <ChevronUp size={16} color={colors.textSecondary} />
@@ -132,7 +153,7 @@ export const SentFamilyResponsesScreen = () => {
           <Card variant="tinted" style={{ alignItems: 'center', gap: 10, paddingVertical: 30 }}>
             <Users size={26} color={colors.gold} />
             <Body style={{ textAlign: 'center' }}>
-              Nothing shared yet. Use “Share with parents” on any match.
+              {t('Nothing shared yet. Use “Share with parents” on any match.')}
             </Body>
           </Card>
         )}
@@ -141,10 +162,10 @@ export const SentFamilyResponsesScreen = () => {
       <FadeIn delay={300}>
         <View style={{ gap: 12 }}>
           <Card variant="gold" style={styles.advice}>
-            <Text style={styles.adviceText}>A parent’s note is advice, not a veto. The decision stays yours.</Text>
+            <Text style={styles.adviceText}>{t('A parent’s note is advice, not a veto. The decision stays yours.')}</Text>
           </Card>
           <Button
-            label="Manage family access"
+            label={t('Manage family access')}
             variant="secondary"
             icon={Settings2}
             onPress={() => setCurrentScreen('link-parent')}

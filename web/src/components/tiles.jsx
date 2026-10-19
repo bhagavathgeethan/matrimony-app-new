@@ -3,6 +3,8 @@ import React from 'react';
 import { BadgeCheck, Check, Lock, Crown } from 'lucide-react';
 import { cx } from './ui';
 import { ShortlistButton } from './candidate';
+import { t } from '@shared/i18n';
+import { summaryNote } from '@shared/constants';
 
 export function ProfileTile({ c, onOpen, selected, onToggleSelect, footer, star = true }) {
   const score = c.overlapScores?.overall ?? 0;
@@ -21,7 +23,7 @@ export function ProfileTile({ c, onOpen, selected, onToggleSelect, footer, star 
         {onToggleSelect && (
           <button
             className={cx('tile-select', selected && 'on')}
-            aria-label={selected ? `Deselect ${c.firstName}` : `Select ${c.firstName}`}
+            aria-label={selected ? t('Deselect {firstName}', { firstName: c.firstName }) : t('Select {firstName}', { firstName: c.firstName })}
             onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
           >
             {selected && <Check size={14} strokeWidth={3} />}
@@ -35,10 +37,10 @@ export function ProfileTile({ c, onOpen, selected, onToggleSelect, footer, star 
           <span className="h3">{c.firstName}, {c.age}</span>
           {c.verified && <BadgeCheck size={14} color="var(--gold)" />}
           {c.premium && <Crown size={13} color="var(--gold)" />}
-          {c.activeRecently && <span className="active-dot" title="Active today" aria-label="Active today" />}
+          {c.activeRecently && <span className="active-dot" title={t('Active today')} aria-label={t('Active today')} />}
         </span>
         <span className="small" style={{ fontWeight: 600, color: 'var(--text-2)' }}>{c.city}</span>
-        {c.summaryNote && <span className="tiny muted">{c.summaryNote}</span>}
+        {c.summaryNote && <span className="tiny muted">{summaryNote(c.summaryNote)}</span>}
         {footer}
       </div>
     </div>

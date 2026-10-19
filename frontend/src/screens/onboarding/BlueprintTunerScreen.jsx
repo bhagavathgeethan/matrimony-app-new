@@ -5,6 +5,8 @@ import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { BlueprintSlider } from '../../components/blueprint/BlueprintSlider';
 import { OnboardingScreen, StepBar, FadeIn, Eyebrow, Heading, Accent, Button } from '../../components/ui/kit';
+import { PILLARS } from '@shared/constants';
+import { t } from '@shared/i18n';
 
 const { colors, fonts } = theme;
 
@@ -41,11 +43,13 @@ export const BlueprintTunerScreen = () => {
     setCurrentScreen(user?.onboarding?.completed ? 'blueprint-summary' : 'vibes');
   };
 
+  // Each scale's ends come from PILLARS, so the labels always match how the value is scored
+  const ends = (key) => { const p = PILLARS.find((x) => x.key === key); return `${t(p.low)} → ${t(p.high)}`; };
   const sliders = [
-    ['Money', 'Save aggressively → Live for now', Wallet, money, setMoney, moneyFlexibility, setMoneyFlexibility],
-    ['Roots', 'Stay near family → Move anywhere', MapPin, roots, setRoots, rootsFlexibility, setRootsFlexibility],
-    ['Kids', 'Not planning → Soon, hands-on', Baby, kids, setKids, kidsFlexibility, setKidsFlexibility],
-    ['Ambition', 'Protect balance → All-in on work', Briefcase, ambition, setAmbition, ambitionFlexibility, setAmbitionFlexibility],
+    ['Money', ends('money'), Wallet, money, setMoney, moneyFlexibility, setMoneyFlexibility],
+    ['Roots', ends('roots'), MapPin, roots, setRoots, rootsFlexibility, setRootsFlexibility],
+    ['Kids', ends('kids'), Baby, kids, setKids, kidsFlexibility, setKidsFlexibility],
+    ['Ambition', ends('ambition'), Briefcase, ambition, setAmbition, ambitionFlexibility, setAmbitionFlexibility],
   ];
 
   return (
@@ -55,18 +59,18 @@ export const BlueprintTunerScreen = () => {
         <>
           <View style={styles.hint}>
             <Info size={13} color={colors.gold} />
-            <Text style={styles.hintText}>Gold band = how much difference you’ll accept</Text>
+            <Text style={styles.hintText}>{t('Gold band = how much difference you’ll accept')}</Text>
           </View>
           {error && <Text style={styles.error}>{error}</Text>}
-          <Button label={saving ? 'Saving…' : 'Save blueprint'} disabled={saving} onPress={handleSave} />
+          <Button label={saving ? t('Saving…') : t('Save blueprint')} disabled={saving} onPress={handleSave} />
         </>
       }
     >
       <FadeIn>
         <View style={styles.header}>
-          <Eyebrow>Step 04 / 05 · Blueprint</Eyebrow>
+          <Eyebrow>{t('Step 04 / 05 · Blueprint')}</Eyebrow>
           <Heading size={32}>
-            Your <Accent>shared future</Accent>
+            {t('Your')}{' '}<Accent>{t('shared future')}</Accent>
           </Heading>
         </View>
       </FadeIn>
@@ -75,7 +79,7 @@ export const BlueprintTunerScreen = () => {
         {sliders.map(([title, subtitle, icon, value, setValue, flex, setFlex], i) => (
           <FadeIn key={title} delay={60 + i * 60}>
             <BlueprintSlider
-              title={title}
+              title={t(title)}
               subtitle={subtitle}
               icon={icon}
               value={value}

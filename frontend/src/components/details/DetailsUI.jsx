@@ -1,9 +1,10 @@
 // Personal details on mobile: option picker sheet, field controls, read-only sections and the section editor.
 // Field definitions come from ../../../../shared/profileFields.js (same as the web app and backend).
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { Capacitor } from '@capacitor/core';
-import { PenLine, FileText, BookOpen, GraduationCap, MapPin, Users, Contact, Headphones, Pencil, Plus, ChevronDown, Check, X } from 'lucide-react';
+import { PenLine, FileText, BookOpen, GraduationCap, MapPin, Users, Contact, Headphones, Pencil, Plus, X } from 'lucide-react';
 import {
   PROFILE_SECTIONS, HEIGHT_OPTIONS, WEIGHT_OPTIONS, MAX_MULTI, formatField, formatHeight, formatWeight, visibleFields, isFilled,
 } from '@shared/profileFields';
@@ -11,6 +12,8 @@ import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { Chip, Toggle, Button, Heading } from '../ui/kit';
 import { t } from '@shared/i18n';
+import { SelectField } from '../common/Picker';
+import { useBackHandler } from '../../services/backButton';
 
 const { colors, fonts, shadows } = theme;
 const isNativeApp = Capacitor.isNativePlatform();
@@ -43,14 +46,20 @@ export function displayValue(f, v, values) {
 
 // ---------- option picker ----------
 
-export const Sheet = ({ title, onClose, children, footer, zIndex = 70 }) => (
+// Rendered at the top of the page: a fixed overlay nested under an animated (transformed) card would
+// otherwise be positioned and clipped inside that card and painted under the fields after it.
+export const Sheet = (props) => createPortal(<SheetBody {...props} />, document.body);
+
+const SheetBody = ({ title, onClose, children, footer, zIndex = 70 }) => {
+  useBackHandler(onClose);
+  return (
   <View style={[styles.overlay, { zIndex }]}>
     <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
     <View style={[styles.sheet, isNativeApp && { maxWidth: '100%' }]}>
       <View style={styles.handle} />
       <View style={styles.sheetHead}>
         <Heading size={24} style={{ flex: 1 }}>{title}</Heading>
-        <TouchableOpacity onPress={onClose} style={styles.close} accessibilityLabel="Close">
+        <TouchableOpacity onPress={onClose} style={styles.close} accessibilityLabel={t('Close')}>
           <X size={18} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
@@ -60,29 +69,8 @@ export const Sheet = ({ title, onClose, children, footer, zIndex = 70 }) => (
       {footer && <View style={styles.sheetFooter}>{footer}</View>}
     </View>
   </View>
-);
-
-const OptionSheet = ({ title, options, value, onPick, onClose }) => (
-  <Sheet title={title} onClose={onClose} zIndex={80}>
-    <View style={{ gap: 2 }}>
-    {[[null, 'Not set'], ...options].map(([v, label]) => {
-      const on = v === value || (v === null && value == null);
-      return (
-        <TouchableOpacity
-          key={String(v)}
-          onPress={() => { onPick(v); onClose(); }}
-          style={[styles.option, on && styles.optionOn]}
-          accessibilityRole="button"
-          accessibilityLabel={label}
-        >
-          <Text style={[styles.optionText, v === null && { color: colors.textMuted }, on && { color: colors.accent }]}>{label}</Text>
-          {on && <Check size={16} color={colors.accent} />}
-        </TouchableOpacity>
-      );
-    })}
-    </View>
-  </Sheet>
-);
+  );
+};
 
 function optionsFor(field, values) {
   switch (field.type) {
@@ -100,7 +88,6 @@ function optionsFor(field, values) {
 // ---------- one field ----------
 
 export const FieldControl = ({ field, draft, set }) => {
-  const [picking, setPicking] = useState(false);
   const value = draft[field.key];
 
   if (field.type === 'bool') {
@@ -118,13 +105,13 @@ export const FieldControl = ({ field, draft, set }) => {
     control = (
       <TextInput
         value={value ?? ''}
-        onChangeText={(t) => set(field.key, t)}
+        onChangeText={(text) => set(field.key, text)}
         placeholder={field.placeholder || ''}
         placeholderTextColor={colors.textLight}
         maxLength={field.max}
         multiline={long}
         numberOfLines={long ? 5 : 1}
-        accessibilityLabel={field.label}
+        accessibilityLabel={t(field.label)}
         style={[styles.input, long && styles.inputLong]}
       />
     );
@@ -150,17 +137,13 @@ export const FieldControl = ({ field, draft, set }) => {
       </View>
     );
   } else {
-    const shown = isFilled(value) ? displayValue(field, value, draft) : t('Select');
     control = (
-      <>
-        <TouchableOpacity onPress={() => setPicking(true)} style={styles.selectBox} accessibilityRole="button" accessibilityLabel={`${field.label}: ${shown}`}>
-          <Text style={[styles.selectText, !isFilled(value) && { color: colors.textLight }]} numberOfLines={1}>{shown}</Text>
-          <ChevronDown size={16} color={colors.textMuted} />
-        </TouchableOpacity>
-        {picking && (
-          <OptionSheet title={t(field.label)} options={optionsFor(field, draft)} value={value} onPick={(v) => set(field.key, v)} onClose={() => setPicking(false)} />
-        )}
-      </>
+      <SelectField
+        label={t(field.label)}
+        value={value ?? null}
+        onChange={(v) => set(field.key, v)}
+        options={[{ value: null, label: t('Not set'), muted: true }, ...optionsFor(field, draft)]}
+      />
     );
   }
 
@@ -188,21 +171,23 @@ export function useDetailsDraft(fields, original) {
 
 // ---------- section editor ----------
 
-export const SectionEditSheet = ({ sectionKey, onClose }) => {
+// values / save / exclude: editing someone else's details (a family member from their portal);
+// by default the signed-in member edits their own.
+export const SectionEditSheet = ({ sectionKey, onClose, values, save: saveChanges, exclude = [] }) => {
   const { user, updateDetails } = useApp();
   const section = PROFILE_SECTIONS.find((s) => s.key === sectionKey);
-  const original = valuesOf(user);
+  const original = values || valuesOf(user);
   const [draft, set] = useDetailsDraft(section.fields, original);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const fields = section.fields.filter((f) => !f.upTo || Number(draft[f.upTo]) > 0);
+  const fields = section.fields.filter((f) => !exclude.includes(f.key) && (!f.upTo || Number(draft[f.upTo]) > 0));
 
   const save = async () => {
     const changes = changedValues(section.fields, draft, original);
     if (!Object.keys(changes).length) return onClose();
     setBusy(true);
     setError(null);
-    const res = await updateDetails(changes);
+    const res = await (saveChanges || updateDetails)(changes);
     setBusy(false);
     if (!res.ok) return setError(res.error);
     onClose();
@@ -217,7 +202,7 @@ export const SectionEditSheet = ({ sectionKey, onClose }) => {
           {error && <Text style={styles.error}>{error}</Text>}
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Button variant="secondary" label={t('Cancel')} style={{ flex: 1 }} onPress={onClose} />
-            <Button label={busy ? 'Saving…' : t('Save')} style={{ flex: 2 }} disabled={busy} onPress={save} />
+            <Button label={busy ? t('Saving…') : t('Save')} style={{ flex: 2 }} disabled={busy} onPress={save} />
           </View>
         </>
       }
@@ -240,7 +225,7 @@ export const DetailsSections = ({ person, own = false, onEdit }) => {
         if (!own && filled.length === 0) return null;
         const single = fields.length === 1 && fields[0].type === 'longtext';
         const add = (
-          <TouchableOpacity onPress={() => onEdit(section.key)} style={styles.addRow} accessibilityLabel={`Add ${section.title}`}>
+          <TouchableOpacity onPress={() => onEdit(section.key)} style={styles.addRow} accessibilityLabel={t('Add {title}', { title: t(section.title) })}>
             <Plus size={13} color={ADD_COLOR} />
             <Text style={styles.addText}>{t('Add Details')}</Text>
           </TouchableOpacity>
@@ -251,7 +236,7 @@ export const DetailsSections = ({ person, own = false, onEdit }) => {
               <Icon size={20} color={ICON_TONES[section.icon]} />
               <Text style={styles.sectionTitle}>{t(section.title)}</Text>
               {own && (
-                <TouchableOpacity onPress={() => onEdit(section.key)} style={styles.pencil} accessibilityLabel={`Edit ${section.title}`}>
+                <TouchableOpacity onPress={() => onEdit(section.key)} style={styles.pencil} accessibilityLabel={t('Edit {title}', { title: t(section.title) })}>
                   <Pencil size={16} color={colors.textSecondary} />
                 </TouchableOpacity>
               )}
@@ -270,7 +255,7 @@ export const DetailsSections = ({ person, own = false, onEdit }) => {
                   {section.key === 'basic' && f.key === 'firstName' && person?.age != null && (
                     <View style={styles.row}>
                       <Text style={styles.rowLabel}>{t('Age')}</Text>
-                      <View style={styles.rowValueWrap}><Text style={styles.rowValue}>{person.age} Yrs</Text></View>
+                      <View style={styles.rowValueWrap}><Text style={styles.rowValue}>{t('{age} Yrs', { age: person.age })}</Text></View>
                     </View>
                   )}
                 </React.Fragment>
@@ -289,7 +274,7 @@ export const FullProfileSheet = ({ candidate, onClose }) => {
   return (
     <Sheet title={`${candidate.firstName}, ${candidate.age}`} onClose={onClose}>
       {hasDetails ? <DetailsSections person={candidate} /> : (
-        <Text style={styles.paragraph}>{candidate.firstName} hasn’t added personal details yet.</Text>
+        <Text style={styles.paragraph}>{t('{firstName} hasn’t added personal details yet.', { firstName: candidate.firstName })}</Text>
       )}
     </Sheet>
   );
@@ -354,23 +339,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.borderLight,
   },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 13,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-  },
-  optionOn: {
-    backgroundColor: colors.accentSoft,
-  },
-  optionText: {
-    fontFamily: fonts.sans,
-    fontSize: 15.5,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
   label: {
     fontFamily: fonts.sans,
     fontSize: 11,
@@ -407,24 +375,6 @@ const styles = StyleSheet.create({
     minHeight: 120,
     paddingTop: 12,
     textAlignVertical: 'top',
-  },
-  selectBox: {
-    height: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    backgroundColor: colors.card,
-  },
-  selectText: {
-    flex: 1,
-    fontFamily: fonts.sans,
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.textPrimary,
   },
   chips: {
     flexDirection: 'row',

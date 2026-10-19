@@ -2,9 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" href="data:," />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Sangam — Where two lives meet</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content" />
+    <title>3Knot Matrimony — Where two lives meet</title>
 
     <style>
       * {
@@ -17,7 +17,7 @@
       }
       body {
         background-color: #F3EDE3;
-        font-family: 'Plus Jakarta Sans Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        font-family: 'Plus Jakarta Sans Variable', 'Nirmala UI', 'Noto Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
         color: #23140F;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
@@ -50,26 +50,54 @@
       .mx-pulse {
         animation: mx-pulse 3.2s ease-in-out infinite;
       }
-      /* Logo: strands draw in, then the bindu pops */
-      .mx-draw path {
+      /* Logo: the gold thaali's outline draws, it fills with gold, the bail drops on, the three beads (the three
+         knots) are set one by one, then a glint runs across it */
+      .tk-tie .tk-body {
         stroke-dasharray: 100;
         stroke-dashoffset: 100;
-        animation: mx-draw 1100ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+        fill-opacity: 0;
+        animation: tk-body 1300ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
       }
-      .mx-draw path:nth-of-type(2) { animation-delay: 120ms; }
-      @keyframes mx-draw { to { stroke-dashoffset: 0; } }
-      .mx-draw .mx-bindu {
-        transform-origin: 60px 58px;
-        transform: scale(0);
-        animation: mx-pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1) 950ms forwards;
+      @keyframes tk-body {
+        from { stroke: #FFD95A; }
+        60% { stroke-dashoffset: 0; fill-opacity: 0; stroke: #FFD95A; }
+        to { stroke-dashoffset: 0; fill-opacity: 1; stroke: #7A4E02; }
       }
-      @keyframes mx-pop { to { transform: scale(1); } }
+      .tk-tie .tk-bail { opacity: 0; transform: translateY(-10px); animation: tk-drop 600ms cubic-bezier(0.34, 1.56, 0.64, 1) 750ms forwards; }
+      @keyframes tk-drop { to { opacity: 1; transform: none; } }
+      .tk-tie .tk-detail { opacity: 0; animation: tk-fade 600ms ease 1000ms forwards; }
+      @keyframes tk-fade { to { opacity: 1; } }
+      .tk-tie .tk-bead { transform: scale(0); animation: tk-pop 480ms cubic-bezier(0.34, 1.8, 0.64, 1) forwards; }
+      .tk-tie .tk-bead-1 { animation-delay: 1300ms; }
+      .tk-tie .tk-bead-2 { animation-delay: 1600ms; }
+      .tk-tie .tk-bead-3 { animation-delay: 1900ms; }
+      @keyframes tk-pop { from { transform: scale(0); } to { transform: scale(1); } }
+      .tk-tie .tk-glint { animation: tk-glint 2800ms ease-in-out 1950ms infinite; }
+      @keyframes tk-glint { from { transform: translateX(0); } 45%, to { transform: translateX(200px); } }
+      @media (prefers-reduced-motion: reduce) {
+        .tk-tie .tk-body { animation: none; stroke-dashoffset: 0; fill-opacity: 1; }
+        .tk-tie .tk-bail, .tk-tie .tk-detail, .tk-tie .tk-bead { animation: none; opacity: 1; transform: none; }
+        .tk-tie .tk-glint { animation: none; display: none; }
+      }
+      /* Polished-gold lettering (loading screen) */
+      .tk-gold-text {
+        background: linear-gradient(180deg, #FFF1B8 0%, #F9D44A 40%, #F0B92B 65%, #C98A0C 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .tk-gold-text-deep {
+        background: linear-gradient(180deg, #E0A526 0%, #B07806 55%, #7A4E02 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
       /* Indeterminate progress bar */
       .mx-shimmer {
         width: 40%;
         height: 100%;
         border-radius: 2px;
-        background: linear-gradient(90deg, rgba(201,162,92,0), #E3C68A, rgba(201,162,92,0));
+        background: linear-gradient(90deg, rgba(249,212,74,0), #F9D44A, #FFF1B8, #F9D44A, rgba(249,212,74,0));
         animation: mx-shimmer 1.2s ease-in-out infinite;
       }
       @keyframes mx-shimmer {
@@ -78,8 +106,6 @@
       }
       @media (prefers-reduced-motion: reduce) {
         .mx-fade, .mx-pulse, .mx-shimmer { animation: none; }
-        .mx-draw path { animation: none; stroke-dashoffset: 0; }
-        .mx-draw .mx-bindu { animation: none; transform: none; }
       }
 
       /* Blueprint pillar slider */
@@ -115,10 +141,15 @@
         border: 7px solid #A81E3C;
         box-shadow: 0 4px 14px rgba(168, 30, 60, 0.4);
       }
+      /* Wide letter-spacing breaks Indic scripts apart; only Latin labels use it */
+      html:not([lang="en"]) body * {
+        letter-spacing: normal !important;
+      }
     </style>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Wine backdrop until React mounts (replaced by the app's loading screen), so launch never flashes white -->
+    <div id="root"><div style="position:fixed;top:0;right:0;bottom:0;left:0;background:linear-gradient(160deg, #3A0B18 0%, #6E1028 42%, #A81E3C 100%)"></div></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

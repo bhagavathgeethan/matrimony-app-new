@@ -4,9 +4,12 @@ const express = require('express');
 const db = require('../config/db');
 const { computeMatchScore } = require('../services/blueprintEngine');
 const { blueprintFromRow, VIBES } = require('./profile');
-const { loadViewer, buildCards, VISIBLE_USER_SQL } = require('./matches');
-const { notBlockedSql, isPremium } = require('../lib/members');
+const { loadViewer, buildCards, visibleTo, VISIBLE_USER_SQL } = require('./matches');
+const { detailValues } = require('./profile');
+const { notBlockedSql, has, limitOf, requireFeature } = require('../lib/members');
+const { FIELD_BY_KEY, HEIGHT_RANGE } = require('../../../shared/profileFields.js');
 const { httpError, ageFrom, newId } = require('../lib/util');
+const { tx } = require('../lib/i18n');
 const { route } = require('../lib/http');
 
 const router = express.Router();
@@ -17,8 +20,19 @@ const SORTS = ['fit', 'active', 'newest', 'age_asc', 'age_desc'];
 const STRONG_PILLAR = 80; // "strong on <pillar>" means at least this pillar score
 const PAGE_SIZE = 20;
 const PREMIUM_BOOST = 3; // premium members rank a little higher in "best fit"
-const MAX_SAVED = 10;
-const FILTER_KEYS = ['q', 'ageMin', 'ageMax', 'minScore', 'city', 'timelines', 'strongOn', 'vibes', 'verified', 'notContacted', 'matchesPreferences', 'sort'];
+// Premium "advanced" filters on personal details: query key -> details field
+const ADVANCED_LISTS = {
+  education: 'educationCategory',
+  employedIn: 'employedIn',
+  eatingHabits: 'eatingHabits',
+  motherTongue: 'motherTongue',
+  familyType: 'familyType',
+  maritalStatus: 'maritalStatus',
+};
+const FILTER_KEYS = [
+  'q', 'ageMin', 'ageMax', 'minScore', 'city', 'timelines', 'strongOn', 'vibes', 'verified', 'notContacted', 'matchesPreferences', 'sort',
+  'heightMin', 'heightMax', ...Object.keys(ADVANCED_LISTS),
+];
 
 const list = (v) => (v === undefined || v === '' ? [] : String(v).split(',').map((s) => s.trim()).filter(Boolean));
 
@@ -47,8 +61,18 @@ function parseFilters(query) {
   if (!SORTS.includes(sort)) throw httpError(400, `sort must be one of: ${SORTS.join(', ')}`);
   const offset = int(query, 'offset', { min: 0, max: 100000 }) || 0;
   const limit = int(query, 'limit', { min: 1, max: 50 }) || PAGE_SIZE;
+  const heightMin = int(query, 'heightMin', { min: HEIGHT_RANGE.min, max: HEIGHT_RANGE.max });
+  const heightMax = int(query, 'heightMax', { min: HEIGHT_RANGE.min, max: HEIGHT_RANGE.max });
+  if (heightMin !== undefined && heightMax !== undefined && heightMin > heightMax) throw httpError(400, 'heightMin cannot be more than heightMax');
+  const advanced = {};
+  for (const [key, field] of Object.entries(ADVANCED_LISTS)) {
+    const values = list(query[key]);
+    if (values.some((v) => !FIELD_BY_KEY[field].options.includes(v))) throw httpError(400, `Unknown ${key}`);
+    if (values.length) advanced[key] = values;
+  }
   return {
-    q, ageMin, ageMax, minScore, city, timelines, strongOn, vibes, sort, offset, limit,
+    q, ageMin, ageMax, minScore, city, timelines, strongOn, vibes, sort, offset, limit, heightMin, heightMax, advanced,
+    usesAdvanced: heightMin !== undefined || heightMax !== undefined || Object.keys(advanced).length > 0,
     verified: query.verified === 'true' || query.verified === true,
     notContacted: query.notContacted === 'true' || query.notContacted === true,
     matchesPreferences: query.matchesPreferences === 'true' || query.matchesPreferences === true,
@@ -61,6 +85,7 @@ const escapeLike = (s) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 async function search(userId, rawQuery, { onlyIds = null } = {}) {
   const f = parseFilters(rawQuery);
   const viewer = await loadViewer(userId);
+  if (f.usesAdvanced) requireFeature(viewer, 'advancedFilters');
 
   // Narrow in SQL (visibility, blocks, text, city, timeline, verified); score in JS
   const params = [userId, viewer.gender];
@@ -99,17 +124,21 @@ async function search(userId, rawQuery, { onlyIds = null } = {}) {
     params
   );
 
-  let rows = res.rows.map((row) => ({
+  let rows = res.rows.filter((row) => visibleTo(row, viewer)).map((row) => ({
     row,
     age: ageFrom(row.birth_year, row.birth_month),
     scores: computeMatchScore(viewer.blueprint, blueprintFromRow(row.bp)),
-    boost: isPremium(row) ? PREMIUM_BOOST : 0,
+    boost: has(row, 'searchBoost') ? PREMIUM_BOOST : 0,
+    details: detailValues(row),
   }));
-  rows = rows.filter(({ age, scores }) =>
+  rows = rows.filter(({ age, scores, details }) =>
     (f.ageMin === undefined || age >= f.ageMin)
     && (f.ageMax === undefined || age <= f.ageMax)
     && (f.minScore === undefined || scores.overall >= f.minScore)
-    && f.strongOn.every((p) => scores[p] >= STRONG_PILLAR));
+    && f.strongOn.every((p) => scores[p] >= STRONG_PILLAR)
+    && (f.heightMin === undefined || (details.heightCm && details.heightCm >= f.heightMin))
+    && (f.heightMax === undefined || (details.heightCm && details.heightCm <= f.heightMax))
+    && Object.entries(f.advanced).every(([key, values]) => values.includes(details[ADVANCED_LISTS[key]])));
 
   let cards = null;
   if (f.matchesPreferences) {
@@ -170,8 +199,12 @@ async function createSaved(userId, body) {
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   if (!name || name.length > 80) throw httpError(400, 'Give the search a name (up to 80 characters)');
   const filters = cleanFilters(body.filters);
+  const me = (await db.query('SELECT plan, premium_until, plan_paused_at FROM users WHERE id = $1', [userId])).rows[0];
+  const max = limitOf(me, 'savedSearches');
   const count = (await db.query('SELECT COUNT(*)::int AS n FROM saved_searches WHERE user_id = $1', [userId])).rows[0].n;
-  if (count >= MAX_SAVED) throw httpError(400, `You can save up to ${MAX_SAVED} searches`);
+  if (count >= max) {
+    throw httpError(max < 10 ? 403 : 400, `You can save up to ${max} searches${max < 10 ? ' — Premium allows 10 with instant alerts' : ''}`, max < 10 ? 'PREMIUM_REQUIRED' : undefined);
+  }
   const row = (await db.query(
     'INSERT INTO saved_searches (id, user_id, name, filters, alerts) VALUES ($1, $2, $3, $4, $5) RETURNING *',
     [newId(), userId, name, JSON.stringify(filters), body.alerts !== false]
@@ -209,12 +242,13 @@ async function deleteSaved(userId, id) {
   return { success: true };
 }
 
-// A newcomer finished onboarding: alert owners of saved searches the newcomer fits (at most once an hour per search)
+// A newcomer finished onboarding: Premium owners of saved searches the newcomer fits get an instant alert (at most once
+// an hour per search); everyone else's match is counted for the daily digest.
 async function alertSavedSearches(newUserId) {
   const { notify } = require('./notifications');
   const saved = await db.query(
-    `SELECT s.* FROM saved_searches s
-     WHERE s.alerts AND s.user_id <> $1 AND (s.last_alert_at IS NULL OR s.last_alert_at < NOW() - INTERVAL '1 hour')`,
+    `SELECT s.*, u.plan, u.premium_until, u.plan_paused_at FROM saved_searches s JOIN users u ON u.id = s.user_id
+     WHERE s.alerts AND s.user_id <> $1`,
     [newUserId]
   );
   const newcomer = (await db.query('SELECT first_name, birth_year, birth_month, city FROM users WHERE id = $1', [newUserId])).rows[0];
@@ -227,10 +261,15 @@ async function alertSavedSearches(newUserId) {
       continue; // owner without a blueprint, or filters no longer valid
     }
     if (!hit) continue;
+    const instant = has(s, 'instantAlerts');
+    if (!instant || (s.last_alert_at && new Date(s.last_alert_at) > new Date(Date.now() - 3600000))) {
+      await db.query('UPDATE saved_searches SET pending_count = pending_count + 1 WHERE id = $1', [s.id]);
+      continue;
+    }
     await notify(s.user_id, {
       type: 'saved_search',
-      title: `New match for “${s.name}”`,
-      body: `${newcomer.first_name}, ${ageFrom(newcomer.birth_year, newcomer.birth_month)} · ${newcomer.city} fits your saved search`,
+      title: tx('New match for “{search}”', { search: s.name }),
+      body: tx('{name}, {age} · {city} fits your saved search', { name: newcomer.first_name, age: ageFrom(newcomer.birth_year, newcomer.birth_month), city: newcomer.city }),
       data: { savedSearchId: s.id, candidateId: newUserId },
       groupKey: `saved:${s.id}`,
     });
@@ -246,4 +285,24 @@ router.post('/saved', route(async (req, res) => res.status(201).json(await creat
 router.put('/saved/:id', route(async (req, res) => res.json(await updateSaved(req.userId, req.params.id, req.body || {}))));
 router.delete('/saved/:id', route(async (req, res) => res.json(await deleteSaved(req.userId, req.params.id))));
 
-module.exports = { router, search, parseFilters, alertSavedSearches };
+// Daily digest of saved-search matches that weren't sent instantly
+async function sendSavedSearchDigests() {
+  const { notify } = require('./notifications');
+  const due = await db.query(
+    `SELECT user_id, SUM(pending_count)::int AS n, COUNT(*) FILTER (WHERE pending_count > 0)::int AS searches
+     FROM saved_searches WHERE pending_count > 0 GROUP BY user_id`
+  );
+  for (const r of due.rows) {
+    await notify(r.user_id, {
+      type: 'saved_search',
+      title: tx(r.n === 1 ? '1 new person fits your saved searches' : '{n} new people fit your saved searches', { n: r.n }),
+      body: tx('Open Search to see who’s new.'),
+      data: { digest: true },
+      groupKey: 'saved-digest',
+    });
+    await db.query('UPDATE saved_searches SET pending_count = 0, last_alert_at = NOW() WHERE user_id = $1', [r.user_id]);
+  }
+  return due.rows.length;
+}
+
+module.exports = { router, search, parseFilters, alertSavedSearches, sendSavedSearchDigests };

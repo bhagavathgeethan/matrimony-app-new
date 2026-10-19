@@ -10,12 +10,14 @@ const { computeMatchScore } = require('../services/blueprintEngine');
 const { blueprintFromRow, detailValues, updateDetails } = require('./profile');
 const { getCandidate } = require('./matches');
 const { httpError, newId, randomToken, normalizePhone, maskPhone, ageFrom, relativeTime } = require('../lib/util');
+const { tx } = require('../lib/i18n');
+const { has, limitOf } = require('../lib/members');
 const { route, optionalString, oneOf } = require('../lib/http');
 
 const router = express.Router();
 const portalRouter = express.Router();
 
-const MAX_LINKS = 4;
+const PLAN_COLS = 'plan, premium_until, plan_paused_at';
 const EXPIRY = { '7d': 7, '30d': 30, never: null };
 const DEFAULT_PERMISSIONS = { showBlueprintScore: true, showFirstNameCity: true, showPhoto: false, showContact: false };
 const DECISIONS = ['approved', 'unsure', 'concern_raised'];
@@ -68,14 +70,17 @@ async function createLink(userId, body) {
   if (!name) throw httpError(400, 'Enter their name');
   if (!phone) throw httpError(400, 'Enter a valid mobile number');
 
-  const me = (await db.query('SELECT phone FROM users WHERE id = $1', [userId])).rows[0];
+  const me = (await db.query(`SELECT phone, ${PLAN_COLS} FROM users WHERE id = $1`, [userId])).rows[0];
   if (me.phone === phone) throw httpError(400, 'Use a family member’s number, not your own');
   const active = await db.query(
     `SELECT phone FROM family_links WHERE user_id = $1 AND status <> 'revoked'`,
     [userId]
   );
   if (active.rows.some((l) => l.phone === phone)) throw httpError(409, 'This number is already linked');
-  if (active.rows.length >= MAX_LINKS) throw httpError(400, `You can link up to ${MAX_LINKS} family members`);
+  const maxLinks = limitOf(me, 'familyLinks');
+  if (active.rows.length >= maxLinks) {
+    throw httpError(maxLinks < 4 ? 403 : 400, `You can link up to ${maxLinks} family members${maxLinks < 4 ? ' — the Family plan allows 4' : ''}`, maxLinks < 4 ? 'PREMIUM_REQUIRED' : undefined);
+  }
 
   const token = randomToken(24);
   const res = await db.query(
@@ -206,8 +211,8 @@ async function getPortal(token) {
     await db.query(`UPDATE family_links SET status = 'linked', linked_at = NOW() WHERE id = $1`, [link.id]);
     await notifications.notify(link.user_id, {
       type: 'family_linked',
-      title: `${link.name} opened your family link`,
-      body: `${link.name} can now see the profiles you share with them.`,
+      title: tx('{name} opened your family link', { name: link.name }),
+      body: tx('{name} can now see the profiles you share with them.', { name: link.name }),
       data: { familyLinkId: link.id },
     });
   }
@@ -219,6 +224,8 @@ async function getPortal(token) {
 
   const res = await db.query(
     `SELECT s.*, u.first_name, u.birth_year, u.birth_month, u.city, u.id_verified_at, row_to_json(b.*) AS bp,
+            EXISTS (SELECT 1 FROM conversations c
+                    WHERE (c.user_a = s.user_id AND c.user_b = s.candidate_id) OR (c.user_a = s.candidate_id AND c.user_b = s.user_id)) AS contacted,
             (SELECT row_to_json(p.*) FROM photos p WHERE p.user_id = u.id ORDER BY p.position LIMIT 1) AS photo
      FROM family_shares s
      JOIN users u ON u.id = s.candidate_id
@@ -228,6 +235,7 @@ async function getPortal(token) {
     [link.id]
   );
 
+  const childPlan = (await db.query(`SELECT ${PLAN_COLS} FROM users WHERE id = $1`, [link.user_id])).rows[0];
   // Family members the child allowed to manage the profile also get the personal details to edit
   const manage = link.can_manage
     ? detailValues((await db.query('SELECT * FROM users WHERE id = $1', [link.user_id])).rows[0])
@@ -237,6 +245,17 @@ async function getPortal(token) {
     parentName: link.name,
     canManage: Boolean(link.can_manage),
     profileDetails: manage,
+    // Family plan: compare shared profiles side by side, and suggest interests for the member to approve
+    compareEnabled: has(childPlan, 'familyCompare'),
+    canPropose: Boolean(link.can_manage) && has(childPlan, 'familyAssisted'),
+    // Suggestions this family member made, keyed by the shared card (no member ids leave the portal)
+    proposals: (await db.query(
+      `SELECT p.id, p.status, p.note, p.created_at,
+              (SELECT s.id FROM family_shares s WHERE s.family_link_id = p.family_link_id AND s.candidate_id = p.candidate_id
+               ORDER BY s.created_at DESC LIMIT 1) AS share_id
+       FROM interest_proposals p WHERE p.family_link_id = $1 ORDER BY p.created_at DESC`,
+      [link.id]
+    )).rows.map((p) => ({ id: p.id, shareId: p.share_id, status: p.status, note: p.note, createdAt: p.created_at })),
     records: res.rows.map((r) => {
       const p = r.permissions;
       const scores = childBp && r.bp ? computeMatchScore(childBp, blueprintFromRow(r.bp)) : null;
@@ -253,6 +272,8 @@ async function getPortal(token) {
         childNote: r.child_note,
         status: r.status,
         feedbackNote: r.feedback_note,
+        // Already in touch with this person: suggesting an interest no longer applies
+        contacted: r.contacted,
         sharedAt: relativeTime(r.created_at),
         expiresAt: r.expires_at,
       };
@@ -283,11 +304,11 @@ async function respond(token, shareId, body) {
   realtime.notify(share.user_id, 'family:feedback', { share: updated });
   await notifications.notify(share.user_id, {
     type: 'family_feedback',
-    title: {
-      approved: `${link.name} approved ${updated.candidateName}`,
-      unsure: `${link.name} is unsure about ${updated.candidateName}`,
-      concern_raised: `${link.name} raised a concern about ${updated.candidateName}`,
-    }[decision],
+    title: tx({
+      approved: '{name} approved {candidate}',
+      unsure: '{name} is unsure about {candidate}',
+      concern_raised: '{name} raised a concern about {candidate}',
+    }[decision], { name: link.name, candidate: updated.candidateName }),
     body: updated.feedbackNote,
     data: { shareId, candidateId: share.candidate_id },
   });
@@ -321,14 +342,92 @@ async function portalUpdateDetails(token, body) {
   const profile = await updateDetails(link.user_id, body || {});
   await notifications.notify(link.user_id, {
     type: 'family_edit',
-    title: `${link.name} updated your personal details`,
-    body: 'Check your profile to see the changes.',
+    title: tx('{name} updated your personal details', { name: link.name }),
+    body: tx('Check your profile to see the changes.'),
     data: { familyLinkId: link.id },
   });
   return { profileDetails: profile.details };
 }
 
+// ---------- family-assisted interests (Family plan) ----------
+
+// A managing family member suggests sending interest to a profile that was shared with them
+async function propose(token, body) {
+  const link = await linkForToken(token);
+  if (!link) throw httpError(404, 'This link is invalid or access has been revoked');
+  const child = (await db.query(`SELECT first_name, ${PLAN_COLS} FROM users WHERE id = $1`, [link.user_id])).rows[0];
+  if (!link.can_manage || !has(child, 'familyAssisted')) {
+    throw httpError(403, 'Suggesting interests needs the Family plan and edit access', 'PREMIUM_REQUIRED');
+  }
+  const share = (await db.query('SELECT * FROM family_shares WHERE id = $1 AND family_link_id = $2', [body.shareId, link.id])
+    .catch(() => ({ rows: [] }))).rows[0];
+  if (!share || isExpired(share)) throw httpError(404, 'Profile not found');
+  const note = optionalString(body, 'note', { max: 500, allowEmpty: true }) || null;
+  const pending = (await db.query(
+    `SELECT id FROM interest_proposals WHERE user_id = $1 AND candidate_id = $2 AND status = 'pending'`,
+    [link.user_id, share.candidate_id]
+  )).rows[0];
+  if (pending) throw httpError(409, 'Already suggested — waiting for their answer');
+  const contacted = (await db.query(
+    'SELECT 1 FROM conversations WHERE (user_a = $1 AND user_b = $2) OR (user_a = $2 AND user_b = $1)',
+    [link.user_id, share.candidate_id]
+  )).rows[0];
+  if (contacted) throw httpError(409, 'Already in touch with this person', 'ALREADY_CONTACTED');
+  const id = newId();
+  await db.query(
+    'INSERT INTO interest_proposals (id, user_id, family_link_id, candidate_id, note) VALUES ($1, $2, $3, $4, $5)',
+    [id, link.user_id, link.id, share.candidate_id, note]
+  );
+  const cand = (await db.query('SELECT first_name FROM users WHERE id = $1', [share.candidate_id])).rows[0];
+  await notifications.notify(link.user_id, {
+    type: 'family_proposal',
+    title: cand?.first_name ? tx('{name} suggests sending interest to {candidate}', { name: link.name, candidate: cand.first_name }) : tx('{name} suggests sending interest to a match', { name: link.name }),
+    body: note || tx('Approve to send the interest, or decline — it’s your call.'),
+    data: { proposalId: id, candidateId: share.candidate_id },
+  });
+  return { id, status: 'pending' };
+}
+
+async function listProposals(userId) {
+  const res = await db.query(
+    `SELECT p.*, l.name AS family_name, u.first_name, u.birth_year, u.birth_month, u.city
+     FROM interest_proposals p LEFT JOIN family_links l ON l.id = p.family_link_id JOIN users u ON u.id = p.candidate_id
+     WHERE p.user_id = $1 ORDER BY (p.status = 'pending') DESC, p.created_at DESC`,
+    [userId]
+  );
+  return res.rows.map((p) => ({
+    id: p.id, status: p.status, note: p.note, familyName: p.family_name, candidateId: p.candidate_id,
+    candidateName: p.first_name, candidateAge: ageFrom(p.birth_year, p.birth_month), candidateCity: p.city, createdAt: p.created_at,
+  }));
+}
+
+// The member decides: approving sends the interest in their name (with the family's note, if any)
+async function answerProposal(userId, id, approve) {
+  const p = (await db.query('SELECT * FROM interest_proposals WHERE id = $1 AND user_id = $2', [id, userId]).catch(() => ({ rows: [] }))).rows[0];
+  if (!p) throw httpError(404, 'Suggestion not found');
+  if (p.status !== 'pending') throw httpError(409, 'Already answered');
+  let conversationId = null;
+  if (approve) {
+    const { openConversation } = require('./chat');
+    const { conversation } = await openConversation(userId, p.candidate_id, { message: p.note || undefined });
+    conversationId = conversation.id;
+  }
+  await db.query('UPDATE interest_proposals SET status = $2, responded_at = NOW() WHERE id = $1', [id, approve ? 'approved' : 'declined']);
+  return { id, status: approve ? 'approved' : 'declined', conversationId };
+}
+
+// A family member gifts a plan from the portal
+async function portalGift(token, body, step) {
+  const link = await linkForToken(token);
+  if (!link) throw httpError(404, 'This link is invalid or access has been revoked');
+  const premium = require('./premium');
+  return step === 'checkout' ? premium.giftCheckout(link, body.plan) : premium.giftConfirm(link, body);
+}
+
 // Child-side routes (auth required; mounted at /api/family)
+router.get('/proposals', route(async (req, res) => res.json(await listProposals(req.userId))));
+router.post('/proposals/:id/approve', route(async (req, res) => res.json(await answerProposal(req.userId, req.params.id, true))));
+router.post('/proposals/:id/decline', route(async (req, res) => res.json(await answerProposal(req.userId, req.params.id, false))));
 router.get('/votes', route(async (req, res) => res.json(await votes(req.userId))));
 router.put('/links/:id', route(async (req, res) => res.json(await setManage(req.userId, req.params.id, req.body?.canManage))));
 router.get('/links', route(async (req, res) => res.json(await listLinks(req.userId))));
@@ -338,8 +437,43 @@ router.delete('/links/:id', route(async (req, res) => res.json(await revokeLink(
 router.get('/shares', route(async (req, res) => res.json(await listShares(req.userId))));
 router.post('/shares', route(async (req, res) => res.status(201).json(await createShares(req.userId, req.body || {}))));
 
+
+// Family sign-in in the app: a family member proves their number with a code and gets back the
+// portals they were invited to (the same private views their SMS links open). No account is created.
+async function activeLinksForPhone(phone) {
+  return (await db.query(
+    `SELECT l.portal_token, l.name, l.relation, u.first_name AS child_name
+     FROM family_links l JOIN users u ON u.id = l.user_id
+     WHERE l.phone = $1 AND l.status <> 'revoked' ORDER BY l.created_at DESC`,
+    [phone]
+  )).rows;
+}
+
+async function familySignInSend(body) {
+  const phone = normalizePhone(body.phone);
+  if (!phone) throw httpError(400, 'Enter a valid mobile number', 'INVALID_PHONE');
+  if (!(await activeLinksForPhone(phone)).length) {
+    throw httpError(404, 'No family invite for this number. Ask your family member to add you from their app.', 'NO_FAMILY_INVITE');
+  }
+  return require('./auth').sendOtp(phone);
+}
+
+async function familySignInVerify(body) {
+  const phone = await require('./auth').checkOtp(body.phone, body.code);
+  const links = await activeLinksForPhone(phone);
+  if (!links.length) throw httpError(404, 'No family invite for this number. Ask your family member to add you from their app.', 'NO_FAMILY_INVITE');
+  return {
+    portals: links.map((l) => ({ token: l.portal_token, childName: l.child_name || 'Your child', name: l.name, relation: l.relation })),
+  };
+}
+
 // Parent portal routes (public; mounted at /api/portal)
+portalRouter.post('/sign-in/send', route(async (req, res) => res.json(await familySignInSend(req.body || {}))));
+portalRouter.post('/sign-in/verify', route(async (req, res) => res.json(await familySignInVerify(req.body || {}))));
 portalRouter.get('/:token', route(async (req, res) => res.json(await getPortal(req.params.token))));
+portalRouter.post('/:token/proposals', route(async (req, res) => res.status(201).json(await propose(req.params.token, req.body || {}))));
+portalRouter.post('/:token/gift/checkout', route(async (req, res) => res.status(201).json(await portalGift(req.params.token, req.body || {}, 'checkout'))));
+portalRouter.post('/:token/gift/confirm', route(async (req, res) => res.json(await portalGift(req.params.token, req.body || {}, 'confirm'))));
 portalRouter.put('/:token/details', route(async (req, res) => res.json(await portalUpdateDetails(req.params.token, req.body))));
 portalRouter.post('/:token/shares/:shareId/feedback', route(async (req, res) => {
   res.json(await respond(req.params.token, req.params.shareId, req.body || {}));

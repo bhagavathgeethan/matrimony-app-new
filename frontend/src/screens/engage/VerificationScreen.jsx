@@ -8,7 +8,7 @@ import { t } from '@shared/i18n';
 
 const { colors, fonts } = theme;
 
-// Selfie verification, reviewed by the Sangam team against the profile photos
+// Selfie verification, reviewed by the 3Knot team against the profile photos
 export const VerificationScreen = () => {
   const { user, verification, loadVerification, submitVerification, setCurrentScreen } = useApp();
   const [file, setFile] = useState(null);
@@ -40,27 +40,27 @@ export const VerificationScreen = () => {
   const pending = v?.request?.status === 'pending';
   return (
     <Screen tabBar>
-      <TopBar onBack={() => setCurrentScreen('blueprint-summary')} title="Verification" />
+      <TopBar onBack={() => setCurrentScreen('blueprint-summary')} title={t('Verification')} />
       <View style={{ gap: 6, marginBottom: 16 }}>
-        <Eyebrow>Trust</Eyebrow>
+        <Eyebrow>{t('Trust')}</Eyebrow>
         <Heading size={30}>{t('Get the verified badge')}</Heading>
-        <Body size={14}>Take a clear selfie. Our team compares it with your profile photos — it’s never shown to anyone else and is deleted after review.</Body>
+        <Body size={14}>{t('Take a clear selfie. Our team compares it with your profile photos — it’s never shown to anyone else and is deleted after review.')}</Body>
       </View>
       {v?.verified || user?.verified ? (
-        <Card style={styles.row}><BadgeCheck size={30} color={colors.success} /><Text style={styles.title}>You’re verified</Text></Card>
+        <Card style={styles.row}><BadgeCheck size={30} color={colors.success} /><Text style={styles.title}>{t('You’re verified')}</Text></Card>
       ) : pending ? (
-        <Card style={styles.row}><Clock size={26} color={colors.gold} /><View style={{ flex: 1 }}><Text style={styles.title}>Selfie under review</Text><Body size={13}>Usually within a day. We’ll notify you.</Body></View></Card>
+        <Card style={styles.row}><Clock size={26} color={colors.gold} /><View style={{ flex: 1 }}><Text style={styles.title}>{t('Selfie under review')}</Text><Body size={13}>{t('Usually within a day. We’ll notify you.')}</Body></View></Card>
       ) : (
         <Card style={{ gap: 14 }}>
           {v?.request?.status === 'rejected' && (
-            <Text style={styles.error}>Last attempt wasn’t approved{v.request.note ? `: ${v.request.note}` : ''}. Please try again.</Text>
+            <Text style={styles.error}>{v.request.note ? t('Last attempt wasn’t approved: {reason}. Please try again.', { reason: v.request.note }) : t('Last attempt wasn’t approved. Please try again.')}</Text>
           )}
-          <Body size={13.5}>• Face the camera in good light, no sunglasses or filters{'\n'}• Just you in the photo{'\n'}• Your profile needs at least one clear photo of you</Body>
-          {preview && <Image source={{ uri: preview }} style={styles.preview} accessibilityLabel="Your selfie" />}
-          <input ref={input} type="file" accept="image/*" capture="user" onChange={pick} style={{ display: 'none' }} aria-label="Selfie" />
+          <Body size={13.5}>{t('• Face the camera in good light, no sunglasses or filters\n• Just you in the photo\n• Your profile needs at least one clear photo of you')}</Body>
+          {preview && <Image source={{ uri: preview }} style={styles.preview} accessibilityLabel={t('Your selfie')} />}
+          <input ref={input} type="file" accept="image/*" capture="user" onChange={pick} style={{ display: 'none' }} aria-label={t('Selfie')} />
           {error && <Text style={styles.error}>{error}</Text>}
-          <Button variant="secondary" icon={Camera} label={file ? 'Retake' : 'Take a selfie'} onPress={() => input.current?.click()} />
-          <Button icon={ShieldCheck} label={busy ? 'Sending…' : 'Submit for review'} disabled={!file || busy} onPress={send} />
+          <Button variant="secondary" icon={Camera} label={file ? t('Retake') : t('Take a selfie')} onPress={() => input.current?.click()} />
+          <Button icon={ShieldCheck} label={busy ? t('Sending…') : t('Submit for review')} disabled={!file || busy} onPress={send} />
         </Card>
       )}
     </Screen>

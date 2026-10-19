@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Check, BadgeCheck, Images, Lock } from 'lucide-react';
 import { theme } from '../../theme/tokens';
+import { t } from '@shared/i18n';
+import { summaryNote } from '@shared/constants';
 
 const { colors, fonts, gradients, radii, shadows } = theme;
 
@@ -19,7 +21,7 @@ export const ProfileThumbnailRow = ({ candidate, selected = false, onToggleSelec
         <TouchableOpacity
           onPress={onToggleSelect}
           style={[styles.select, selected && styles.selectOn]}
-          accessibilityLabel={selected ? 'Deselect' : 'Select'}
+          accessibilityLabel={selected ? t('Deselect') : t('Select')}
         >
           {selected && <Check size={14} color={colors.white} strokeWidth={3} />}
         </TouchableOpacity>
@@ -47,11 +49,11 @@ export const ProfileThumbnailRow = ({ candidate, selected = false, onToggleSelec
             {candidate.firstName}, {candidate.age}
           </Text>
           {candidate.verified && <BadgeCheck size={14} color={colors.gold} />}
-          {candidate.activeRecently && <View style={styles.activeDot} accessibilityLabel="Active today" />}
+          {candidate.activeRecently && <View style={styles.activeDot} accessibilityLabel={t('Active today')} />}
         </View>
         <Text style={styles.city} numberOfLines={1}>{candidate.city}</Text>
         {candidate.summaryNote ? (
-          <Text style={styles.note} numberOfLines={1}>{candidate.summaryNote}</Text>
+          <Text style={styles.note} numberOfLines={1}>{summaryNote(candidate.summaryNote)}</Text>
         ) : null}
       </View>
     </TouchableOpacity>

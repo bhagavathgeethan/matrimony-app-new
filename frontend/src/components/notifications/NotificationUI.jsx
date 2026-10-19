@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MessageCircle, Unlock, Sparkles, Users, ShieldAlert, Bell, X, Heart, Video, Bookmark, Sun, ClipboardList, BadgeCheck } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
+import { t, notificationText } from '@shared/i18n';
 
 const { colors, fonts, radii, shadows } = theme;
 
@@ -37,8 +38,8 @@ export const NotificationRow = ({ n, onPress }) => (
   <TouchableOpacity activeOpacity={0.85} onPress={() => onPress(n)} style={[styles.row, !n.read && styles.rowUnread]}>
     <NotificationIcon type={n.type} />
     <View style={{ flex: 1, gap: 2 }}>
-      <Text style={styles.title} numberOfLines={1}>{n.title}</Text>
-      <Text style={styles.body} numberOfLines={2}>{n.body}</Text>
+      <Text style={styles.title} numberOfLines={1}>{notificationText(n).title}</Text>
+      <Text style={styles.body} numberOfLines={2}>{notificationText(n).body}</Text>
     </View>
     <View style={{ alignItems: 'flex-end', gap: 6 }}>
       <Text style={styles.time}>{n.time}</Text>
@@ -54,8 +55,8 @@ export const NotificationBanner = () => {
 
   useEffect(() => {
     if (!latest) return undefined;
-    const t = setTimeout(() => dismissToast(latest.id), 6000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => dismissToast(latest.id), 6000);
+    return () => clearTimeout(timer);
   }, [latest, dismissToast]);
 
   if (!latest) return null;
@@ -66,11 +67,11 @@ export const NotificationBanner = () => {
           <TouchableOpacity activeOpacity={0.85} onPress={() => openNotification(latest)} style={styles.bannerMain}>
             <NotificationIcon type={latest.type} size={36} />
             <View style={{ flex: 1, gap: 1 }}>
-              <Text style={styles.title} numberOfLines={1}>{latest.title}</Text>
-              <Text style={styles.body} numberOfLines={1}>{latest.body}</Text>
+              <Text style={styles.title} numberOfLines={1}>{notificationText(latest).title}</Text>
+              <Text style={styles.body} numberOfLines={1}>{notificationText(latest).body}</Text>
             </View>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => dismissToast(latest.id)} style={styles.close} accessibilityLabel="Dismiss">
+          <TouchableOpacity onPress={() => dismissToast(latest.id)} style={styles.close} accessibilityLabel={t('Dismiss')}>
             <X size={15} color={colors.textMuted} />
           </TouchableOpacity>
         </View>

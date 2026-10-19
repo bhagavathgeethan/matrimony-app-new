@@ -6,6 +6,7 @@ import { useApp } from '../../context/AppContext';
 import {
   OnboardingScreen, TopBar, FadeIn, Eyebrow, Heading, Accent, Button, Card, Toggle, IconBadge, Badge, Divider,
 } from '../../components/ui/kit';
+import { t } from '@shared/i18n';
 
 const { colors, fonts, radii } = theme;
 const MAX_PHOTOS = 6;
@@ -58,17 +59,17 @@ export const PhotoVerificationScreen = () => {
           {error ? (
             <Text style={styles.error}>{error}</Text>
           ) : (
-            photos.length === 0 && <Text style={styles.hint}>Add at least one photo to continue</Text>
+            photos.length === 0 && <Text style={styles.hint}>{t('Add at least one photo to continue')}</Text>
           )}
-          <Button label="Continue" disabled={photos.length === 0 || uploading} onPress={handleContinue} />
+          <Button label={t('Continue')} disabled={photos.length === 0 || uploading} onPress={handleContinue} />
         </>
       }
     >
       <FadeIn>
         <View style={styles.header}>
-          <Eyebrow>Photos & verification</Eyebrow>
+          <Eyebrow>{t('Photos & verification')}</Eyebrow>
           <Heading size={32}>
-            Photos, on <Accent>your terms</Accent>
+            {t('Photos, on')}{' '}<Accent>{t('your terms')}</Accent>
           </Heading>
         </View>
       </FadeIn>
@@ -79,12 +80,12 @@ export const PhotoVerificationScreen = () => {
             <View key={photo.id} style={styles.tile}>
               <Image source={{ uri: photo.url }} style={styles.img} />
               {i === 0 ? (
-                <Badge label="Main" tone="glass" style={styles.tileBadge} />
+                <Badge label={t('Main')} tone="glass" style={styles.tileBadge} />
               ) : (
                 <TouchableOpacity
                   onPress={() => runPhotoAction(photo.id, makePhotoPrimary)}
                   style={[styles.tileBtn, { left: 6 }]}
-                  accessibilityLabel="Make main photo"
+                  accessibilityLabel={t('Make main photo')}
                 >
                   <Star size={13} color={colors.white} />
                 </TouchableOpacity>
@@ -92,7 +93,7 @@ export const PhotoVerificationScreen = () => {
               <TouchableOpacity
                 onPress={() => runPhotoAction(photo.id, deletePhoto)}
                 style={[styles.tileBtn, { right: 6 }]}
-                accessibilityLabel="Remove photo"
+                accessibilityLabel={t('Remove photo')}
               >
                 <X size={13} color={colors.white} />
               </TouchableOpacity>
@@ -115,7 +116,7 @@ export const PhotoVerificationScreen = () => {
               ) : (
                 <>
                   <Plus size={22} color={colors.accent} />
-                  <Text style={styles.addText}>{photos.length ? 'Add' : 'Add photo'}</Text>
+                  <Text style={styles.addText}>{photos.length ? t('Add') : t('Add photo')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -132,8 +133,8 @@ export const PhotoVerificationScreen = () => {
               <View style={styles.row}>
                 <IconBadge icon={s.icon} size={34} />
                 <View style={{ flex: 1, gap: 1 }}>
-                  <Text style={styles.rowTitle}>{s.title}</Text>
-                  <Text style={styles.rowSub}>{s.sub}</Text>
+                  <Text style={styles.rowTitle}>{t(s.title)}</Text>
+                  <Text style={styles.rowSub}>{t(s.sub)}</Text>
                 </View>
                 <Toggle value={s.value} onChange={s.set} />
               </View>
@@ -146,8 +147,8 @@ export const PhotoVerificationScreen = () => {
         <Card variant="dark" style={styles.idCard} padding={14}>
           <BadgeCheck size={20} color={colors.gold} />
           <View style={{ flex: 1, gap: 2 }}>
-            <Text style={styles.idTitle}>{user?.verified ? 'ID verified' : 'ID verification — coming soon'}</Text>
-            <Text style={styles.idText}>One-time ID check. We store a hash, never the document.</Text>
+            <Text style={styles.idTitle}>{user?.verified ? t('ID verified') : t('ID verification — coming soon')}</Text>
+            <Text style={styles.idText}>{t('One-time ID check. We store a hash, never the document.')}</Text>
           </View>
         </Card>
       </FadeIn>

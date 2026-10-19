@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { AppProvider, useApp } from './context/AppContext';
+import { t } from '@shared/i18n';
 import { IOSDeviceFrame } from './components/common/IOSDeviceFrame';
 import { LoadingScreen } from './components/brand/LoadingScreen';
 import { WelcomeScreen } from './screens/auth/WelcomeScreen';
@@ -22,6 +23,9 @@ import { ChatThreadScreen } from './screens/chat/ChatThreadScreen';
 import { LinkParentScreen } from './screens/family/LinkParentScreen';
 import { PrivacyErasureScreen } from './screens/privacy/PrivacyErasureScreen';
 import { ParentPortalScreen } from './screens/family/ParentPortalScreen';
+import { FamilySignInScreen } from './screens/auth/FamilySignInScreen';
+import { familySession, useFamilySession } from './services/familySession';
+import { setRootBack } from './services/backButton';
 import { NotificationsScreen } from './screens/main/NotificationsScreen';
 import { PersonalOnboardingScreen } from './screens/onboarding/PersonalOnboardingScreen';
 import { PersonalDetailsScreen } from './screens/main/PersonalDetailsScreen';
@@ -32,9 +36,26 @@ import { VerificationScreen } from './screens/engage/VerificationScreen';
 import { StoriesScreen } from './screens/engage/StoriesScreen';
 import { SafetyScreen } from './screens/engage/SafetyScreen';
 import { PreferencesScreen } from './screens/engage/PreferencesScreen';
+import { AssistedScreen } from './screens/engage/AssistedScreen';
+
+// Main tabs: Back on another tab returns to the feed; Back on the feed leaves the app in the background
+const TAB_ROOTS = ['profile-list', 'conversations', 'family-tracker', 'blueprint-summary'];
 
 const ScreenRouter = () => {
-  const { currentScreen } = useApp();
+  const { currentScreen, setCurrentScreen, user } = useApp();
+  useEffect(() => {
+    setRootBack(() => {
+      if (user?.onboarding?.completed && TAB_ROOTS.includes(currentScreen)) {
+        setCurrentScreen('feed');
+        return true;
+      }
+      return false;
+    });
+  }, [currentScreen, user, setCurrentScreen]);
+  // A new screen starts at the top, not at the previous screen's scroll position
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [currentScreen]);
 
   const renderActiveScreen = () => {
     switch (currentScreen) {
@@ -42,6 +63,8 @@ const ScreenRouter = () => {
         return <WelcomeScreen />;
       case 'phone':
         return <PhoneSignInScreen />;
+      case 'family-signin':
+        return <FamilySignInScreen />;
       case 'otp':
         return <OTPVerifyScreen />;
       case 'consent':
@@ -66,6 +89,8 @@ const ScreenRouter = () => {
         return <SafetyScreen />;
       case 'preferences':
         return <PreferencesScreen />;
+      case 'assisted':
+        return <AssistedScreen />;
       case 'blueprint-intro':
         return <BlueprintIntroScreen />;
       case 'blueprint-q1':
@@ -105,15 +130,15 @@ const ScreenRouter = () => {
 };
 
 // Shows the branded loading screen until data has loaded and the logo animation has played
-const MIN_SPLASH_MS = 2200;
+const MIN_SPLASH_MS = 2600; // long enough to see the third knot tied
 const SplashGate = ({ children }) => {
   const { isLoading } = useApp();
   const [minElapsed, setMinElapsed] = useState(false);
   const [phase, setPhase] = useState('showing'); // showing → leaving → done
 
   useEffect(() => {
-    const t = setTimeout(() => setMinElapsed(true), MIN_SPLASH_MS);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setMinElapsed(true), MIN_SPLASH_MS);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -123,8 +148,8 @@ const SplashGate = ({ children }) => {
   // Separate effect so the phase change above can't cancel the unmount timer
   useEffect(() => {
     if (phase !== 'leaving') return undefined;
-    const t = setTimeout(() => setPhase('done'), 450);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setPhase('done'), 450);
+    return () => clearTimeout(timer);
   }, [phase]);
 
   return (
@@ -138,27 +163,46 @@ const SplashGate = ({ children }) => {
 // A family member opening their SMS link lands on /portal/<token>: show only their read-only portal
 const portalToken = (window.location.pathname.match(/^\/portal\/([0-9a-f]{48})\/?$/) || [])[1] || null;
 
-const PortalPage = () => (
+// A family member's view: from their SMS link, or after family sign-in on this device
+const PortalPage = ({ token, portals = [], onSignOut }) => (
   <View style={{ minHeight: '100vh', backgroundColor: '#F3EDE3', alignItems: 'center' }}>
-    <View style={{ width: '100%', maxWidth: 520, minHeight: '100vh', backgroundColor: '#FBF7F1' }}>
-      <ParentPortalScreen tokenFromUrl={portalToken} />
+    <View style={{ width: '100%', maxWidth: 760, minHeight: '100vh', backgroundColor: '#FBF7F1' }}>
+      <ParentPortalScreen tokenFromUrl={token} portals={portals} onChoosePortal={familySession.choose} onSignOut={onSignOut} />
     </View>
   </View>
 );
+
+const FamilyApp = ({ session }) => {
+  const { setCurrentScreen } = useApp();
+  const signOut = () => {
+    if (!window.confirm(t('Sign out of the family view on this device?'))) return;
+    setCurrentScreen('welcome');
+    familySession.signOut();
+  };
+  return <PortalPage token={session.active} portals={session.portals} onSignOut={signOut} />;
+};
+
+const Root = () => {
+  const family = useFamilySession();
+  if (family) return <FamilyApp session={family} />;
+  return (
+    <SplashGate>
+      <ScreenRouter />
+    </SplashGate>
+  );
+};
 
 export default function App() {
   if (portalToken) {
     return (
       <AppProvider>
-        <PortalPage />
+        <PortalPage token={portalToken} />
       </AppProvider>
     );
   }
   return (
     <AppProvider>
-      <SplashGate>
-        <ScreenRouter />
-      </SplashGate>
+      <Root />
     </AppProvider>
   );
 }

@@ -45,6 +45,7 @@ const SCREEN_GROUPS = [
     { id: 'shortlist', label: 'Shortlist' },
     { id: 'preferences', label: 'Preferences & prompts' },
     { id: 'premium', label: 'Premium' },
+    { id: 'assisted', label: 'Assisted service' },
     { id: 'verification', label: 'Verification' },
     { id: 'stories', label: 'Success stories' },
     { id: 'safety', label: 'Safety' },
@@ -61,16 +62,16 @@ const TABS = [
   { tab: 'me', screen: 'blueprint-summary', label: 'Me', icon: User },
 ];
 
-const TAB_SCREENS = TABS.map((t) => t.screen);
+const TAB_SCREENS = TABS.map((item) => item.screen);
 
 export const IOSDeviceFrame = ({ children, customBottomNav = true }) => {
   const { currentScreen, setCurrentScreen, activeTab, setActiveTab, conversations, user } = useApp();
   const [pickerOpen, setPickerOpen] = useState(false);
 
   // Personal details lives under the Me tab
-  const isMainTabScreen = [...TAB_SCREENS, 'personal-details', 'daily', 'shortlist', 'preferences', 'premium', 'verification', 'stories', 'safety', 'notifications', 'privacy']
+  const isMainTabScreen = [...TAB_SCREENS, 'personal-details', 'daily', 'shortlist', 'preferences', 'premium', 'assisted', 'verification', 'stories', 'safety', 'notifications', 'privacy']
     .includes(currentScreen) && Boolean(user?.onboarding?.completed);
-  const unread = conversations.filter((t) => t.unread).length;
+  const unread = conversations.filter((conv) => conv.unread).length;
   const currentLabel =
     SCREEN_GROUPS.flatMap(([, items]) => items).find((i) => i.id === currentScreen)?.label || currentScreen;
 

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Check } from 'lucide-react';
 import { theme } from '../../theme/tokens';
+import { t } from '@shared/i18n';
 
 const { colors, fonts, gradients } = theme;
 
@@ -9,8 +10,14 @@ import { VIBE_ART, ALL_VIBES } from '@shared/constants';
 
 export { ALL_VIBES };
 
-export const VibeTileGrid = ({ selectedVibes = [], onToggleVibe }) => (
-  <View style={styles.grid}>
+// Four tall tiles a row on phones; on tablets six wider ones, so all twelve fit without scrolling
+export const VibeTileGrid = ({ selectedVibes = [], onToggleVibe }) => {
+  // The grid's own width (not the window's: the app may sit in a phone-sized frame on a wide screen)
+  const [width, setWidth] = useState(0);
+  const wide = width >= 800;
+  const tileSize = wide ? { width: 'calc(16.666% - 7px)', aspectRatio: 1.05 } : null;
+  return (
+  <View style={styles.grid} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
     {ALL_VIBES.map((vibe) => {
       const [emoji, from, to] = VIBE_ART[vibe];
       const isSelected = selectedVibes.includes(vibe);
@@ -21,12 +28,13 @@ export const VibeTileGrid = ({ selectedVibes = [], onToggleVibe }) => (
           onPress={() => onToggleVibe(vibe)}
           style={[
             styles.tile,
+            tileSize,
             { backgroundImage: `linear-gradient(150deg, ${from} 0%, ${to} 100%)` },
             isSelected && styles.tileSelected,
           ]}
         >
           <Text style={styles.emoji}>{emoji}</Text>
-          <Text style={styles.label}>{vibe}</Text>
+          <Text style={styles.label}>{t(vibe)}</Text>
           <View style={[styles.check, isSelected && styles.checkOn]}>
             {isSelected && <Check size={10} color={colors.white} strokeWidth={3} />}
           </View>
@@ -34,7 +42,8 @@ export const VibeTileGrid = ({ selectedVibes = [], onToggleVibe }) => (
       );
     })}
   </View>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   grid: {

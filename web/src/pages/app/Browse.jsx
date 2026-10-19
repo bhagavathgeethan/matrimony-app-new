@@ -1,13 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { BadgeCheck, TrendingUp, Check, Send, Search, X, SlidersHorizontal, History, UserX, RotateCw, MapPin, Heart, Bookmark, Bell, BellOff } from 'lucide-react';
+import { BadgeCheck, TrendingUp, Check, Send, Search, X, SlidersHorizontal, ArrowUpDown, History, UserX, RotateCw, MapPin, Heart, Bookmark, Bell, BellOff } from 'lucide-react';
 import {
-  PILLARS, TIMELINES, ALL_VIBES, SEARCH_SORTS, MIN_SCORE_OPTIONS, SEARCH_AGE_LIMITS, DEFAULT_SEARCH_FILTERS, activeFilterChips,
+  PILLARS, TIMELINES, ALL_VIBES, SEARCH_SORTS, MIN_SCORE_OPTIONS, SEARCH_AGE_LIMITS, DEFAULT_SEARCH_FILTERS, activeFilterChips, ADVANCED_FILTER_FIELDS, describeSearch,
 } from '@shared/constants';
 import { useStore } from '../../store';
 import { Button, Empty, Modal, Toggle, cx } from '../../components/ui';
+import { Select } from '../../components/Select';
 import { ShareModal } from '../../components/domain';
 import { ProfileTile } from '../../components/tiles';
+import { CandidateModal } from '../../components/candidate';
+import { hasFeature, UpsellPill } from '../../components/premium';
+import { FIELD_BY_KEY, HEIGHT_OPTIONS, formatHeight } from '@shared/profileFields';
 import { t } from '@shared/i18n';
 
 const QUICK = [
@@ -27,13 +30,13 @@ export function BrowsePage() {
   useEffect(() => {
     loadSavedSearches();
   }, [loadSavedSearches]);
-  const navigate = useNavigate();
   const { filters, results, total, nextOffset, facets, status, error } = search;
   const [q, setQ] = useState(filters.q);
   const [selected, setSelected] = useState([]);
   const [sharing, setSharing] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const seeking = user?.gender === 'man' ? 'Brides' : user?.gender === 'woman' ? 'Grooms' : 'Profiles';
+  const [viewing, setViewing] = useState(null); // full profile of a result
+  const seeking = t(user?.gender === 'man' ? 'Brides' : user?.gender === 'woman' ? 'Grooms' : 'Profiles');
   const chips = activeFilterChips(filters);
   const typed = useRef(false);
 
@@ -81,9 +84,9 @@ export function BrowsePage() {
       <div className="page-head">
         <div className="stack" style={{ '--gap': '6px' }}>
           <span className="eyebrow">{t('Search & browse')}</span>
-          <h1 className="h1">{seeking} for you</h1>
+          <h1 className="h1">{t('{seeking} for you', { seeking })}</h1>
           <span className="small muted" aria-live="polite">
-            {loading ? 'Searching…' : `${total} ${total === 1 ? 'profile' : 'profiles'} · ${SEARCH_SORTS.find(([k]) => k === filters.sort)?.[1].toLowerCase()}`}
+            {loading ? t('Searching…') : `${t(total === 1 ? '1 profile' : '{n} profiles', { n: total })} · ${t(SEARCH_SORTS.find(([k]) => k === filters.sort)?.[1] || '')}`}
           </span>
         </div>
       </div>
@@ -93,10 +96,10 @@ export function BrowsePage() {
           <Search size={18} />
           <input
             type="search"
-            placeholder="Search by name, city, profession or vibe"
+            placeholder={t('Search by name, city, profession or vibe')}
             value={q}
             maxLength={80}
-            aria-label="Search profiles"
+            aria-label={t('Search profiles')}
             onChange={(e) => onType(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -106,32 +109,31 @@ export function BrowsePage() {
             }}
           />
           {q && (
-            <button className="icon-btn sm" aria-label="Clear search" onClick={() => { typed.current = false; setQ(''); apply({ q: '' }); }}>
+            <button className="icon-btn sm" aria-label={t('Clear search')} onClick={() => { typed.current = false; setQ(''); apply({ q: '' }); }}>
               <X size={16} />
             </button>
           )}
         </label>
-        <select className="input sort-select" aria-label="Sort by" value={filters.sort} onChange={(e) => apply({ sort: e.target.value })}>
-          {SEARCH_SORTS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-        </select>
+        <Select className="sort-select" icon={ArrowUpDown} aria-label={t('Sort by')} value={filters.sort} onChange={(sort) => apply({ sort })}
+          options={SEARCH_SORTS.map(([k, label]) => [k, t(label)])} />
         <Button variant="secondary" icon={SlidersHorizontal} onClick={() => setShowFilters(true)}>
-          Filters{chips.length > 0 && <span className="filter-count">{chips.length}</span>}
+          {t('Filters')}{chips.length > 0 && <span className="filter-count">{chips.length}</span>}
         </Button>
         {(chips.length > 0 || q.trim()) && (
-          <Button variant="ghost" icon={Bookmark} onClick={() => setSaving(true)}>Save search</Button>
+          <Button variant="ghost" icon={Bookmark} onClick={() => setSaving(true)}>{t('Save search')}</Button>
         )}
       </div>
 
       {savedSearches.length > 0 && (
-        <div className="row wrap" style={{ '--gap': '8px', alignItems: 'center' }} aria-label="Saved searches">
-          <span className="small muted row" style={{ '--gap': '5px' }}><Bookmark size={14} /> Saved</span>
+        <div className="row wrap" style={{ '--gap': '8px', alignItems: 'center' }} aria-label={t('Saved searches')}>
+          <span className="small muted row" style={{ '--gap': '5px' }}><Bookmark size={14} />{' '}{t('Saved')}</span>
           {savedSearches.map((sv) => (
             <span key={sv.id} className="saved-chip">
               <button className="chip sm" onClick={() => { typed.current = false; setQ(sv.filters.q || ''); runSavedSearch(sv); }}>{sv.name}</button>
-              <button className="icon-btn sm" aria-label={sv.alerts ? `Turn off alerts for ${sv.name}` : `Turn on alerts for ${sv.name}`} onClick={() => updateSavedSearch(sv.id, { alerts: !sv.alerts })}>
+              <button className="icon-btn sm" aria-label={sv.alerts ? t('Turn off alerts for {name}', { name: sv.name }) : t('Turn on alerts for {name}', { name: sv.name })} onClick={() => updateSavedSearch(sv.id, { alerts: !sv.alerts })}>
                 {sv.alerts ? <Bell size={13} /> : <BellOff size={13} />}
               </button>
-              <button className="icon-btn sm" aria-label={`Delete saved search ${sv.name}`} onClick={() => deleteSavedSearch(sv.id)}><X size={13} /></button>
+              <button className="icon-btn sm" aria-label={t('Delete saved search {name}', { name: sv.name })} onClick={() => deleteSavedSearch(sv.id)}><X size={13} /></button>
             </span>
           ))}
         </div>
@@ -140,41 +142,41 @@ export function BrowsePage() {
       <div className="row wrap" style={{ '--gap': '8px' }}>
         {QUICK.map(([label, Icon, on, flip]) => (
           <button key={label} className={cx('chip', on(filters) && 'active')} onClick={() => apply(flip(filters))}>
-            <Icon size={14} /> {label}
+            <Icon size={14} /> {t(label)}
           </button>
         ))}
       </div>
 
       {chips.length > 0 && (
-        <div className="row wrap" style={{ '--gap': '8px' }} aria-label="Active filters">
+        <div className="row wrap" style={{ '--gap': '8px' }} aria-label={t('Active filters')}>
           {chips.map((c) => (
-            <button key={c.key} className="chip filter-chip" onClick={() => apply(c.clear)} aria-label={`Remove filter ${c.label}`}>
-              {c.label} <X size={13} />
+            <button key={c.key} className="chip filter-chip" onClick={() => apply(c.clear)} aria-label={t('Remove filter {label}', { label: c.label })}>
+              {t(c.label)} <X size={13} />
             </button>
           ))}
-          <button className="link-btn small" onClick={clearAll}>Clear all</button>
+          <button className="link-btn small" onClick={clearAll}>{t('Clear all')}</button>
         </div>
       )}
 
       {showRecent && (
         <div className="row wrap" style={{ '--gap': '8px', alignItems: 'center' }}>
-          <span className="small muted row" style={{ '--gap': '5px' }}><History size={14} /> Recent</span>
+          <span className="small muted row" style={{ '--gap': '5px' }}><History size={14} />{' '}{t('Recent')}</span>
           {recentSearches.map((r) => (
-            <button key={r.label} className="chip" onClick={() => pickRecent(r)}>{r.label}</button>
+            <button key={r.label} className="chip" onClick={() => pickRecent(r)}>{describeSearch(r.filters)}</button>
           ))}
-          <button className="link-btn small" onClick={clearRecentSearches}>Clear</button>
+          <button className="link-btn small" onClick={clearRecentSearches}>{t('Clear')}</button>
         </div>
       )}
 
       {status === 'error' ? (
-        <Empty icon={RotateCw} title="Search didn’t load">
+        <Empty icon={RotateCw} title={t('Search didn’t load')}>
           <span className="small">{error}</span>
-          <Button size="sm" variant="soft" onClick={() => runSearch()}>Try again</Button>
+          <Button size="sm" variant="soft" onClick={() => runSearch()}>{t('Try again')}</Button>
         </Empty>
       ) : !loading && results.length === 0 && status !== 'idle' ? (
-        <Empty icon={Search} title="No profiles match this search">
-          <span className="small">Try fewer filters or a different word.</span>
-          {(chips.length > 0 || q) && <Button size="sm" variant="soft" onClick={clearAll}>Clear search</Button>}
+        <Empty icon={Search} title={t('No profiles match this search')}>
+          <span className="small">{t('Try fewer filters or a different word.')}</span>
+          {(chips.length > 0 || q) && <Button size="sm" variant="soft" onClick={clearAll}>{t('Clear search')}</Button>}
         </Empty>
       ) : (
         <div className={cx('browse-grid', loading && 'is-loading')}>
@@ -184,7 +186,7 @@ export function BrowsePage() {
               c={c}
               selected={selected.includes(c.id)}
               onToggleSelect={() => toggle(c.id)}
-              onOpen={() => navigate(`/matches?focus=${c.id}`)}
+              onOpen={() => setViewing(c)}
             />
           ))}
         </div>
@@ -193,7 +195,7 @@ export function BrowsePage() {
       {nextOffset != null && status !== 'error' && (
         <div className="row" style={{ justifyContent: 'center' }}>
           <Button variant="secondary" loading={status === 'loadingMore'} onClick={loadMoreSearch}>
-            Show more ({total - results.length} left)
+            {t('Show more ({n} left)', { n: total - results.length })}
           </Button>
         </div>
       )}
@@ -201,11 +203,11 @@ export function BrowsePage() {
       {chosen.length > 0 && (
         <div className="batch-bar fade-in">
           <div className="grow">
-            <div className="h3">{chosen.length} selected</div>
-            <div className="tiny" style={{ color: 'rgba(255,246,238,0.7)' }}>Send them to family together</div>
+            <div className="h3">{t('{n} selected', { n: chosen.length })}</div>
+            <div className="tiny" style={{ color: 'rgba(255,246,238,0.7)' }}>{t('Send them to family together')}</div>
           </div>
-          <Button variant="secondary" size="sm" onClick={() => setSelected([])}>Clear</Button>
-          <Button variant="gold" size="sm" icon={Send} onClick={() => setSharing(true)}>Send to family</Button>
+          <Button variant="secondary" size="sm" onClick={() => setSelected([])}>{t('Clear')}</Button>
+          <Button variant="gold" size="sm" icon={Send} onClick={() => setSharing(true)}>{t('Send to family')}</Button>
         </div>
       )}
 
@@ -214,9 +216,11 @@ export function BrowsePage() {
       )}
 
       {saving && <SaveSearchModal onClose={() => setSaving(false)} onSave={saveCurrentSearch} />}
+      {viewing && <CandidateModal candidate={results.find((r) => r.id === viewing.id) || viewing} onClose={() => setViewing(null)} />}
 
       {showFilters && (
         <FiltersModal
+          advanced={hasFeature(user, 'advancedFilters')}
           filters={filters}
           cities={facets.cities}
           onClose={() => setShowFilters(false)}
@@ -244,21 +248,21 @@ function SaveSearchModal({ onClose, onSave }) {
     onClose();
   };
   return (
-    <Modal title="Save this search" onClose={onClose} width={460}>
+    <Modal title={t('Save this search')} onClose={onClose} width={460}>
       <form className="stack" onSubmit={submit}>
-        <input className="input" placeholder="Name, e.g. Chennai 80%+" maxLength={80} value={name} onChange={(e) => setName(e.target.value)} aria-label="Search name" autoFocus />
-        <div className="row between"><span className="h3">Alert me when someone new fits</span><Toggle label="Alert me when someone new fits" value={alerts} onChange={setAlerts} /></div>
+        <input className="input" placeholder={t('Name, e.g. Chennai 80%+')} maxLength={80} value={name} onChange={(e) => setName(e.target.value)} aria-label={t('Search name')} autoFocus />
+        <div className="row between"><span className="h3">{t('Alert me when someone new fits')}</span><Toggle label={t('Alert me when someone new fits')} value={alerts} onChange={setAlerts} /></div>
         {error && <span className="error-text">{error}</span>}
         <div className="row between">
-          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button type="submit" icon={Bookmark} loading={busy} disabled={!name.trim() || busy}>Save</Button>
+          <Button type="button" variant="ghost" onClick={onClose}>{t('Cancel')}</Button>
+          <Button type="submit" icon={Bookmark} loading={busy} disabled={!name.trim() || busy}>{t('Save')}</Button>
         </div>
       </form>
     </Modal>
   );
 }
 
-function FiltersModal({ filters, cities, onClose, onApply }) {
+function FiltersModal({ filters, cities, onClose, onApply, advanced }) {
   const [d, setD] = useState(filters);
   const set = (patch) => setD((x) => ({ ...x, ...patch }));
   const age = (key, value) => {
@@ -267,29 +271,29 @@ function FiltersModal({ filters, cities, onClose, onApply }) {
   };
   const ageError =
     [d.ageMin, d.ageMax].some((a) => a != null && (a < SEARCH_AGE_LIMITS.min || a > SEARCH_AGE_LIMITS.max))
-      ? `Ages must be between ${SEARCH_AGE_LIMITS.min} and ${SEARCH_AGE_LIMITS.max}`
+      ? t('Ages must be between {min} and {max}', SEARCH_AGE_LIMITS)
       : d.ageMin != null && d.ageMax != null && d.ageMin > d.ageMax
-        ? 'Minimum age is above the maximum'
+        ? t('Minimum age is above the maximum')
         : null;
   const reset = { ...DEFAULT_SEARCH_FILTERS, q: filters.q, sort: filters.sort };
 
   return (
-    <Modal title="Filters" onClose={onClose} width={620}>
+    <Modal title={t('Filters')} onClose={onClose} width={620}>
       <div className="filter-section">
-        <span className="label">Age</span>
+        <span className="label">{t('Age')}</span>
         <div className="row" style={{ '--gap': '10px' }}>
-          <input className="input grow" type="number" inputMode="numeric" placeholder="From" aria-label="Minimum age"
+          <input className="input grow" type="number" inputMode="numeric" placeholder={t('From')} aria-label={t('Minimum age')}
             min={SEARCH_AGE_LIMITS.min} max={SEARCH_AGE_LIMITS.max} value={d.ageMin ?? ''} onChange={(e) => age('ageMin', e.target.value)} />
-          <span className="muted">to</span>
-          <input className="input grow" type="number" inputMode="numeric" placeholder="To" aria-label="Maximum age"
+          <span className="muted">{t('to')}</span>
+          <input className="input grow" type="number" inputMode="numeric" placeholder={t('To')} aria-label={t('Maximum age')}
             min={SEARCH_AGE_LIMITS.min} max={SEARCH_AGE_LIMITS.max} value={d.ageMax ?? ''} onChange={(e) => age('ageMax', e.target.value)} />
         </div>
         {ageError && <span className="small" style={{ color: 'var(--accent)' }}>{ageError}</span>}
       </div>
 
       <div className="filter-section">
-        <span className="label">City</span>
-        <input className="input" placeholder="Any city" aria-label="City" maxLength={80} value={d.city} onChange={(e) => set({ city: e.target.value })} />
+        <span className="label">{t('City')}</span>
+        <input className="input" placeholder={t('Any city')} aria-label={t('City')} maxLength={80} value={d.city} onChange={(e) => set({ city: e.target.value })} />
         {cities.length > 0 && (
           <div className="row wrap" style={{ '--gap': '6px' }}>
             {cities.map((c) => (
@@ -303,52 +307,79 @@ function FiltersModal({ filters, cities, onClose, onApply }) {
       </div>
 
       <div className="filter-section">
-        <span className="label">Minimum alignment</span>
+        <span className="label">{t('Minimum alignment')}</span>
         <div className="row wrap" style={{ '--gap': '6px' }}>
           {MIN_SCORE_OPTIONS.map(([v, label]) => (
-            <button key={v} className={cx('chip sm', d.minScore === v && 'active')} onClick={() => set({ minScore: v })}>{label}</button>
+            <button key={v} className={cx('chip sm', d.minScore === v && 'active')} onClick={() => set({ minScore: v })}>{t(label)}</button>
           ))}
         </div>
       </div>
 
       <div className="filter-section">
-        <span className="label">Strongly aligned on</span>
+        <span className="label">{t('Strongly aligned on')}</span>
         <div className="row wrap" style={{ '--gap': '6px' }}>
           {PILLARS.map((p) => (
             <button key={p.key} className={cx('chip sm', d.strongOn.includes(p.key) && 'active')} onClick={() => set({ strongOn: toggleIn(d.strongOn, p.key) })}>
-              {p.label}
+              {t(p.label)}
             </button>
           ))}
         </div>
-        <span className="tiny muted">Each chosen pillar must be 80% or closer to yours.</span>
+        <span className="tiny muted">{t('Each chosen pillar must be 80% or closer to yours.')}</span>
       </div>
 
       <div className="filter-section">
-        <span className="label">Marriage timeline</span>
+        <span className="label">{t('Marriage timeline')}</span>
         <div className="row wrap" style={{ '--gap': '6px' }}>
-          {TIMELINES.map(([t, label]) => (
-            <button key={t} className={cx('chip sm', d.timelines.includes(t) && 'active')} onClick={() => set({ timelines: toggleIn(d.timelines, t) })}>{label}</button>
+          {TIMELINES.map(([tl, label]) => (
+            <button key={tl} className={cx('chip sm', d.timelines.includes(tl) && 'active')} onClick={() => set({ timelines: toggleIn(d.timelines, tl) })}>{t(label)}</button>
           ))}
         </div>
       </div>
 
       <div className="filter-section">
-        <span className="label">Shares any of these vibes</span>
+        <span className="label">{t('Shares any of these vibes')}</span>
         <div className="row wrap" style={{ '--gap': '6px' }}>
           {ALL_VIBES.map((v) => (
-            <button key={v} className={cx('chip sm', d.vibes.includes(v) && 'active')} onClick={() => set({ vibes: toggleIn(d.vibes, v) })}>{v}</button>
+            <button key={v} className={cx('chip sm', d.vibes.includes(v) && 'active')} onClick={() => set({ vibes: toggleIn(d.vibes, v) })}>{t(v)}</button>
           ))}
         </div>
       </div>
 
+      <div className={cx('filter-section advanced', !advanced && 'locked')}>
+        <div className="row between">
+          <span className="label">{t('Advanced filters')}</span>
+          {!advanced && <UpsellPill feature="advancedFilters" />}
+        </div>
+        <fieldset disabled={!advanced} className="stack" style={{ border: 0, padding: 0, margin: 0, '--gap': '12px' }}>
+          <div className="row" style={{ '--gap': '10px' }}>
+            {['heightMin', 'heightMax'].map((k) => (
+              <Select key={k} className="grow" aria-label={t(k === 'heightMin' ? 'Height from' : 'Height to')} value={d[k] ?? ''}
+                disabled={!advanced} onChange={(v) => set({ [k]: v === '' ? null : Number(v) })}
+                placeholder={t(k === 'heightMin' ? 'Height from — any' : 'Height to — any')}
+                options={[['', t(k === 'heightMin' ? 'Height from — any' : 'Height to — any')], ...HEIGHT_OPTIONS.map((n) => [n, formatHeight(n)])]} />
+            ))}
+          </div>
+          {ADVANCED_FILTER_FIELDS.map(([key, label, field]) => (
+            <div key={key} className="stack" style={{ '--gap': '6px' }}>
+              <span className="tiny muted" style={{ fontWeight: 700 }}>{t(label)}</span>
+              <div className="row wrap" style={{ '--gap': '6px' }} role="group" aria-label={t(label)}>
+                {FIELD_BY_KEY[field].options.map((o) => (
+                  <button key={o} type="button" className={cx('chip sm', (d[key] || []).includes(o) && 'active')} onClick={() => set({ [key]: toggleIn(d[key] || [], o) })}>{t(o)}</button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </fieldset>
+      </div>
+
       <div className="filter-section">
-        <div className="row between"><span className="h3">Verified profiles only</span><Toggle value={d.verified} onChange={(v) => set({ verified: v })} label="Verified profiles only" /></div>
-        <div className="row between"><span className="h3">Hide people I’ve messaged</span><Toggle value={d.notContacted} onChange={(v) => set({ notContacted: v })} label="Hide people I’ve messaged" /></div>
+        <div className="row between"><span className="h3">{t('Verified profiles only')}</span><Toggle value={d.verified} onChange={(v) => set({ verified: v })} label={t('Verified profiles only')} /></div>
+        <div className="row between"><span className="h3">{t('Hide people I’ve messaged')}</span><Toggle value={d.notContacted} onChange={(v) => set({ notContacted: v })} label={t('Hide people I’ve messaged')} /></div>
       </div>
 
       <div className="row between" style={{ position: 'sticky', bottom: -28, background: 'var(--bg)', padding: '12px 0 0' }}>
-        <Button variant="ghost" onClick={() => setD(reset)}>Reset</Button>
-        <Button disabled={!!ageError} onClick={() => onApply(d)}>Show results</Button>
+        <Button variant="ghost" onClick={() => setD(reset)}>{t('Reset')}</Button>
+        <Button disabled={!!ageError} onClick={() => onApply(d)}>{t('Show results')}</Button>
       </div>
     </Modal>
   );

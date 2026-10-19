@@ -5,6 +5,7 @@ const env = require('../config/env');
 const db = require('../config/db');
 const sms = require('../services/sms');
 const { httpError, newId, sha256, randomToken, safeEqualHex, normalizePhone } = require('../lib/util');
+const { tx } = require('../lib/i18n');
 const { route } = require('../lib/http');
 
 const router = express.Router();
@@ -52,7 +53,8 @@ async function sendOtp(rawPhone) {
   };
 }
 
-async function verifyOtp(rawPhone, rawCode) {
+// Checks a code and uses it up; returns the normalised phone. Shared by member and family sign-in.
+async function checkOtp(rawPhone, rawCode) {
   const phone = normalizePhone(rawPhone);
   const code = typeof rawCode === 'string' ? rawCode.trim() : '';
   if (!phone) throw httpError(400, 'Enter a valid mobile number', 'INVALID_PHONE');
@@ -74,14 +76,18 @@ async function verifyOtp(rawPhone, rawCode) {
     throw httpError(400, 'That code is not right. Check the SMS and try again.', 'OTP_WRONG');
   }
 
-  return db.transaction(async (client) => {
-    // Consume atomically so the same code can't be used twice in parallel
-    const consumed = await client.query(
-      'UPDATE otp_codes SET consumed_at = NOW() WHERE id = $1 AND consumed_at IS NULL RETURNING id',
-      [otp.id]
-    );
-    if (consumed.rows.length === 0) throw httpError(400, 'This code was already used', 'OTP_USED');
+  // Consume atomically so the same code can't be used twice in parallel
+  const consumed = await db.query(
+    'UPDATE otp_codes SET consumed_at = NOW() WHERE id = $1 AND consumed_at IS NULL RETURNING id',
+    [otp.id]
+  );
+  if (consumed.rows.length === 0) throw httpError(400, 'This code was already used', 'OTP_USED');
+  return phone;
+}
 
+async function verifyOtp(rawPhone, rawCode) {
+  const phone = await checkOtp(rawPhone, rawCode);
+  return db.transaction(async (client) => {
     let user = (await client.query('SELECT id FROM users WHERE phone = $1', [phone])).rows[0];
     const isNewUser = !user;
     if (isNewUser) {
@@ -147,8 +153,8 @@ router.post('/otp/verify', route(async (req, res) => {
       const { notify } = require('./notifications');
       await notify(userId, {
         type: 'security',
-        title: 'New sign-in to your account',
-        body: `Signed in on another device at ${new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}. If this wasn’t you, sign out and contact support.`,
+        title: tx('New sign-in to your account'),
+        body: tx('Signed in on another device at {when}. If this wasn’t you, sign out and contact support.', { when: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) }),
         data: {},
       });
     }
@@ -162,4 +168,4 @@ router.post('/logout', requireAuth, route(async (req, res) => {
   res.json({ success: true });
 }));
 
-module.exports = { router, requireAuth, userIdForToken, sendOtp, verifyOtp };
+module.exports = { router, requireAuth, userIdForToken, sendOtp, verifyOtp, checkOtp };

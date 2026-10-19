@@ -4,6 +4,7 @@ import { Check, X, Plus, ShieldCheck, Link2, RotateCw, Trash2 } from 'lucide-rea
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { Screen, TopBar, FadeIn, Eyebrow, Heading, Accent, Body, Button, Card, Divider, Badge, Chip, Toggle } from '../../components/ui/kit';
+import { t } from '@shared/i18n';
 
 const { colors, fonts, gradients, radii } = theme;
 
@@ -34,7 +35,7 @@ export const LinkParentScreen = () => {
   };
 
   const handleAdd = async () => {
-    const res = await run('add', () => addFamilyMember({ name: name.trim(), relation, phone }), `Invite sent to ${name.trim()} by SMS`);
+    const res = await run('add', () => addFamilyMember({ name: name.trim(), relation, phone }), t('Invite sent to {name} by SMS', { name: name.trim() }));
     if (res.ok) {
       setAdding(false);
       setName('');
@@ -45,15 +46,15 @@ export const LinkParentScreen = () => {
   const copyLink = async (link) => {
     try {
       await navigator.clipboard.writeText(link.portalUrl);
-      setMessage(`${link.name}’s private link copied`);
+      setMessage(t('{name}’s private link copied', { name: link.name }));
     } catch {
       setMessage(link.portalUrl);
     }
   };
 
   const confirmRemove = (link) => {
-    if (window.confirm(`Remove ${link.name}? Their link stops working and shared cards disappear from their view.`)) {
-      run(link.id, () => removeFamilyMember(link.id), `${link.name} removed`);
+    if (window.confirm(t('Remove {name}? Their link stops working and shared cards disappear from their view.', { name: link.name }))) {
+      run(link.id, () => removeFamilyMember(link.id), t('{name} removed', { name: link.name }));
     }
   };
 
@@ -63,12 +64,12 @@ export const LinkParentScreen = () => {
 
       <FadeIn>
         <View style={styles.header}>
-          <Eyebrow>Family access</Eyebrow>
+          <Eyebrow>{t('Family access')}</Eyebrow>
           <Heading>
-            Bring family in —{'\n'}
-            <Accent>on your terms</Accent>
+            {t('Bring family in —')}{'\n'}
+            <Accent>{t('on your terms')}</Accent>
           </Heading>
-          <Body>A family member only sees what you forward. No search, no chat, no browsing.</Body>
+          <Body>{t('A family member only sees what you forward. No search, no chat, no browsing.')}</Body>
         </View>
       </FadeIn>
 
@@ -84,39 +85,37 @@ export const LinkParentScreen = () => {
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={styles.name}>
                     {link.name}
-                    {link.relation ? <Text style={styles.phone}>{` · ${link.relation}`}</Text> : null}
+                    {link.relation ? <Text style={styles.phone}>{` · ${t(link.relation)}`}</Text> : null}
                   </Text>
                   <Text style={styles.status}>
-                    {`${STATUS_LABEL[link.status] || link.status} · ${link.sharedProfilesCount} profile${
-                      link.sharedProfilesCount === 1 ? '' : 's'
-                    } shared · ${link.phoneMasked}`}
+                    {`${t(STATUS_LABEL[link.status] || link.status)} · ${t(link.sharedProfilesCount === 1 ? '1 profile shared' : '{n} profiles shared', { n: link.sharedProfilesCount })} · ${link.phoneMasked}`}
                   </Text>
                 </View>
-                <Badge label={link.status === 'linked' ? 'Active' : 'Pending'} tone={link.status === 'linked' ? 'success' : 'gold'} />
+                <Badge label={link.status === 'linked' ? t('Active') : t('Pending')} tone={link.status === 'linked' ? 'success' : 'gold'} />
               </View>
               <View style={[styles.row, { paddingTop: 0 }]}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.name}>Can edit my personal details</Text>
-                  <Text style={styles.status}>From their link — never your name, photos or chats</Text>
+                  <Text style={styles.name}>{t('Can edit my personal details')}</Text>
+                  <Text style={styles.status}>{t('From their link — never your name, photos or chats')}</Text>
                 </View>
                 <Toggle value={Boolean(link.canManage)} onChange={(v) => setFamilyManage(link.id, v)} />
               </View>
               <View style={styles.actions}>
                 <TouchableOpacity onPress={() => copyLink(link)} style={styles.action}>
                   <Link2 size={14} color={colors.accent} />
-                  <Text style={styles.actionText}>Copy link</Text>
+                  <Text style={styles.actionText}>{t('Copy link')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   disabled={busy === `resend-${link.id}`}
-                  onPress={() => run(`resend-${link.id}`, () => resendFamilyInvite(link.id), `Invite re-sent to ${link.name}`)}
+                  onPress={() => run(`resend-${link.id}`, () => resendFamilyInvite(link.id), t('Invite re-sent to {name}', { name: link.name }))}
                   style={styles.action}
                 >
                   <RotateCw size={14} color={colors.accent} />
-                  <Text style={styles.actionText}>Resend SMS</Text>
+                  <Text style={styles.actionText}>{t('Resend SMS')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity disabled={busy === link.id} onPress={() => confirmRemove(link)} style={styles.action}>
                   <Trash2 size={14} color={colors.textMuted} />
-                  <Text style={[styles.actionText, { color: colors.textMuted }]}>Remove</Text>
+                  <Text style={[styles.actionText, { color: colors.textMuted }]}>{t('Remove')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -128,29 +127,29 @@ export const LinkParentScreen = () => {
             <View style={styles.form}>
               <TextInput
                 value={name}
-                onChangeText={setName}
-                placeholder="Their name (e.g. Amma)"
+                onChangeText={(v) => { setName(v); setError(null); }}
+                placeholder={t('Their name (e.g. Amma)')}
                 placeholderTextColor={colors.textLight}
                 style={styles.input}
               />
               <View style={styles.chips}>
                 {RELATIONS.map((r) => (
-                  <Chip key={r} label={r} active={relation === r} onPress={() => setRelation(r)} />
+                  <Chip key={r} label={t(r)} active={relation === r} onPress={() => setRelation(r)} />
                 ))}
               </View>
               <TextInput
                 value={phone}
-                onChangeText={setPhone}
+                onChangeText={(v) => { setPhone(v); setError(null); }}
                 keyboardType="phone-pad"
-                placeholder="Their mobile number"
+                placeholder={t('Their mobile number')}
                 placeholderTextColor={colors.textLight}
                 style={styles.input}
               />
               <View style={styles.formButtons}>
-                <Button small variant="secondary" label="Cancel" style={{ flex: 1 }} onPress={() => setAdding(false)} />
+                <Button small variant="secondary" label={t('Cancel')} style={{ flex: 1 }} onPress={() => setAdding(false)} />
                 <Button
                   small
-                  label={busy === 'add' ? 'Sending…' : 'Send invite'}
+                  label={busy === 'add' ? t('Sending…') : t('Send invite')}
                   style={{ flex: 2 }}
                   disabled={!name.trim() || phone.replace(/\D/g, '').length < 10 || busy === 'add'}
                   onPress={handleAdd}
@@ -163,8 +162,8 @@ export const LinkParentScreen = () => {
                 <Plus size={18} color={colors.accent} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.name}>Add a family member</Text>
-                <Text style={styles.status}>They get a private link by SMS — no app or account needed</Text>
+                <Text style={styles.name}>{t('Add a family member')}</Text>
+                <Text style={styles.status}>{t('They get a private link by SMS — no app or account needed')}</Text>
               </View>
             </TouchableOpacity>
           )}
@@ -177,20 +176,20 @@ export const LinkParentScreen = () => {
       <FadeIn delay={160}>
         <View style={{ gap: 10 }}>
           <Card style={[styles.matrixCol, { backgroundColor: colors.successSoft, borderColor: 'transparent' }]}>
-            <Text style={[styles.matrixHead, { color: colors.success }]}>A family member can</Text>
-            {CAN.map((t) => (
-              <View key={t} style={styles.matrixItem}>
+            <Text style={[styles.matrixHead, { color: colors.success }]}>{t('A family member can')}</Text>
+            {CAN.map((item) => (
+              <View key={item} style={styles.matrixItem}>
                 <Check size={14} color={colors.success} strokeWidth={3} />
-                <Text style={styles.matrixText}>{t}</Text>
+                <Text style={styles.matrixText}>{t(item)}</Text>
               </View>
             ))}
           </Card>
           <Card style={[styles.matrixCol, { backgroundColor: colors.accentSoft, borderColor: 'transparent' }]}>
-            <Text style={[styles.matrixHead, { color: colors.accent }]}>A family member cannot</Text>
-            {CANNOT.map((t) => (
-              <View key={t} style={styles.matrixItem}>
+            <Text style={[styles.matrixHead, { color: colors.accent }]}>{t('A family member cannot')}</Text>
+            {CANNOT.map((item) => (
+              <View key={item} style={styles.matrixItem}>
                 <X size={14} color={colors.accent} strokeWidth={3} />
-                <Text style={styles.matrixText}>{t}</Text>
+                <Text style={styles.matrixText}>{t(item)}</Text>
               </View>
             ))}
           </Card>
@@ -201,9 +200,9 @@ export const LinkParentScreen = () => {
         <View style={{ gap: 12 }}>
           <View style={styles.revoke}>
             <ShieldCheck size={14} color={colors.success} />
-            <Text style={styles.revokeText}>Remove anyone, any time — their link stops working instantly.</Text>
+            <Text style={styles.revokeText}>{t('Remove anyone, any time — their link stops working instantly.')}</Text>
           </View>
-          <Button label="Done" onPress={() => setCurrentScreen('family-tracker')} />
+          <Button label={t('Done')} onPress={() => setCurrentScreen('family-tracker')} />
         </View>
       </FadeIn>
     </Screen>
@@ -263,6 +262,7 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
+    flexWrap: 'wrap', // narrow phones / large text: the buttons wrap instead of running off the edge
     gap: 8,
     paddingHorizontal: 14,
     paddingBottom: 12,

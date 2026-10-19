@@ -12,7 +12,9 @@ const {
 const { route, optionalString, optionalBoolean, oneOf } = require('../lib/http');
 const { validatePreferences } = require('../../../shared/preferences.js');
 const { validatePrompts } = require('../../../shared/engagement.js');
-const { isPremium } = require('../lib/members');
+const { isPremium, planOf, has, requireFeature } = require('../lib/members');
+const { TIER_INFO, PHOTO_VISIBILITY, featuresOf } = require('../../../shared/plans.js');
+const { LANGUAGE_CODES } = require('../../../shared/i18n.js');
 const {
   FIELD_BY_KEY, ONBOARDING_REQUIRED_KEYS, isFilled, validateDetails, crossFieldErrors, profileCompletion,
 } = require('../../../shared/profileFields.js');
@@ -128,11 +130,20 @@ async function getProfile(userId) {
     hideFromContacts: u.hide_from_contacts,
     incognito: u.incognito,
     showHoroscope: u.show_horoscope,
+    showPremiumBadge: u.show_premium_badge,
+    hideActivity: u.hide_activity,
+    photoVisibility: u.photo_visibility,
+    visibilityRules: u.visibility_rules || {},
     paused: Boolean(u.paused_at),
     hiddenByModeration: Boolean(u.moderation_hidden_at),
     role: u.role,
-    plan: isPremium(u) ? 'premium' : 'free',
+    // Current tier ('free' | 'plus' | 'premium' | 'family') and what it includes
+    plan: planOf(u),
+    planName: TIER_INFO[planOf(u)].name,
+    planFeatures: featuresOf(planOf(u)),
     premiumUntil: isPremium(u) ? u.premium_until : null,
+    planPaused: Boolean(u.plan_paused_at),
+    assistedActive: Boolean(u.assisted_until && new Date(u.assisted_until) > new Date()),
     preferences: u.preferences || {},
     prompts: u.prompts || [],
     blueprint,
@@ -151,11 +162,20 @@ async function getProfile(userId) {
     onboarding: onboardingState(u, { hasConsent: Boolean(c), blueprint, photoCount: photos.length }),
     notificationPrefs: { messages: true, matches: true, family: true, tips: true, push: true, ...(u.notification_prefs || {}) },
     erasureScheduledFor: erasureRes.rows[0]?.scheduled_for || null,
+    language: u.ui_language || 'en',
     createdAt: u.created_at,
   };
 }
 
 // ---------- writing ----------
+
+// Interface language, so notifications are written and pushed in it
+async function updateLanguage(userId, body) {
+  const language = oneOf(body, 'language', LANGUAGE_CODES);
+  if (!language) throw httpError(400, 'Choose a language');
+  await db.query('UPDATE users SET ui_language = $2 WHERE id = $1', [userId, language]);
+  return { language };
+}
 
 async function updateBasics(userId, body) {
   const firstName = optionalString(body, 'firstName', { max: 60 });
@@ -171,7 +191,7 @@ async function updateBasics(userId, body) {
     birth = parseBirthYearMonth(body.birthYearMonth);
     if (!birth) throw httpError(400, 'Enter your birth month and year like "Mar 1997"');
     const age = ageFrom(birth.year, birth.month);
-    if (age < 18) throw httpError(400, 'You must be at least 18 to use Sangam');
+    if (age < 18) throw httpError(400, 'You must be at least 18 to use 3Knot');
     if (age > 80) throw httpError(400, 'Please check your birth year');
   }
 
@@ -238,7 +258,7 @@ async function updateConsent(userId, body) {
   const productResearch = optionalBoolean(body, 'productResearch');
   const marketing = optionalBoolean(body, 'marketing');
   if (matching === false) {
-    throw httpError(400, 'Matching consent is required to use Sangam. To withdraw it, request account erasure.');
+    throw httpError(400, 'Matching consent is required to use 3Knot. To withdraw it, request account erasure.');
   }
   await db.query(
     `INSERT INTO consents (user_id, matching, family_sharing, product_research, marketing, updated_at)
@@ -259,9 +279,29 @@ async function updatePrivacy(userId, body) {
   const hideContacts = optionalBoolean(body, 'hideFromContacts');
   const incognito = optionalBoolean(body, 'incognito');
   const showHoroscope = optionalBoolean(body, 'showHoroscope');
-  if (incognito) {
-    const u = (await db.query('SELECT plan, premium_until FROM users WHERE id = $1', [userId])).rows[0];
-    if (!isPremium(u)) throw httpError(403, 'Incognito browsing is a Premium feature', 'PREMIUM_REQUIRED');
+  const showPremiumBadge = optionalBoolean(body, 'showPremiumBadge');
+  const hideActivity = optionalBoolean(body, 'hideActivity');
+  const u = (await db.query('SELECT plan, premium_until, plan_paused_at FROM users WHERE id = $1', [userId])).rows[0];
+  // Premium settings: turning one on needs the plan; turning off is always allowed
+  if (incognito) requireFeature(u, 'incognito');
+  if (hideActivity) requireFeature(u, 'hideActivity');
+  if (showPremiumBadge === false) requireFeature(u, 'badgeChoice');
+  let photoVisibility;
+  if (body.photoVisibility !== undefined) {
+    if (body.photoVisibility !== null && !PHOTO_VISIBILITY.some(([k]) => k === body.photoVisibility)) throw httpError(400, 'Choose a photo privacy option');
+    if (body.photoVisibility !== null) requireFeature(u, 'photoPrivacy');
+    photoVisibility = body.photoVisibility;
+  }
+  let visibilityRules;
+  if (body.visibilityRules !== undefined) {
+    const r = body.visibilityRules || {};
+    if (typeof r !== 'object' || Array.isArray(r)) throw httpError(400, 'visibilityRules must be an object');
+    const cities = Array.isArray(r.hideCities) ? r.hideCities.map((c) => String(c).trim()).filter(Boolean).slice(0, 10) : [];
+    if (cities.some((c) => c.length > 80)) throw httpError(400, 'City names must be at most 80 characters');
+    const ageOk = (v) => v === undefined || v === null || (Number.isInteger(v) && v >= 18 && v <= 80);
+    if (!ageOk(r.ageMin) || !ageOk(r.ageMax) || (r.ageMin && r.ageMax && r.ageMin > r.ageMax)) throw httpError(400, 'Ages must be 18–80, minimum below maximum');
+    visibilityRules = { hideCities: cities, ...(r.ageMin ? { ageMin: r.ageMin } : {}), ...(r.ageMax ? { ageMax: r.ageMax } : {}) };
+    if (cities.length || visibilityRules.ageMin || visibilityRules.ageMax) requireFeature(u, 'visibilityRules');
   }
   await db.query(
     `UPDATE users SET
@@ -270,9 +310,14 @@ async function updatePrivacy(userId, body) {
        hide_from_contacts = COALESCE($4, hide_from_contacts),
        incognito = COALESCE($5, incognito),
        show_horoscope = COALESCE($6, show_horoscope),
+       show_premium_badge = COALESCE($7, show_premium_badge),
+       hide_activity = COALESCE($8, hide_activity),
+       photo_visibility = CASE WHEN $9::boolean THEN $10 ELSE photo_visibility END,
+       visibility_rules = COALESCE($11::jsonb, visibility_rules),
        updated_at = NOW()
      WHERE id = $1`,
-    [userId, blur, hideSearch, hideContacts, incognito, showHoroscope]
+    [userId, blur, hideSearch, hideContacts, incognito, showHoroscope, showPremiumBadge, hideActivity,
+      photoVisibility !== undefined, photoVisibility ?? null, visibilityRules ? JSON.stringify(visibilityRules) : null]
   );
   return getProfile(userId);
 }
@@ -455,6 +500,7 @@ router.put('/prompts', route(async (req, res) => res.json(await updatePrompts(re
 router.put('/status', route(async (req, res) => res.json(await updateStatus(req.userId, req.body || {}))));
 router.put('/details', route(async (req, res) => res.json(await updateDetails(req.userId, req.body || {}))));
 router.put('/consent', route(async (req, res) => res.json({ consent: await updateConsent(req.userId, req.body || {}) })));
+router.put('/language', route(async (req, res) => res.json(await updateLanguage(req.userId, req.body || {}))));
 router.put('/privacy', route(async (req, res) => res.json(await updatePrivacy(req.userId, req.body || {}))));
 router.put('/vibes', route(async (req, res) => res.json({ vibes: await updateVibes(req.userId, req.body?.vibes) })));
 router.put('/blueprint', route(async (req, res) => res.json({ blueprint: await updateBlueprint(req.userId, req.body || {}) })));

@@ -1,26 +1,38 @@
-// Branded loading screen: the Sangam strands draw themselves while app data loads
+// Branded loading screen: the thaali thread is tied with its three knots while app data loads
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../theme/tokens';
-import { LogoMark, APP_NAME, APP_TAGLINE } from './Logo';
+import { LogoMark, APP_NAME, APP_NAME_SUFFIX, APP_TAGLINE } from './Logo';
+import { t } from '@shared/i18n';
 
-const { colors, fonts, gradients } = theme;
+const { fonts, gradients } = theme;
 
-export const LoadingScreen = ({ leaving = false, message = 'Aligning your matches…' }) => (
+// Gold-lettered lines under the name (gradient text via .tk-gold-text in index.html)
+const goldLine = (fontSize, letterSpacing, fontWeight) => ({
+  fontFamily: fonts.sans,
+  fontSize,
+  fontWeight,
+  letterSpacing,
+  textTransform: 'uppercase',
+  paddingLeft: letterSpacing,
+});
+
+export const LoadingScreen = ({ leaving = false, message = t('Aligning your matches…') }) => (
   <View style={[styles.root, leaving && styles.leaving]}>
     <View style={styles.glowTop} />
     <View style={styles.glowBottom} />
 
     <View style={styles.center}>
-      <div className="mx-pulse" style={{ position: 'absolute', width: 260, height: 260, borderRadius: 130, background: 'radial-gradient(circle, rgba(201,162,92,0.32), rgba(201,162,92,0) 68%)' }} />
+      <div className="mx-pulse" style={{ position: 'absolute', width: 260, height: 260, borderRadius: 130, background: 'radial-gradient(circle, rgba(249,200,60,0.3), rgba(249,200,60,0) 68%)' }} />
       <LogoMark size={156} variant="onDark" animated />
-      <div className="mx-fade" style={{ animationDelay: '900ms', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginTop: 18 }}>
-        <Text style={styles.name}>{APP_NAME}</Text>
-        <Text style={styles.tagline}>{APP_TAGLINE}</Text>
+      <div className="mx-fade" style={{ animationDelay: '1100ms', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginTop: 18 }}>
+        <div className="tk-gold-text" style={{ fontFamily: fonts.sans, fontWeight: 800, fontSize: 44, letterSpacing: -1.2, lineHeight: 1.15 }}>{APP_NAME}</div>
+        <div className="tk-gold-text" style={goldLine(13, 5.5, '700')}>{APP_NAME_SUFFIX}</div>
+        <div className="tk-gold-text" style={goldLine(12, 3.2, '600')}>{t(APP_TAGLINE)}</div>
       </div>
     </View>
 
-    <div className="mx-fade" style={{ animationDelay: '1200ms', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, paddingBottom: 56 }}>
+    <div className="mx-fade" style={{ animationDelay: '1400ms', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, paddingBottom: 56 }}>
       <View style={styles.track}>
         <div className="mx-shimmer" />
       </View>
@@ -71,21 +83,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-  },
-  name: {
-    fontFamily: fonts.sans,
-    fontWeight: '800',
-    fontSize: 44,
-    letterSpacing: -1.2,
-    color: colors.onDark,
-  },
-  tagline: {
-    fontFamily: fonts.sans,
-    fontWeight: '600',
-    fontSize: 12,
-    letterSpacing: 3.2,
-    textTransform: 'uppercase',
-    color: colors.gold,
   },
   track: {
     width: 140,

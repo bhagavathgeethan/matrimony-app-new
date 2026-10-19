@@ -6,6 +6,7 @@ const realtime = require('../services/realtime');
 const push = require('../services/push');
 const { httpError, newId, relativeTime } = require('../lib/util');
 const { route, oneOf } = require('../lib/http');
+const { isTx, render } = require('../lib/i18n');
 
 const router = express.Router();
 
@@ -22,6 +23,7 @@ const CATEGORY = {
   family_feedback: 'family',
   family_linked: 'family',
   family_edit: 'family',
+  family_proposal: 'family',
   profile_nudge: 'tips',
   // Account events (verification, premium, success stories, moderation) and security alerts are always sent
   account: 'security',
@@ -30,15 +32,18 @@ const CATEGORY = {
 const PREF_KEYS = ['messages', 'matches', 'family', 'tips', 'push'];
 const DEFAULT_PREFS = { messages: true, matches: true, family: true, tips: true, push: true };
 
-function toDto(n) {
+// title/body are stored in English; data.i18n keeps the template so each app shows them in its own language
+function toDto(n, lang = 'en') {
   const sender = n.data?.senderName;
-  const title = n.type === 'message' && n.count > 1 && sender ? `${n.count} new messages from ${sender}` : n.title;
+  const data = n.data || {};
+  const i18n = { ...(data.i18n || {}) };
+  if (n.type === 'message' && n.count > 1 && sender) i18n.title = { key: '{n} new messages from {name}', vars: { n: n.count, name: sender } };
   return {
     id: n.id,
     type: n.type,
-    title,
-    body: n.body,
-    data: n.data || {},
+    title: i18n.title ? render(lang, i18n.title) : n.title,
+    body: i18n.body ? render(lang, i18n.body) : n.body,
+    data: Object.keys(i18n).length ? { ...data, i18n } : data,
     count: n.count,
     read: Boolean(n.read_at),
     createdAt: n.updated_at,
@@ -56,16 +61,28 @@ async function getPrefs(userId) {
   return { ...DEFAULT_PREFS, ...(res.rows[0]?.notification_prefs || {}) };
 }
 
+async function languageOf(userId) {
+  const res = await db.query('SELECT ui_language FROM users WHERE id = $1', [userId]);
+  return res.rows[0]?.ui_language || 'en';
+}
+
 /**
  * Creates (or, for a matching unread groupKey, bumps) a notification for userId.
+ * title/body are plain text or tx() templates (lib/i18n.js), which are translated per reader.
  * Returns the stored notification DTO, or null when the user has switched that category off.
  */
-async function notify(userId, { type, title, body, data = {}, groupKey = null }) {
+async function notify(userId, { type, title: titleIn, body: bodyIn, data: dataIn = {}, groupKey = null }) {
   if (!userId || !CATEGORY[type]) return null;
   const prefs = await getPrefs(userId);
   const category = CATEGORY[type];
   if (category !== 'security' && prefs[category] === false) return null;
 
+  const i18n = {};
+  if (isTx(titleIn)) i18n.title = titleIn;
+  if (isTx(bodyIn)) i18n.body = bodyIn;
+  const data = Object.keys(i18n).length ? { ...dataIn, i18n } : dataIn;
+  const title = render('en', titleIn);
+  const body = render('en', bodyIn);
   const clippedBody = String(body || '').slice(0, 300);
   let row;
   if (groupKey) {
@@ -93,7 +110,10 @@ async function notify(userId, { type, title, body, data = {}, groupKey = null })
   } else if (prefs.push !== false) {
     const tokens = (await db.query('SELECT platform, token FROM push_tokens WHERE user_id = $1', [userId])).rows;
     if (tokens.length) {
-      const result = await push.send({ tokens, title: dto.title, body: dto.body, data: { ...dto.data, type, notificationId: dto.id } });
+      // The phone shows push text as sent, so write it in the member's language
+      const lang = await languageOf(userId);
+      const shown = toDto(row, lang);
+      const result = await push.send({ tokens, title: shown.title, body: shown.body, data: { ...dto.data, type, notificationId: dto.id } });
       if (result.failedTokens?.length) {
         await db.query('DELETE FROM push_tokens WHERE token = ANY($1)', [result.failedTokens]);
       }
@@ -127,7 +147,7 @@ async function list(userId, { before, limit = 30 } = {}) {
   );
   const rows = res.rows.slice(0, lim);
   return {
-    items: rows.map(toDto),
+    items: rows.map((r) => toDto(r)),
     unreadCount: await unreadCount(userId),
     nextCursor: res.rows.length > lim ? rows[rows.length - 1].updated_at : null,
   };

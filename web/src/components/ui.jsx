@@ -1,25 +1,56 @@
 // Web UI primitives (DOM + CSS classes from styles/global.css)
 import React, { useEffect, useId } from 'react';
 import { X } from 'lucide-react';
-import { APP_NAME, APP_TAGLINE, LOGO_PATHS } from '@shared/constants';
+import { APP_NAME, APP_FULL_NAME, APP_NAME_SUFFIX, APP_TAGLINE, LOGO_PATHS } from '@shared/constants';
+import { t } from '@shared/i18n';
 
 export const cx = (...parts) => parts.filter(Boolean).join(' ');
 
-export function LogoMark({ size = 40, variant = 'onLight', animated = false }) {
-  const gradId = useId().replace(/:/g, '');
-  const palette = variant === 'onDark'
-    ? { left: '#FFF3E6', right: `url(#${gradId})`, bindu: `url(#${gradId})` }
-    : { left: 'var(--accent)', right: `url(#${gradId})`, bindu: 'var(--accent)' };
+// 3Knot mark: a pure-gold Tamil thaali; its three beads stand for the three knots (moondru mudichu).
+// animated: the outline draws, the pendant fills, the beads are set one by one, then a glint (.tk-* in global.css)
+// Gradient and clip ids must be unique per mark on the page
+const useMarkIds = () => {
+  const id = useId().replace(/:/g, '');
+  return { gold: `tk-gold-${id}`, shine: `tk-shine-${id}`, band: `tk-band-${id}`, clip: `tk-clip-${id}` };
+};
+
+export function LogoMark({ size = 40, animated = false }) {
+  const ids = useMarkIds();
+  const L = LOGO_PATHS;
   return (
-    <svg width={size} height={size} viewBox={LOGO_PATHS.viewBox} className={animated ? 'logo-draw' : undefined} role="img" aria-label={`${APP_NAME} logo`}>
+    <svg width={size} height={size} viewBox={L.viewBox} className={animated ? 'tk-tie' : undefined} role="img" aria-label={`${APP_FULL_NAME} logo`}>
       <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
-          {LOGO_PATHS.gold.map(([offset, color]) => <stop key={offset} offset={offset} stopColor={color} />)}
+        <linearGradient id={ids.gold} x1="0.15" y1="0" x2="0.85" y2="1">
+          {L.gold.map(([offset, color]) => <stop key={offset} offset={offset} stopColor={color} />)}
         </linearGradient>
+        <radialGradient id={ids.shine} cx="0.38" cy="0.32" r="0.75">
+          {L.shine.map(([offset, color]) => <stop key={offset} offset={offset} stopColor={color} />)}
+        </radialGradient>
+        <linearGradient id={ids.band} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0" />
+          <stop offset="0.5" stopColor="#FFFFFF" stopOpacity="0.75" />
+          <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+        </linearGradient>
+        <clipPath id={ids.clip}><path d={L.body} /></clipPath>
       </defs>
-      <path d={LOGO_PATHS.right} pathLength="100" fill="none" stroke={palette.right} strokeWidth="10" strokeLinecap="round" />
-      <path d={LOGO_PATHS.left} pathLength="100" fill="none" stroke={palette.left} strokeWidth="10" strokeLinecap="round" />
-      <circle cx={LOGO_PATHS.bindu.cx} cy={LOGO_PATHS.bindu.cy} r={LOGO_PATHS.bindu.r} fill={palette.bindu} />
+      <g className="tk-bail">
+        <rect {...L.bail} fill={`url(#${ids.gold})`} stroke={L.edge} strokeWidth="1.2" />
+        <path d={L.bailRidges} stroke={L.edge} strokeWidth="0.9" strokeOpacity="0.7" />
+      </g>
+      <path className="tk-body" d={L.body} pathLength="100" fill={`url(#${ids.gold})`} stroke={L.edge} strokeWidth="1.6" strokeLinejoin="round" />
+      <g className="tk-detail">
+        <path d={L.inner} fill="none" stroke={L.edge} strokeWidth="1.1" strokeOpacity="0.55" />
+        <ellipse {...L.boss} fill={`url(#${ids.shine})`} stroke={L.edge} strokeWidth="1" />
+        <path d={L.drop} fill={`url(#${ids.shine})`} stroke={L.edge} strokeWidth="0.8" />
+      </g>
+      {L.beads.map(([cx, cy], i) => (
+        <circle key={cx} className={`tk-bead tk-bead-${i + 1}`} style={{ transformOrigin: `${cx}px ${cy}px` }} cx={cx} cy={cy} r={L.beadR} fill={`url(#${ids.shine})`} stroke={L.edge} strokeWidth="0.8" />
+      ))}
+      {animated && (
+        <g clipPath={`url(#${ids.clip})`}>
+          <g transform="skewX(-18)"><rect className="tk-glint" x="-40" y="0" width="34" height="120" fill={`url(#${ids.band})`} /></g>
+        </g>
+      )}
     </svg>
   );
 }
@@ -29,8 +60,8 @@ export function Brand({ dark = false, tagline = true, size = 36 }) {
     <span className="brand">
       <LogoMark size={size} variant={dark ? 'onDark' : 'onLight'} />
       <span className="stack" style={{ '--gap': '1px' }}>
-        <span className="brand-name" style={{ color: dark ? 'var(--on-dark)' : 'var(--text)' }}>{APP_NAME}</span>
-        {tagline && <span className="brand-tag">{APP_TAGLINE}</span>}
+        <span className={cx('brand-name', dark ? 'tk-gold-text' : 'tk-gold-text-deep')}>{APP_NAME}</span>
+        {tagline && <span className="brand-tag">{t(APP_TAGLINE)}</span>}
       </span>
     </span>
   );
@@ -61,7 +92,7 @@ export function Toggle({ value, onChange, disabled, label }) {
   );
 }
 
-export function ScoreRing({ score = 0, size = 72, dark = false, label = 'ALIGNED' }) {
+export function ScoreRing({ score = 0, size = 72, dark = false, label = t('ALIGNED') }) {
   const inner = size - Math.max(10, size * 0.14);
   return (
     <span
@@ -132,7 +163,7 @@ export function Modal({ title, onClose, children, width }) {
       <div className="modal fade-in" role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined} style={width ? { maxWidth: width } : undefined}>
         <div className="row between" style={{ alignItems: 'flex-start' }}>
           <div className="h1 grow" style={{ fontSize: 26 }}>{title}</div>
-          <button className="icon-btn" onClick={onClose} aria-label="Close"><X size={18} /></button>
+          <button className="icon-btn" onClick={onClose} aria-label={t('Close')}><X size={18} /></button>
         </div>
         {children}
       </div>
@@ -140,13 +171,14 @@ export function Modal({ title, onClose, children, width }) {
   );
 }
 
-export function LoadingScreen({ leaving = false, message = 'Aligning your matches…' }) {
+export function LoadingScreen({ leaving = false, message = t('Aligning your matches…') }) {
   return (
     <div className={cx('splash', leaving && 'leaving')} aria-busy="true">
       <LogoMark size={150} variant="onDark" animated />
       <div className="stack fade-in" style={{ '--gap': '8px', alignItems: 'center', animationDelay: '900ms' }}>
-        <div className="splash-name">{APP_NAME}</div>
-        <div className="brand-tag" style={{ fontSize: 12 }}>{APP_TAGLINE}</div>
+        <div className="splash-name tk-gold-text">{APP_NAME}</div>
+        <div className="splash-suffix tk-gold-text">{APP_NAME_SUFFIX}</div>
+        <div className="brand-tag tk-gold-text" style={{ fontSize: 12 }}>{t(APP_TAGLINE)}</div>
       </div>
       <div className="splash-bar"><span /></div>
       <div className="small" style={{ color: 'rgba(255,246,238,0.6)' }}>{message}</div>

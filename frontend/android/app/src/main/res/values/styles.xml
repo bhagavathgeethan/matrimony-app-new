@@ -17,7 +17,7 @@
         <item name="android:navigationBarColor">@color/sangamIvory</item>
     </style>
 
-    <!-- Launch splash in Sangam wine; Android 12+ shows the logo on this colour -->
+    <!-- Launch splash in 3Knot wine; Android 12+ shows the logo on this colour -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
         <item name="windowSplashScreenBackground">@color/sangamWine</item>

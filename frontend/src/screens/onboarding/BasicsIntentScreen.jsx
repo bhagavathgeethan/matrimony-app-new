@@ -4,6 +4,7 @@ import { Ban } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { OnboardingScreen, StepBar, FadeIn, Eyebrow, Heading, Accent, Button, Card, Chip } from '../../components/ui/kit';
+import { t } from '@shared/i18n';
 
 const { colors, fonts, radii } = theme;
 
@@ -13,7 +14,7 @@ const INVOLVEMENT = ['I decide alone', 'I consult my parents', 'Parents lead'];
 
 const Field = ({ label, value, onChangeText, placeholder, style }) => (
   <View style={[{ gap: 6 }, style]}>
-    <Text style={styles.label}>{label}</Text>
+    <Text style={styles.label}>{t(label)}</Text>
     <TextInput
       value={value}
       onChangeText={onChangeText}
@@ -26,10 +27,10 @@ const Field = ({ label, value, onChangeText, placeholder, style }) => (
 
 const ChipGroup = ({ label, options, value, onChange }) => (
   <View style={{ gap: 8 }}>
-    <Text style={styles.label}>{label}</Text>
+    <Text style={styles.label}>{t(label)}</Text>
     <View style={styles.chips}>
       {options.map(([key, text]) => (
-        <Chip key={key} label={text} active={value === key} onPress={() => onChange(key)} />
+        <Chip key={key} label={t(text)} active={value === key} onPress={() => onChange(key)} />
       ))}
     </View>
   </View>
@@ -75,41 +76,41 @@ export const BasicsIntentScreen = () => {
           ) : (
             <View style={styles.notice}>
               <Ban size={13} color={colors.accent} />
-              <Text style={styles.noticeText}>No complexion fields. Matching scores use values only.</Text>
+              <Text style={styles.noticeText}>{t('No complexion fields. Matching scores use values only.')}</Text>
             </View>
           )}
-          <Button label={saving ? 'Saving…' : 'Next — about you'} disabled={!complete || saving} onPress={handleNext} />
+          <Button label={saving ? t('Saving…') : t('Next — about you')} disabled={!complete || saving} onPress={handleNext} />
         </>
       }
     >
       <FadeIn>
         <View style={styles.header}>
-          <Eyebrow>Step 02 / 05 · Basics</Eyebrow>
+          <Eyebrow>{t('Step 02 / 05 · Basics')}</Eyebrow>
           <Heading size={34}>
-            The short version <Accent>of you</Accent>
+            {t('The short version')}{' '}<Accent>{t('of you')}</Accent>
           </Heading>
         </View>
       </FadeIn>
 
       <FadeIn delay={80}>
         <Card style={{ gap: 12 }} padding={16}>
-          <Field label="First name" value={firstName} onChangeText={setFirstName} placeholder="Your first name" />
+          <Field label={t('First name')} value={firstName} onChangeText={setFirstName} placeholder={t('Your first name')} />
           <View style={styles.twoCol}>
-            <Field label="Born" value={born} onChangeText={setBorn} placeholder="e.g. Mar 1997" style={{ flex: 1 }} />
-            <Field label="Lives in" value={city} onChangeText={setCity} placeholder="e.g. Bengaluru" style={{ flex: 1 }} />
+            <Field label={t('Born')} value={born} onChangeText={setBorn} placeholder={t('e.g. Mar 1997')} style={{ flex: 1 }} />
+            <Field label={t('Lives in')} value={city} onChangeText={setCity} placeholder={t('e.g. Bengaluru')} style={{ flex: 1 }} />
           </View>
         </Card>
       </FadeIn>
 
       <FadeIn delay={140}>
-        <ChipGroup label="I am" options={GENDERS} value={gender} onChange={setGender} />
+        <ChipGroup label={t('I am')} options={GENDERS} value={gender} onChange={setGender} />
       </FadeIn>
       <FadeIn delay={180}>
-        <ChipGroup label="Hoping to marry" options={TIMELINES} value={timeline} onChange={setTimeline} />
+        <ChipGroup label={t('Hoping to marry')} options={TIMELINES} value={timeline} onChange={setTimeline} />
       </FadeIn>
       <FadeIn delay={220}>
         <ChipGroup
-          label="Family involvement"
+          label={t('Family involvement')}
           options={INVOLVEMENT.map((v) => [v, v])}
           value={familyInvolvement}
           onChange={setFamilyInvolvement}

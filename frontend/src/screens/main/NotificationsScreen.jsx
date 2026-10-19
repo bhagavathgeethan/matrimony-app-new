@@ -5,6 +5,7 @@ import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { Screen, TopBar, FadeIn, Eyebrow, Heading, Body, Card, Divider, SectionLabel, Button } from '../../components/ui/kit';
 import { NotificationRow } from '../../components/notifications/NotificationUI';
+import { t } from '@shared/i18n';
 
 const { colors, fonts } = theme;
 const isToday = (iso) => new Date(iso).toDateString() === new Date().toDateString();
@@ -36,16 +37,16 @@ export const NotificationsScreen = () => {
             style={[styles.markAll, !unreadNotifications && { opacity: 0.4 }]}
           >
             <CheckCheck size={15} color={colors.accent} />
-            <Text style={styles.markAllText}>Mark all read</Text>
+            <Text style={styles.markAllText}>{t('Mark all read')}</Text>
           </TouchableOpacity>
         }
       />
 
       <FadeIn>
         <View style={{ gap: 6 }}>
-          <Eyebrow>Inbox</Eyebrow>
-          <Heading size={36}>Notifications</Heading>
-          <Body size={13.5}>{unreadNotifications ? `${unreadNotifications} unread` : 'You’re all caught up'}</Body>
+          <Eyebrow>{t('Inbox')}</Eyebrow>
+          <Heading size={36}>{t('Notifications')}</Heading>
+          <Body size={13.5}>{unreadNotifications ? `${unreadNotifications} unread` : t('You’re all caught up')}</Body>
         </View>
       </FadeIn>
 
@@ -53,14 +54,14 @@ export const NotificationsScreen = () => {
         <Card variant="tinted" style={styles.empty}>
           <Bell size={28} color={colors.gold} />
           <Body style={{ textAlign: 'center' }}>
-            New messages, aligned matches and family responses will show up here.
+            {t('New messages, aligned matches and family responses will show up here.')}
           </Body>
         </Card>
       ) : (
         groups.map(([label, items]) => items.length > 0 && (
           <FadeIn key={label} delay={60}>
             <View style={{ gap: 8 }}>
-              <SectionLabel>{label}</SectionLabel>
+              <SectionLabel>{t(label)}</SectionLabel>
               <Card padding={0} style={{ overflow: 'hidden' }}>
                 {items.map((n, i) => (
                   <View key={n.id}>
@@ -76,7 +77,7 @@ export const NotificationsScreen = () => {
 
       {notificationsCursor && (
         <Button
-          label={loadingMore ? 'Loading…' : 'Load older'}
+          label={loadingMore ? t('Loading…') : t('Load older')}
           variant="secondary"
           disabled={loadingMore}
           onPress={async () => {

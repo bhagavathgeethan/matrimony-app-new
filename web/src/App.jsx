@@ -25,8 +25,10 @@ import { StoriesPage } from './pages/app/Stories';
 import { SafetyPage } from './pages/app/Safety';
 import { PreferencesPage } from './pages/app/Preferences';
 import { AdminPage } from './pages/app/Admin';
+import { AssistedPage } from './pages/app/Assisted';
 import { PortalPage } from './pages/Portal';
 import { NotFoundPage } from './pages/NotFound';
+import { t } from '@shared/i18n';
 
 // Branded loading screen while a saved session is being restored (min ~1.6s so the logo animation plays)
 function SplashGate({ children }) {
@@ -35,16 +37,16 @@ function SplashGate({ children }) {
   const [phase, setPhase] = useState(authStatus === 'checking' ? 'showing' : 'done');
 
   useEffect(() => {
-    const t = setTimeout(() => setMinElapsed(true), 1600);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setMinElapsed(true), 2600);
+    return () => clearTimeout(timer);
   }, []);
   useEffect(() => {
     if (phase === 'showing' && authStatus !== 'checking' && minElapsed) setPhase('leaving');
   }, [phase, authStatus, minElapsed]);
   useEffect(() => {
     if (phase !== 'leaving') return undefined;
-    const t = setTimeout(() => setPhase('done'), 420);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setPhase('done'), 420);
+    return () => clearTimeout(timer);
   }, [phase]);
 
   return (
@@ -81,7 +83,7 @@ function RequireAdmin() {
       <header className="admin-top">
         <Link to="/" className="row" style={{ '--gap': '8px' }}><Brand tagline={false} size={28} /></Link>
         <span className="row small" style={{ '--gap': '14px' }}>
-          {user.onboarding?.completed && <Link to="/matches">Back to the app</Link>}
+          {user.onboarding?.completed && <Link to="/matches">{t('Back to the app')}</Link>}
         </span>
       </header>
       <Outlet />
@@ -142,6 +144,7 @@ export default function App() {
                 <Route path="/today" element={<TodayPage />} />
                 <Route path="/shortlist" element={<ShortlistPage />} />
                 <Route path="/premium" element={<PremiumPage />} />
+                <Route path="/premium/assisted" element={<AssistedPage />} />
                 <Route path="/profile/verification" element={<VerificationPage />} />
                 <Route path="/profile/preferences" element={<PreferencesPage />} />
                 <Route path="/stories" element={<StoriesPage />} />

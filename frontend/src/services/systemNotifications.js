@@ -3,6 +3,7 @@
 // Remote push (app fully closed) arrives via FCM once a real push provider is connected.
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { notificationText, t } from '@shared/i18n';
 
 const native = Capacitor.isNativePlatform();
 let ready = false;
@@ -19,8 +20,8 @@ export const systemNotifications = {
       if (perm.display !== 'granted') await LocalNotifications.requestPermissions();
       await LocalNotifications.createChannel({
         id: 'sangam',
-        name: 'Sangam',
-        description: 'Messages, matches and family responses',
+        name: '3Knot',
+        description: t('Messages, matches and family responses'),
         importance: 4,
         visibility: 1,
       });
@@ -39,8 +40,8 @@ export const systemNotifications = {
         notifications: [
           {
             id: nextId++,
-            title: n.title,
-            body: n.body,
+            title: notificationText(n).title,
+            body: notificationText(n).body,
             channelId: 'sangam',
             smallIcon: 'ic_launcher_foreground',
             extra: { notification: n },

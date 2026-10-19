@@ -53,17 +53,25 @@ function computeMatchScore(userBlueprint, candidateBlueprint) {
   };
 }
 
-function synthesizeArchetype(blueprint) {
-  const moneyDesc = blueprint.money > 60 ? "saver" : "spender who lives for now";
-  const rootsDesc = blueprint.roots < 45 ? "who'd move cities for the right role" : "anchored to family roots";
-  const kidsDesc = blueprint.kids > 50 ? "wants kids within a few years" : "focused on shared partnership";
-  const ambitionDesc = blueprint.ambition > 70 ? "won't apologise for ambition" : "protects evening work-life balance";
+// Plain-language summary. Values near the middle get a neutral phrase instead of being pushed to one side.
+// Keep in step with blueprintSummary in shared/constants.js.
+function archetypeParts(bp) {
+  return {
+    money: bp.money > 60 ? 'saver' : bp.money < 40 ? 'spender who lives for now' : 'balanced saver-spender',
+    roots: bp.roots < 40 ? 'who’d move cities for the right role' : bp.roots > 60 ? 'anchored to family roots' : 'flexible about where to live',
+    kids: bp.kids > 55 ? 'wants kids within a few years' : bp.kids < 40 ? 'focused on shared partnership' : 'open on when to have kids',
+    ambition: bp.ambition > 70 ? 'won’t apologise for ambition' : bp.ambition <= 40 ? 'protects evening work-life balance' : 'balances career and home',
+  };
+}
 
-  return `In short: a ${moneyDesc} ${rootsDesc}, ${kidsDesc}, and ${ambitionDesc}.`;
+function synthesizeArchetype(blueprint) {
+  const p = archetypeParts(blueprint);
+  return `In short: a ${p.money} ${p.roots}, ${p.kids}, and ${p.ambition}.`;
 }
 
 module.exports = {
   calculatePillarOverlap,
   computeMatchScore,
-  synthesizeArchetype
+  synthesizeArchetype,
+  archetypeParts
 };

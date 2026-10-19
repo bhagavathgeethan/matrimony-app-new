@@ -3,6 +3,7 @@
 import {
   MARITAL_STATUS, LANGUAGES, RELIGIONS, EDUCATION, EMPLOYED_IN, INDIAN_STATES, HEIGHT_RANGE, formatHeight, isFilled,
 } from './profileFields.js';
+import { t } from './i18n.js';
 
 const EATING = ['Vegetarian', 'Eggetarian', 'Non vegetarian', 'Vegan'];
 const SMOKING = ['Never smokes', 'Smokes occasionally', 'Smokes regularly'];
@@ -53,16 +54,20 @@ export function validatePreferences(input) {
   return { values, errors };
 }
 
+// In the interface language (English on the server)
 export function describePreference(f, value) {
-  if (!isFilled(value)) return 'Any';
+  if (!isFilled(value)) return t('Any');
   if (f.type === 'range') {
-    const fmt = f.format || ((n) => `${n} ${f.unit}`);
-    if (value.min != null && value.max != null) return f.key === 'age' ? `${value.min}–${value.max} yrs` : `${fmt(value.min)} – ${fmt(value.max)}`;
-    if (value.min != null) return `${f.key === 'age' ? `${value.min} yrs` : fmt(value.min)} or more`;
-    return `Up to ${f.key === 'age' ? `${value.max} yrs` : fmt(value.max)}`;
+    const fmt = f.key === 'age' ? (n) => t('{n} yrs', { n }) : (f.format || ((n) => `${n} ${f.unit}`));
+    if (value.min != null && value.max != null) return `${fmt(value.min)} – ${fmt(value.max)}`;
+    if (value.min != null) return t('{value} or more', { value: fmt(value.min) });
+    return t('Up to {value}', { value: fmt(value.max) });
   }
-  return value.join(', ');
+  return value.map((v) => t(v)).join(', ');
 }
+
+// What a preferenceMatch item asked for, in the interface language
+export const preferenceWanted = (item) => (item.want !== undefined && PREFERENCE_BY_KEY[item.key] ? describePreference(PREFERENCE_BY_KEY[item.key], item.want) : item.wanted);
 
 // How well a person ({ age, details }) fits a set of preferences. Only preferences that were set count.
 // A preference on a detail the person hasn't filled in counts as "unknown", not as a miss.
@@ -79,7 +84,7 @@ export function preferenceMatch(prefs, person) {
     if (value === undefined || value === null || value === '') met = null;
     else if (f.type === 'range') met = (want.min == null || value >= want.min) && (want.max == null || value <= want.max);
     else met = want.includes(value);
-    items.push({ key: f.key, label: f.label, met, wanted: describePreference(f, want) });
+    items.push({ key: f.key, label: f.label, met, want, wanted: describePreference(f, want) });
   }
   const total = items.length;
   const met = items.filter((i) => i.met === true).length;

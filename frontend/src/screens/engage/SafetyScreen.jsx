@@ -18,7 +18,7 @@ export const SafetyScreen = () => {
     <Screen tabBar>
       <TopBar onBack={() => setCurrentScreen('blueprint-summary')} title={t('Safety')} />
       <View style={{ gap: 6, marginBottom: 14 }}>
-        <Eyebrow>Safety centre</Eyebrow>
+        <Eyebrow>{t('Safety centre')}</Eyebrow>
         <Heading size={30}>{t('Stay safe while you meet')}</Heading>
       </View>
       <Card padding={6} style={{ marginBottom: 14 }}>
@@ -28,20 +28,20 @@ export const SafetyScreen = () => {
             <View style={styles.tip}>
               <ShieldCheck size={18} color={colors.success} />
               <View style={{ flex: 1, gap: 2 }}>
-                <Text style={styles.title}>{title}</Text>
-                <Body size={13}>{body}</Body>
+                <Text style={styles.title}>{t(title)}</Text>
+                <Body size={13}>{t(body)}</Body>
               </View>
             </View>
           </View>
         ))}
       </Card>
       <Card style={{ gap: 12 }}>
-        <Text style={styles.label}>Blocked members</Text>
-        {blocks.length === 0 && <Body size={13}>You haven’t blocked anyone. Block or report from any profile or chat.</Body>}
+        <Text style={styles.label}>{t('Blocked members')}</Text>
+        {blocks.length === 0 && <Body size={13}>{t('You haven’t blocked anyone. Block or report from any profile or chat.')}</Body>}
         {blocks.map((b) => (
           <View key={b.userId} style={styles.blocked}>
             <Text style={[styles.title, { flex: 1 }]}>{b.firstName}{b.age ? `, ${b.age}` : ''} <Text style={styles.meta}>{b.city}</Text></Text>
-            <Button small variant="secondary" label="Unblock" onPress={() => unblockMember(b.userId)} />
+            <Button small variant="secondary" label={t('Unblock')} onPress={() => unblockMember(b.userId)} />
           </View>
         ))}
       </Card>

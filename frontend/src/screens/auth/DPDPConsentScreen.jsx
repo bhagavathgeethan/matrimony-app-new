@@ -6,6 +6,7 @@ import { useApp } from '../../context/AppContext';
 import {
   OnboardingScreen, StepBar, FadeIn, Eyebrow, Heading, Accent, Body, Button, Card, Toggle, IconBadge, Badge, Divider,
 } from '../../components/ui/kit';
+import { t } from '@shared/i18n';
 
 const { colors, fonts } = theme;
 
@@ -43,21 +44,21 @@ export const DPDPConsentScreen = () => {
         <>
           {error && <Text style={styles.error}>{error}</Text>}
           <Button
-            label={saving ? 'Saving…' : editing ? 'Save consents' : 'Agree & continue'}
+            label={saving ? t('Saving…') : editing ? t('Save consents') : t('Agree & continue')}
             disabled={saving}
             onPress={handleContinue}
           />
-          <Text style={styles.notice}>Read the full notice</Text>
+          <Text style={styles.notice}>{t('Read the full notice')}</Text>
         </>
       }
     >
       <FadeIn>
         <View style={styles.header}>
-          <Eyebrow>Step 01 / 05 · Consent</Eyebrow>
+          <Eyebrow>{t('Step 01 / 05 · Consent')}</Eyebrow>
           <Heading size={34}>
-            What you’re <Accent>agreeing to</Accent>
+            {t('What you’re')}{' '}<Accent>{t('agreeing to')}</Accent>
           </Heading>
-          <Body size={14}>Granular, itemised, and reversible any time from Settings.</Body>
+          <Body size={14}>{t('Granular, itemised, and reversible any time from Settings.')}</Body>
         </View>
       </FadeIn>
 
@@ -70,10 +71,10 @@ export const DPDPConsentScreen = () => {
                 <IconBadge icon={item.icon} tone={item.value ? 'accent' : 'neutral'} size={34} />
                 <View style={{ flex: 1, gap: 2 }}>
                   <View style={styles.titleRow}>
-                    <Text style={styles.itemTitle}>{item.title}</Text>
-                    {item.required && <Badge label="Required" tone="gold" icon={Lock} />}
+                    <Text style={styles.itemTitle}>{t(item.title)}</Text>
+                    {item.required && <Badge label={t('Required')} tone="gold" icon={Lock} />}
                   </View>
-                  <Text style={styles.itemDesc}>{item.desc}</Text>
+                  <Text style={styles.itemDesc}>{t(item.desc)}</Text>
                 </View>
                 <Toggle value={item.value} onChange={item.set} disabled={item.required} />
               </View>
@@ -86,8 +87,8 @@ export const DPDPConsentScreen = () => {
         <Card variant="dark" style={styles.rightsCard} padding={14}>
           <Scale size={18} color={colors.gold} />
           <Text style={styles.rightsText}>
-            <Text style={styles.rightsTitle}>Your DPDP rights. </Text>
-            Download everything, correct it, or ask for full erasure within 72 hours.
+            <Text style={styles.rightsTitle}>{t('Your DPDP rights.')}{' '}</Text>
+            {t('Download everything, correct it, or ask for full erasure within 72 hours.')}
           </Text>
         </Card>
       </FadeIn>

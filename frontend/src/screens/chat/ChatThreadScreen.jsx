@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { ArrowUp, ShieldCheck, Lightbulb, MessageCircle, Phone, Video, Heart, Send } from 'lucide-react';
-import { SafetyRow } from '../../components/engage/EngageUI';
+import { SafetyRow, CandidateSheet } from '../../components/engage/EngageUI';
+import { VoiceRecorderButton, VoiceNote, ContactShare } from '../../components/engage/PremiumUI';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { TopBar, Avatar, Body, Button, Card } from '../../components/ui/kit';
-import { t } from '@shared/i18n';
+import { t, formatTime } from '@shared/i18n';
 
 const { colors, fonts, gradients, radii } = theme;
 
@@ -16,9 +17,10 @@ export const ChatThreadScreen = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [busy, setBusy] = useState(null);
   const [callError, setCallError] = useState(null);
+  const [viewingProfile, setViewingProfile] = useState(false); // the other person's full profile
 
   // Never fall back to another person's thread: messages must go to the right match
-  const activeThread = conversations.find((t) => t.id === activeThreadId);
+  const activeThread = conversations.find((conv) => conv.id === activeThreadId);
   const candidate = candidates.find((c) => c.id === activeThread?.candidateId);
   const messages = threadMessages[activeThreadId] || [];
 
@@ -27,14 +29,14 @@ export const ChatThreadScreen = () => {
       <View style={[styles.container, styles.empty]}>
         <Card variant="tinted" style={{ alignItems: 'center', gap: 14, paddingVertical: 32 }}>
           <MessageCircle size={28} color={colors.gold} />
-          <Body style={{ textAlign: 'center' }}>Pick a conversation from Chats, or start one from your feed.</Body>
-          <Button label="Go to Chats" variant="secondary" small onPress={() => setCurrentScreen('conversations')} />
+          <Body style={{ textAlign: 'center' }}>{t('Pick a conversation from Chats, or start one from your feed.')}</Body>
+          <Button label={t('Go to Chats')} variant="secondary" small onPress={() => setCurrentScreen('conversations')} />
         </Card>
       </View>
     );
   }
 
-  const candidateName = activeThread.candidateName || candidate?.firstName || 'Match';
+  const candidateName = activeThread.candidateName || candidate?.firstName || t('Match');
   const candidateAge = activeThread.candidateAge ?? candidate?.age;
   const overlapScore = candidate?.overlapScores?.overall ?? activeThread.overlapScore;
   const candidateCity = activeThread.candidateCity || candidate?.city || '';
@@ -68,24 +70,30 @@ export const ChatThreadScreen = () => {
         <TopBar
           onBack={() => setCurrentScreen('conversations')}
           title={
-            <View style={styles.headerCenter}>
+            <TouchableOpacity
+              style={styles.headerCenter}
+              disabled={activeThread.isFormerMember}
+              onPress={() => setViewingProfile(true)}
+              accessibilityRole="button"
+              accessibilityLabel={t('Full profile')}
+            >
               <Avatar uri={activeThread.candidatePhoto} name={candidateName} size={40} />
-              <View style={{ gap: 1 }}>
+              <View style={{ gap: 1, flexShrink: 1 }}>
                 <Text style={styles.headerName}>
                   {candidateName}{candidateAge ? `, ${candidateAge}` : ''}
                 </Text>
                 <Text style={styles.headerMeta}>
-                  {overlapScore != null ? `${overlapScore}% aligned` : 'Sangam'}{candidateCity ? ` · ${candidateCity}` : ''}
+                  {overlapScore != null ? t('{overlapScore}% aligned', { overlapScore }) : t('3Knot')}{candidateCity ? ` · ${candidateCity}` : ''}
                 </Text>
               </View>
-            </View>
+            </TouchableOpacity>
           }
           right={activeThread.status === 'accepted' && !activeThread.isFormerMember ? (
             <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity onPress={() => startCall('audio')} style={styles.callIcon} accessibilityLabel={`Voice call ${candidateName}`}>
+              <TouchableOpacity onPress={() => startCall('audio')} style={styles.callIcon} accessibilityLabel={t('Voice call {candidateName}', { candidateName })}>
                 <Phone size={17} color={colors.textPrimary} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => startCall('video')} style={[styles.callIcon, { backgroundColor: colors.accentSoft }]} accessibilityLabel={`Video call ${candidateName}`}>
+              <TouchableOpacity onPress={() => startCall('video')} style={[styles.callIcon, { backgroundColor: colors.accentSoft }]} accessibilityLabel={t('Video call {candidateName}', { candidateName })}>
                 <Video size={17} color={colors.accent} />
               </TouchableOpacity>
             </View>
@@ -96,7 +104,7 @@ export const ChatThreadScreen = () => {
 
       <ScrollView contentContainerStyle={styles.messages} showsVerticalScrollIndicator={false}>
         <View style={styles.matchedPill}>
-          <Text style={styles.matchedText}>{activeThread.matchedDaysAgo || 'MATCHED'}</Text>
+          <Text style={styles.matchedText}>{t(activeThread.matchedDaysAgo || 'MATCHED')}</Text>
         </View>
 
         {activeThread.needsMyResponse && (
@@ -105,10 +113,10 @@ export const ChatThreadScreen = () => {
               <Heart size={18} color={colors.accent} />
               <Text style={styles.requestTitle}>{t('{name} is interested in you', { name: candidateName })}</Text>
             </View>
-            <Text style={styles.requestText}>Accept to chat, see each other’s photos and video call. Declining is private.</Text>
+            <Text style={styles.requestText}>{t('Accept to chat, see each other’s photos and video call. Declining is private.')}</Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <Button variant="secondary" small label={busy === 'decline' ? '…' : t('Decline')} disabled={!!busy} onPress={() => respond(false)} style={{ flex: 1 }} />
-              <Button small icon={Heart} label={busy === 'accept' ? 'Accepting…' : t('Accept')} disabled={!!busy} onPress={() => respond(true)} style={{ flex: 1 }} />
+              <Button small icon={Heart} label={busy === 'accept' ? t('Accepting…') : t('Accept')} disabled={!!busy} onPress={() => respond(true)} style={{ flex: 1 }} />
             </View>
           </View>
         )}
@@ -117,11 +125,11 @@ export const ChatThreadScreen = () => {
           <View style={styles.opener}>
             <View style={styles.openerHead}>
               <Lightbulb size={14} color="#8A6A2E" />
-              <Text style={styles.openerTag}>Conversation starters</Text>
+              <Text style={styles.openerTag}>{t('Conversation starters')}</Text>
             </View>
             {activeThread.conversationPrompts.map((p) => (
               <TouchableOpacity key={p} onPress={() => setInputMessage(p)} accessibilityRole="button">
-                <Text style={styles.openerText}>• {p}</Text>
+                <Text style={styles.openerText}>• {t(p)}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -130,9 +138,9 @@ export const ChatThreadScreen = () => {
           <View style={styles.opener}>
             <View style={styles.openerHead}>
               <Lightbulb size={14} color="#8A6A2E" />
-              <Text style={styles.openerTag}>Suggested opener</Text>
+              <Text style={styles.openerTag}>{t('Suggested opener')}</Text>
             </View>
-            <Text style={styles.openerText}>{candidate.suggestedOpener}</Text>
+            <Text style={styles.openerText}>{t(candidate.suggestedOpener)}</Text>
           </View>
         )}
         {messages.map((msg) => {
@@ -140,10 +148,12 @@ export const ChatThreadScreen = () => {
           return (
             <View key={msg.id} style={[styles.bubbleRow, isMe && { justifyContent: 'flex-end' }]}>
               <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
-                <Text style={[styles.bubbleText, isMe && { color: colors.white }]}>{msg.text}</Text>
+                {msg.kind === 'voice'
+                  ? <VoiceNote message={msg} mine={isMe} />
+                  : <Text style={[styles.bubbleText, isMe && { color: colors.white }]}>{msg.text}</Text>}
                 <Text style={[styles.bubbleTime, isMe && { color: 'rgba(255,255,255,0.7)' }]}>
-                  {msg.failed ? `Not sent — ${msg.error || 'try again'}` : msg.pending ? 'Sending…' : msg.timestamp}
-                  {msg.id === lastMine?.id && msg.seen !== undefined ? (msg.seen ? ' · Seen' : ' · Delivered') : ''}
+                  {msg.failed ? t('Not sent — {reason}', { reason: msg.error || t('try again') }) : msg.pending ? t('Sending…') : (msg.createdAt ? formatTime(msg.createdAt) : msg.timestamp)}
+                  {msg.id === lastMine?.id && msg.seen !== undefined ? (msg.seen ? t(' · Seen') : t(' · Delivered')) : ''}
                 </Text>
               </View>
             </View>
@@ -152,8 +162,9 @@ export const ChatThreadScreen = () => {
 
         <View style={styles.shield}>
           <ShieldCheck size={13} color={colors.success} />
-          <Text style={styles.shieldText}>Chats are never visible on a parent dashboard.</Text>
+          <Text style={styles.shieldText}>{t('Chats are never visible on a parent dashboard.')}</Text>
         </View>
+        {activeThread.status === 'accepted' && !activeThread.isFormerMember && <ContactShare thread={activeThread} />}
         {activeThread.candidateId && (
           <SafetyRow member={{ id: activeThread.candidateId, firstName: candidateName }} onDone={() => setCurrentScreen('conversations')} />
         )}
@@ -161,23 +172,24 @@ export const ChatThreadScreen = () => {
 
       {activeThread.isFormerMember ? (
         <View style={styles.composer}>
-          <Text style={styles.emptyHint}>This member has left Sangam. Your conversation is kept for you.</Text>
+          <Text style={styles.emptyHint}>{t('This member has left 3Knot. Your conversation is kept for you.')}</Text>
         </View>
       ) : !canChat ? (
         <View style={styles.composer}>
           <Send size={15} color={colors.gold} />
           <Text style={[styles.emptyHint, { flex: 1, textAlign: 'left' }]}>
             {activeThread.status === 'declined'
-              ? `${candidateName} isn’t available right now.`
-              : `Interest sent — you can write more once ${candidateName} accepts.`}
+              ? t('{candidateName} isn’t available right now.', { candidateName })
+              : t('Interest sent — you can write more once {candidateName} accepts.', { candidateName })}
           </Text>
         </View>
       ) : (
       <View style={styles.composer}>
+        {activeThread.status === 'accepted' && <VoiceRecorderButton conversationId={activeThread.id} />}
         <TextInput
           value={inputMessage}
           onChangeText={setInputMessage}
-          placeholder={activeThread.needsMyResponse ? 'Reply to accept…' : 'Write a message…'}
+          placeholder={activeThread.needsMyResponse ? t('Reply to accept…') : t('Write a message…')}
           placeholderTextColor={colors.textLight}
           style={styles.input}
           onSubmitEditing={handleSend}
@@ -187,11 +199,18 @@ export const ChatThreadScreen = () => {
           onPress={handleSend}
           disabled={!inputMessage.trim()}
           style={[styles.send, !inputMessage.trim() && { opacity: 0.5 }]}
-          accessibilityLabel="Send"
+          accessibilityLabel={t('Send')}
         >
           <ArrowUp size={20} color={colors.white} strokeWidth={2.6} />
         </TouchableOpacity>
       </View>
+      )}
+      {viewingProfile && (
+        <CandidateSheet
+          candidate={candidate || { id: activeThread.candidateId, firstName: candidateName, age: candidateAge, city: candidateCity }}
+          onClose={() => setViewingProfile(false)}
+          onOpenThread={() => {}}
+        />
       )}
     </View>
   );
@@ -354,6 +373,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    minWidth: 0, // a text input's built-in width would otherwise push the send button off narrow screens
     height: 50,
     paddingHorizontal: 18,
     borderRadius: 25,
@@ -366,6 +386,7 @@ const styles = StyleSheet.create({
     outlineStyle: 'none',
   },
   send: {
+    flexShrink: 0,
     width: 50,
     height: 50,
     borderRadius: 25,

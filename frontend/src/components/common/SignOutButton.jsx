@@ -16,7 +16,7 @@ export const SignOutButton = ({ style }) => {
   const [busy, setBusy] = useState(false);
   return (
     <>
-      <TouchableOpacity onPress={() => setAsking(true)} style={[styles.button, style]} accessibilityRole="button" accessibilityLabel="Sign out">
+      <TouchableOpacity onPress={() => setAsking(true)} style={[styles.button, style]} accessibilityRole="button" accessibilityLabel={t('Sign out')}>
         <LogOut size={17} color={colors.accent} />
         <Text style={styles.text}>{t('Sign out')}</Text>
       </TouchableOpacity>
@@ -26,7 +26,7 @@ export const SignOutButton = ({ style }) => {
           onClose={() => setAsking(false)}
           footer={(
             <Button
-              label={busy ? 'Signing out…' : t('Sign out')}
+              label={busy ? t('Signing out…') : t('Sign out')}
               icon={LogOut}
               disabled={busy}
               onPress={async () => {
@@ -36,7 +36,7 @@ export const SignOutButton = ({ style }) => {
             />
           )}
         >
-          <Body size={14}>You’ll need your phone number and a one-time code to sign in again. Your profile and chats stay as they are.</Body>
+          <Body size={14}>{t('You’ll need your phone number and a one-time code to sign in again. Your profile and chats stay as they are.')}</Body>
         </Sheet>
       )}
     </>

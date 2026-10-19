@@ -1,4 +1,4 @@
-// Mobile app context: screen-based navigation on top of the shared Sangam store (../shared/store.js),
+// Mobile app context: screen-based navigation on top of the shared 3Knot store (../shared/store.js),
 // which owns all data and logic. Screens keep using useApp() exactly as before.
 import React, { createContext, useContext, useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import { createSangamStore } from '@shared/store';
@@ -46,7 +46,7 @@ export const AppProvider = ({ children }) => {
           return;
         }
         if (target === 'conversations') setActiveTab('chats');
-        if (['daily', 'premium', 'verification', 'stories'].includes(target)) setActiveTab(target === 'daily' ? 'feed' : 'me');
+        if (['daily', 'premium', 'verification', 'stories', 'assisted'].includes(target)) setActiveTab(target === 'daily' ? 'feed' : 'me');
         setCurrentScreen(target);
         if (target === 'feed' || target === 'welcome') setActiveTab('feed');
       },

@@ -213,7 +213,7 @@ test.describe('profile and onboarding', () => {
     assert.deepEqual([first.data.blueprint.money, first.data.blueprint.roots], [30, 50]);
     const full = await api('/me/blueprint', { method: 'PUT', token: u.token, body: BP.ananya });
     assert.equal(full.data.blueprint.money, 72);
-    assert.match(full.data.blueprint.summaryText, /saver who'd move cities/);
+    assert.match(full.data.blueprint.summaryText, /saver who’d move cities/);
     assert.equal((await api('/me/blueprint', { method: 'PUT', token: u.token, body: { kids: 120 } })).status, 400);
     assert.equal((await api('/me/blueprint', { method: 'PUT', token: u.token, body: { kidsFlexibility: 'maybe' } })).status, 400);
   });
@@ -524,9 +524,25 @@ test.describe('multi-user flows', () => {
     assert.equal((await api(`/portal/${link.portalToken}/shares/${share.id}/feedback`, { method: 'POST', body: { decision: 'approved' } })).status, 410);
   });
 
+  test('family sign-in in the app: an invited number gets a code and their portal; others are refused', async () => {
+    const stranger = await api('/portal/sign-in/send', { method: 'POST', body: { phone: '9800011122' } });
+    assert.equal(stranger.status, 404);
+    assert.equal(stranger.data.code, 'NO_FAMILY_INVITE');
+    const sent = await api('/portal/sign-in/send', { method: 'POST', body: { phone: '98455 12210' } });
+    assert.equal(sent.status, 200);
+    assert.equal((await api('/portal/sign-in/verify', { method: 'POST', body: { phone: '9845512210', code: '000000' } })).status, 400);
+    const ok = await api('/portal/sign-in/verify', { method: 'POST', body: { phone: '9845512210', code: sent.data.devCode } });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(ok.data.portals.map((p) => [p.token, p.name, p.childName]), [[link.portalToken, 'Amma', 'Ananya']]);
+    // The code works once, and signing in as family creates no member account
+    assert.equal((await api('/portal/sign-in/verify', { method: 'POST', body: { phone: '9845512210', code: sent.data.devCode } })).status, 400);
+    assert.equal((await db.query('SELECT 1 FROM users WHERE phone = $1', ['+919845512210'])).rows.length, 0);
+  });
+
   test('revoking a family member kills their portal link', async () => {
     assert.equal((await api(`/family/links/${link.id}`, { method: 'DELETE', token: ananya.token })).status, 200);
     assert.equal((await api(`/portal/${link.portalToken}`)).status, 404);
+    assert.equal((await api('/portal/sign-in/send', { method: 'POST', body: { phone: '9845512210' } })).status, 404);
   });
 
   test('export contains the user’s data but no portal secrets', async () => {
@@ -629,6 +645,16 @@ test.describe('notifications', () => {
     assert.equal(accepted.data.conversationId, conversationId);
     assert.equal((await api(`/conversations/${conversationId}`, { token: kabir.token })).data.status, 'accepted');
     assert.equal((await inbox(priya.token)).items.find((n) => n.type === 'interest_request').read, true, 'request cleared once answered');
+  });
+
+  test('the interface language is saved per member and notifications carry their translation key', async () => {
+    assert.equal((await api('/me', { token: kabir.token })).data.language, 'en');
+    assert.equal((await api('/me/language', { method: 'PUT', token: kabir.token, body: { language: 'xx' } })).status, 400);
+    assert.equal((await api('/me/language', { method: 'PUT', token: kabir.token, body: { language: 'ta' } })).status, 200);
+    assert.equal((await api('/me', { token: kabir.token })).data.language, 'ta');
+    const accepted = (await inbox(kabir.token)).items.find((n) => n.type === 'interest_accepted');
+    assert.deepEqual(accepted.data.i18n.title, { key: '{name} accepted your interest', vars: { name: 'Priya' } });
+    await api('/me/language', { method: 'PUT', token: kabir.token, body: { language: 'en' } });
   });
 
   test('messages notify live, group per conversation, and never push while the app is open', async () => {
@@ -942,7 +968,9 @@ test.describe('engagement, safety and operations', () => {
     assert.equal((await api('/me/privacy', { method: 'PUT', token: asha.token, body: { incognito: true } })).status, 403);
     const plans = (await api('/premium', { token: asha.token })).data;
     assert.equal(plans.premium, false);
-    assert.equal(plans.plans.length, 3);
+    assert.equal(plans.tier, 'free');
+    assert.deepEqual(plans.tiers.map((t) => t.tier), ['plus', 'premium', 'family']);
+    assert.equal(plans.tiers.flatMap((t) => t.plans).length, 9);
     const order = await api('/premium/checkout', { method: 'POST', token: asha.token, body: { plan: 'premium_3m' } });
     assert.equal(order.status, 201);
     assert.equal((await api('/premium/confirm', { method: 'POST', token: asha.token, body: { paymentId: order.data.paymentId, payload: {} } })).status, 402);
@@ -1178,7 +1206,7 @@ test.describe('engagement, safety and operations', () => {
     const nudge = (await inbox(vasanth.token)).find((n) => n.type === 'profile_nudge');
     assert.match(nudge.title, /^Your profile is \d+% complete$/);
     const again = await runJobsOnce(morning);
-    assert.deepEqual(again, { picks: 0, nudges: 0 }, 'idempotent');
+    assert.deepEqual(again, { picks: 0, nudges: 0, digests: 0 }, 'idempotent');
     const early = new Date(morning);
     early.setUTCHours(0, 0, 0, 0); // 05:30 IST: before picks time
     assert.equal((await runJobsOnce(early)).picks, 0);
@@ -1224,6 +1252,272 @@ test.describe('engagement, safety and operations', () => {
     assert.ok(exp.reportsFiled.some((r) => r.reason === 'money'));
     assert.ok(exp.payments.some((p) => p.status === 'paid'));
     assert.deepEqual(exp.profile.preferences.age, { min: 28, max: 34 });
+  });
+});
+
+// ---------- premium tiers ----------
+
+test.describe('premium tiers', () => {
+  const NEAR = { money: 70, roots: 40, kids: 60, ambition: 75 };
+  const me = (t) => api('/me', { token: t }).then((r) => r.data);
+  const inbox = (t) => api('/notifications', { token: t }).then((r) => r.data.items);
+  const feed = (t) => api('/matches', { token: t }).then((r) => r.data);
+  async function buy(token, code) {
+    const order = await api('/premium/checkout', { method: 'POST', token, body: { plan: code } });
+    assert.equal(order.status, 201, JSON.stringify(order.data));
+    const done = await api('/premium/confirm', { method: 'POST', token, body: { paymentId: order.data.paymentId, payload: { dummyConfirm: true } } });
+    assert.equal(done.status, 200, JSON.stringify(done.data));
+    return done.data;
+  }
+  let tara; let ravi; let suresh; let gopal; let delhiGirl; let admin;
+
+  test.before(async () => {
+    tara = await makeMember({ name: 'Tara', gender: 'woman', blueprint: NEAR });
+    ravi = await makeMember({ name: 'Ravi', gender: 'man', blueprint: NEAR });
+    suresh = await makeMember({ name: 'Suresh', gender: 'man', blueprint: { ...NEAR, roots: 55 } });
+    gopal = await makeMember({ name: 'Gopal', gender: 'man', blueprint: { ...NEAR, kids: 45 } });
+    delhiGirl = await makeMember({ name: 'Dia', gender: 'woman', city: 'Delhi', blueprint: NEAR });
+    admin = await signIn('+919999999999');
+  });
+
+  test('tiers: Plus unlocks unlimited interests and rewind, not Premium features', async () => {
+    assert.equal((await api('/search?heightMin=160', { token: ravi.token })).status, 403, 'advanced filters need Premium');
+    assert.equal((await api('/matches/rewind', { method: 'POST', token: ravi.token })).status, 403);
+    const plus = await buy(ravi.token, 'plus_1m');
+    assert.equal(plus.tier, 'plus');
+    assert.ok(plus.features.includes('rewind') && !plus.features.includes('advancedFilters'));
+    assert.equal((await me(ravi.token)).plan, 'plus');
+    assert.equal((await api('/search?heightMin=160', { token: ravi.token })).status, 403);
+
+    // Rewind brings back the last pass
+    await api(`/matches/${tara.id}/pass`, { method: 'POST', token: ravi.token });
+    assert.ok(!(await feed(ravi.token)).some((c) => c.firstName === 'Tara'));
+    const rw = await api('/matches/rewind', { method: 'POST', token: ravi.token });
+    assert.equal(rw.status, 200);
+    assert.equal(rw.data.candidate.firstName, 'Tara');
+    assert.ok((await feed(ravi.token)).some((c) => c.firstName === 'Tara'));
+  });
+
+  test('upgrading to Premium switches tier, keeps time, and unlocks advanced filters', async () => {
+    const before = new Date((await me(ravi.token)).premiumUntil);
+    const premium = await buy(ravi.token, 'premium_1m');
+    assert.equal(premium.tier, 'premium');
+    assert.ok(new Date(premium.premiumUntil) > new Date(before.getTime() + 25 * 86400000), 'remaining time kept');
+    await api('/me/details', { method: 'PUT', token: tara.token, body: { heightCm: 165, eatingHabits: 'Vegetarian' } });
+    const r = await api('/search?heightMin=160&heightMax=170&eatingHabits=Vegetarian', { token: ravi.token });
+    assert.equal(r.status, 200, JSON.stringify(r.data));
+    assert.ok(r.data.results.some((c) => c.firstName === 'Tara'));
+    assert.ok(r.data.results.every((c) => c.details.heightCm >= 160 && c.details.heightCm <= 170 && c.details.eatingHabits === 'Vegetarian'));
+    assert.ok(!r.data.results.some((c) => c.firstName === 'Dia'), 'no height recorded → excluded');
+    assert.equal((await api('/search?education=Astrology', { token: ravi.token })).status, 400);
+  });
+
+  test('super interests: highlighted, first in Requests, three a week', async () => {
+    await api('/conversations', { method: 'POST', token: suresh.token, body: { candidateId: tara.id, message: 'Hello from Suresh' } });
+    const sup = await api('/conversations', { method: 'POST', token: ravi.token, body: { candidateId: tara.id, message: 'Hi Tara!', super: true } });
+    assert.equal(sup.status, 201, JSON.stringify(sup.data));
+    const list = (await api('/conversations', { token: tara.token })).data.filter((t) => t.needsMyResponse);
+    assert.equal(list[0].candidateName, 'Ravi', 'super interest first');
+    assert.equal(list[0].isSuper, true);
+    assert.ok((await inbox(tara.token)).some((n) => n.title === '⭐ Ravi sent you a super interest'));
+    assert.equal((await api('/conversations', { method: 'POST', token: suresh.token, body: { candidateId: delhiGirl.id, super: true } })).status, 403, 'free cannot');
+    const limits = (await api('/conversations/limits', { token: ravi.token })).data;
+    assert.equal(limits.superInterestsLeft, 2);
+    assert.equal(limits.introMessages, 3);
+  });
+
+  test('Premium senders can add up to three messages before acceptance', async () => {
+    const t = (await api('/conversations', { token: ravi.token })).data.find((x) => x.candidateName === 'Tara');
+    for (const text of ['Second note', 'Third note']) {
+      assert.equal((await api(`/conversations/${t.id}/messages`, { method: 'POST', token: ravi.token, body: { text } })).status, 201);
+    }
+    assert.equal((await api(`/conversations/${t.id}/messages`, { method: 'POST', token: ravi.token, body: { text: 'Fourth' } })).status, 403);
+  });
+
+  test('spotlight: weekly allowance, shown first to strongly aligned members; extra spotlights as credits', async () => {
+    const r = await api('/premium/spotlight', { method: 'POST', token: ravi.token });
+    assert.equal(r.status, 200, JSON.stringify(r.data));
+    assert.ok(r.data.spotlight.active);
+    assert.equal(r.data.spotlight.weeklyLeft, 0);
+    assert.equal((await api('/premium/spotlight', { method: 'POST', token: ravi.token })).status, 409);
+    const viewerFeed = await feed(delhiGirl.token);
+    assert.equal(viewerFeed[0].firstName, 'Ravi');
+    assert.equal(viewerFeed[0].spotlight, true);
+    assert.equal((await api('/premium/spotlight', { method: 'POST', token: suresh.token })).status, 403, 'free without credits');
+    const credit = await buy(suresh.token, 'spotlight_1');
+    assert.equal(credit.spotlight.credits, 1);
+    assert.equal(credit.tier, 'free', 'add-ons do not change the tier');
+  });
+
+  test('trial once; pausing freezes paid time and features, resuming restores them', async () => {
+    const trial = await api('/premium/trial', { method: 'POST', token: gopal.token });
+    assert.equal(trial.status, 200, JSON.stringify(trial.data));
+    assert.equal(trial.data.tier, 'premium');
+    assert.ok(new Date(trial.data.premiumUntil) < new Date(Date.now() + 8 * 86400000));
+    assert.equal((await api('/premium/trial', { method: 'POST', token: gopal.token })).status, 409);
+
+    const paused = await api('/premium/pause', { method: 'POST', token: gopal.token });
+    assert.equal(paused.data.tier, 'free');
+    assert.ok(paused.data.paused.remainingDays >= 6);
+    assert.equal((await api('/search?heightMin=160', { token: gopal.token })).status, 403);
+    const resumed = await api('/premium/resume', { method: 'POST', token: gopal.token });
+    assert.equal(resumed.data.tier, 'premium');
+    assert.equal(resumed.data.paused, null);
+  });
+
+  test('privacy controls: badge choice, hidden last-seen, photo privacy, visibility rules', async () => {
+    // Hiding the badge needs Plus; Ravi (Premium) hides his
+    assert.equal((await api('/me/privacy', { method: 'PUT', token: suresh.token, body: { showPremiumBadge: false } })).status, 403);
+    await api('/me/privacy', { method: 'PUT', token: ravi.token, body: { showPremiumBadge: false, hideActivity: true } });
+    const card = (await feed(tara.token)).find((c) => c.firstName === 'Ravi');
+    assert.equal(card.premium, false);
+    assert.equal(card.activity, null);
+    assert.equal((await api('/me/privacy', { method: 'PUT', token: suresh.token, body: { hideActivity: true } })).status, 403);
+
+    // Photo privacy: 'everyone' shows clear photos before acceptance; 'verified' hides them from unverified viewers
+    assert.equal((await feed(delhiGirl.token)).find((c) => c.firstName === 'Ravi').photoBlurred, true);
+    await api('/me/privacy', { method: 'PUT', token: ravi.token, body: { photoVisibility: 'everyone' } });
+    assert.equal((await feed(delhiGirl.token)).find((c) => c.firstName === 'Ravi').photoBlurred, false);
+    await api('/me/privacy', { method: 'PUT', token: ravi.token, body: { photoVisibility: 'verified' } });
+    assert.equal((await feed(delhiGirl.token)).find((c) => c.firstName === 'Ravi').photoBlurred, true);
+    assert.equal((await api('/me/privacy', { method: 'PUT', token: ravi.token, body: { photoVisibility: 'strangers' } })).status, 400);
+
+    // Visibility rules: hidden from viewers in Delhi
+    assert.equal((await api('/me/privacy', { method: 'PUT', token: suresh.token, body: { visibilityRules: { hideCities: ['Delhi'] } } })).status, 403);
+    const set = await api('/me/privacy', { method: 'PUT', token: ravi.token, body: { visibilityRules: { hideCities: [' delhi '] } } });
+    assert.deepEqual(set.data.visibilityRules.hideCities, ['delhi']);
+    assert.ok(!(await feed(delhiGirl.token)).some((c) => c.firstName === 'Ravi'), 'hidden from Delhi');
+    assert.equal((await api(`/matches/${ravi.id}`, { token: delhiGirl.token })).status, 404);
+    assert.ok(!(await api('/search', { token: delhiGirl.token })).data.results.some((c) => c.firstName === 'Ravi'));
+    assert.ok((await feed(tara.token)).some((c) => c.firstName === 'Ravi'), 'still visible elsewhere');
+    await api('/me/privacy', { method: 'PUT', token: ravi.token, body: { visibilityRules: {}, photoVisibility: null } });
+  });
+
+  test('more like this, and the compatibility report with a signed PDF link', async () => {
+    assert.equal((await api(`/matches/${ravi.id}/similar`, { token: tara.token })).status, 403);
+    const sim = await api(`/matches/${tara.id}/similar`, { token: ravi.token });
+    assert.equal(sim.status, 200, JSON.stringify(sim.data) + JSON.stringify((await api(`/matches/${tara.id}`, { token: ravi.token })).data));
+    assert.ok(sim.data.every((c) => c.id !== tara.id));
+    assert.equal((await api(`/matches/${ravi.id}/compare`, { token: tara.token })).data.topics, null);
+    const cmp = (await api(`/matches/${tara.id}/compare`, { token: ravi.token })).data;
+    assert.ok(cmp.topics.length >= 2);
+    assert.equal((await api(`/matches/${ravi.id}/report-link`, { method: 'POST', token: tara.token })).status, 403);
+    const link = await api(`/matches/${tara.id}/report-link`, { method: 'POST', token: ravi.token });
+    assert.equal(link.status, 200);
+    const pdf = await fetch(`${base}${link.data.path}`);
+    assert.equal(pdf.status, 200);
+    assert.equal(pdf.headers.get('content-type'), 'application/pdf');
+    assert.equal(Buffer.from(await pdf.arrayBuffer()).subarray(0, 4).toString(), '%PDF');
+    assert.equal((await fetch(`${base}${link.data.path}x`)).status, 410, 'tampered link');
+  });
+
+  test('voice notes (Premium to send) and phone-number exchange by mutual consent', async () => {
+    const thread = (await api('/conversations', { token: tara.token })).data.find((t) => t.candidateName === 'Ravi');
+    const voiceForm = (ms) => {
+      const form = new FormData();
+      form.append('audio', new Blob([Buffer.from('fake-webm-audio')], { type: 'audio/webm' }), 'note.webm');
+      form.append('durationMs', String(ms));
+      return form;
+    };
+    assert.equal((await api(`/conversations/${thread.id}/voice`, { method: 'POST', token: ravi.token, form: voiceForm(3000) })).status, 403, 'not accepted yet');
+    await api(`/conversations/${thread.id}/accept`, { method: 'POST', token: tara.token });
+    assert.equal((await api(`/conversations/${thread.id}/voice`, { method: 'POST', token: tara.token, form: voiceForm(3000) })).status, 403, 'free cannot send');
+    assert.equal((await api(`/conversations/${thread.id}/voice`, { method: 'POST', token: ravi.token, form: voiceForm(70000) })).status, 400);
+    const sent = await api(`/conversations/${thread.id}/voice`, { method: 'POST', token: ravi.token, form: voiceForm(3000) });
+    assert.equal(sent.status, 201, JSON.stringify(sent.data));
+    assert.equal(sent.data.message.kind, 'voice');
+    const audio = await fetch(`${base}/api${sent.data.message.audioPath}`, { headers: { Authorization: `Bearer ${tara.token}` } });
+    assert.equal(audio.status, 200);
+    assert.equal(audio.headers.get('content-type'), 'audio/webm');
+    assert.equal((await fetch(`${base}/api${sent.data.message.audioPath}`, { headers: { Authorization: `Bearer ${gopal.token}` } })).status, 404);
+
+    assert.equal((await api(`/conversations/${thread.id}/contact`, { method: 'POST', token: tara.token })).status, 403, 'free cannot offer first');
+    const offered = await api(`/conversations/${thread.id}/contact`, { method: 'POST', token: ravi.token });
+    assert.equal(offered.data.contact.iShared, true);
+    assert.equal(offered.data.contact.theirPhone, null);
+    const back = await api(`/conversations/${thread.id}/contact`, { method: 'POST', token: tara.token });
+    assert.equal(back.status, 200, 'free can accept an offer');
+    assert.equal(back.data.contact.theirPhone, ravi.phone);
+    assert.equal((await api(`/conversations/${thread.id}`, { token: ravi.token })).data.contact.theirPhone, tara.phone);
+  });
+
+  test('saved searches: free members get 2 and a daily digest; Premium gets instant alerts', async () => {
+    const save = (token, name, filters) => api('/search/saved', { method: 'POST', token, body: { name, filters } });
+    assert.equal((await save(tara.token, 'One', { city: 'Mysuru' })).status, 201);
+    assert.equal((await save(tara.token, 'Two', { minScore: 60 })).status, 201);
+    assert.equal((await save(tara.token, 'Three', { minScore: 70 })).status, 403);
+    await makeMember({ name: 'Kiran', gender: 'man', city: 'Mysuru', blueprint: NEAR });
+    assert.ok(!(await inbox(tara.token)).some((n) => n.type === 'saved_search'), 'no instant alert on the free plan');
+    const { runJobsOnce } = require('../src/modules/jobs');
+    const morning = new Date();
+    morning.setUTCHours(4, 0, 0, 0);
+    assert.ok((await runJobsOnce(morning)).digests >= 1);
+    const digest = (await inbox(tara.token)).find((n) => n.type === 'saved_search');
+    assert.match(digest.title, /new (person fits|people fit) your saved searches/);
+  });
+
+  test('family plan: 4 links, side-by-side compare, suggested interests the member approves; gifts from the portal', async () => {
+    const add = (token, n) => api('/family/links', { method: 'POST', token, body: { name: `Rel${n}`, relation: 'Sibling', phone: `98111${String(n).padStart(5, '0')}` } });
+    assert.equal((await add(gopal.token, 1)).status, 201);
+    assert.equal((await add(gopal.token, 2)).status, 201);
+    assert.equal((await add(gopal.token, 3)).status, 403, 'two links without Family');
+    await buy(gopal.token, 'family_1m');
+    assert.equal((await me(gopal.token)).plan, 'family');
+    assert.equal((await add(gopal.token, 3)).status, 201);
+
+    const link = (await api('/family/links', { token: gopal.token })).data[0];
+    await api('/family/shares', { method: 'POST', token: gopal.token, body: { candidateIds: [tara.id], familyLinkId: link.id, expiresIn: '30d' } });
+    let portal = (await api(`/portal/${link.portalToken}`)).data;
+    assert.equal(portal.compareEnabled, true);
+    assert.equal(portal.canPropose, false, 'needs edit access too');
+    await api(`/family/links/${link.id}`, { method: 'PUT', token: gopal.token, body: { canManage: true } });
+    portal = (await api(`/portal/${link.portalToken}`)).data;
+    assert.equal(portal.canPropose, true);
+    const prop = await api(`/portal/${link.portalToken}/proposals`, { method: 'POST', body: { shareId: portal.records[0].id, note: 'She seems lovely' } });
+    assert.equal(prop.status, 201, JSON.stringify(prop.data));
+    assert.equal((await api(`/portal/${link.portalToken}/proposals`, { method: 'POST', body: { shareId: portal.records[0].id } })).status, 409);
+    assert.ok((await inbox(gopal.token)).some((n) => n.type === 'family_proposal'));
+    const proposals = (await api('/family/proposals', { token: gopal.token })).data;
+    assert.equal(proposals[0].candidateName, 'Tara');
+    const approved = await api(`/family/proposals/${proposals[0].id}/approve`, { method: 'POST', token: gopal.token });
+    assert.equal(approved.data.status, 'approved');
+    const thread = (await api(`/conversations/${approved.data.conversationId}`, { token: tara.token })).data;
+    assert.equal(thread.lastMessage, 'She seems lovely');
+    // Once they are in touch, the family cannot suggest the same person again
+    const again = await api(`/portal/${link.portalToken}/proposals`, { method: 'POST', body: { shareId: portal.records[0].id } });
+    assert.equal(again.status, 409);
+    assert.equal(again.data.error, 'Already in touch with this person');
+
+    // A family member gifts Plus to Suresh's account from his portal link
+    const sLink = (await api('/family/links', { method: 'POST', token: suresh.token, body: { name: 'Appa', relation: 'Father', phone: '9811199999' } })).data;
+    const order = await api(`/portal/${sLink.portalToken}/gift/checkout`, { method: 'POST', body: { plan: 'plus_3m' } });
+    assert.equal(order.status, 201);
+    const gift = await api(`/portal/${sLink.portalToken}/gift/confirm`, { method: 'POST', body: { paymentId: order.data.paymentId, payload: { dummyConfirm: true } } });
+    assert.equal(gift.data.gifted, true);
+    assert.equal((await me(suresh.token)).plan, 'plus');
+    assert.ok((await inbox(suresh.token)).some((n) => n.title === 'Appa gifted you 3Knot Plus'));
+    assert.ok((await api('/premium/payments', { token: suresh.token })).data.some((p) => p.gift));
+  });
+
+  test('assisted service: request, admin queue, hand-picked recommendations', async () => {
+    assert.equal((await api('/premium/assisted', { method: 'POST', token: tara.token, body: { notes: 'x' } })).status, 403);
+    await buy(tara.token, 'assisted_3m');
+    assert.equal((await me(tara.token)).assistedActive, true);
+    const req = await api('/premium/assisted', { method: 'POST', token: tara.token, body: { notes: 'Looking for someone in Chennai', callTime: 'Evenings' } });
+    assert.equal(req.data.request.status, 'new');
+    const queue = (await api('/admin/assisted', { token: admin.token })).data;
+    const entry = queue.find((q) => q.member.firstName === 'Tara');
+    assert.equal(entry.request.callTime, 'Evenings');
+    const options = (await api(`/admin/assisted/${tara.id}/candidates`, { token: admin.token })).data;
+    assert.ok(options.length >= 1);
+    const rec = await api(`/admin/assisted/${tara.id}/recommend`, { method: 'POST', token: admin.token, body: { candidateId: options[0].id, note: 'Shares your values on family' } });
+    assert.equal(rec.status, 200, JSON.stringify(rec.data));
+    await api(`/admin/assisted/requests/${entry.request.id}`, { method: 'PUT', token: admin.token, body: { status: 'active', managerNote: 'Called on Monday' } });
+    const mine = (await api('/premium/assisted', { token: tara.token })).data;
+    assert.equal(mine.recommendations[0].managerNote, 'Shares your values on family');
+    assert.equal(mine.request.status, 'active');
+    assert.ok((await inbox(tara.token)).some((n) => n.title.startsWith('Your relationship manager suggests')));
+    assert.equal((await api('/admin/assisted', { token: tara.token })).status, 403);
   });
 });
 

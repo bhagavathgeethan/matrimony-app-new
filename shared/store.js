@@ -1,7 +1,8 @@
-// Sangam app state + actions, shared by the mobile app (frontend/) and the web app (web/).
+// 3Knot app state + actions, shared by the mobile app (frontend/) and the web app (web/).
 // Framework-free: apps subscribe with React's useSyncExternalStore and supply onRoute(target, params)
 // to translate navigation intents ('welcome', 'consent', 'feed', 'chat-thread', …) into their own routing.
 import { DEFAULT_SEARCH_FILTERS, searchParams, describeSearch } from './constants.js';
+import { t, formatTime, getLanguage, subscribeLanguage } from './i18n.js';
 
 const EMPTY_SEARCH = {
   filters: DEFAULT_SEARCH_FILTERS,
@@ -58,6 +59,8 @@ const EMPTY_DATA = {
   stories: [],
   familyVotes: [],
   verification: null, // { verified, request }
+  proposals: [], // family-suggested interests
+  assisted: null, // { active, until, request, recommendations }
 };
 
 // Where tapping a notification takes the user
@@ -73,7 +76,7 @@ function targetFor(n) {
   if (n.type === 'profile_nudge' || n.type === 'family_edit') {
     return { kind: 'route', target: 'personal-details', params: { section: n.data?.section || null } };
   }
-  if (n.type === 'family_feedback' || n.type === 'family_linked') return { kind: 'route', target: 'family' };
+  if (n.type === 'family_feedback' || n.type === 'family_linked' || n.type === 'family_proposal') return { kind: 'route', target: 'family' };
   if (n.type === 'account' && n.data?.target) return { kind: 'route', target: n.data.target };
   if (n.type === 'security') return { kind: 'route', target: 'settings' };
   return { kind: 'route', target: 'notifications' };
@@ -98,9 +101,22 @@ export function createSangamStore({ client, onRoute = () => {}, onSystemNotifica
 
   const getState = () => state;
   const set = (patch) => {
+    const before = state.user;
     state = { ...state, ...(typeof patch === 'function' ? patch(state) : patch) };
+    if (state.user && state.user !== before) syncLanguage();
     listeners.forEach((l) => l());
   };
+  // The server keeps a copy of this device's interface language: notifications are written in it
+  function syncLanguage() {
+    const language = getLanguage();
+    if (!state.user || state.user.language === language) return;
+    state = { ...state, user: { ...state.user, language } };
+    api.updateLanguage(language).catch(() => {});
+  }
+  subscribeLanguage(() => {
+    syncLanguage();
+    listeners.forEach((l) => l());
+  });
   const subscribe = (listener) => {
     listeners.add(listener);
     return () => listeners.delete(listener);
@@ -154,7 +170,7 @@ export function createSangamStore({ client, onRoute = () => {}, onSystemNotifica
         refreshFeed();
       }
       // The other person read the open thread: reload it for read receipts (premium only)
-      if (event.type === 'conversation:read' && state.activeThreadId === event.conversationId && state.user?.plan === 'premium') {
+      if (event.type === 'conversation:read' && state.activeThreadId === event.conversationId && state.user?.planFeatures?.includes('readReceipts')) {
         openThreadById(event.conversationId, { navigate: false });
       }
       if (event.type === 'safety:blocked') forgetMember(event.userId);
@@ -194,6 +210,11 @@ export function createSangamStore({ client, onRoute = () => {}, onSystemNotifica
       unreadNotifications: typeof unreadCount === 'number' ? unreadCount : s.unreadNotifications + 1,
       toasts: viewing ? s.toasts : [...s.toasts.filter((t) => t.id !== n.id), n].slice(-3),
     }));
+    // A family member opened their link, answered, or suggested someone: the family screens show it now
+    if (n.type?.startsWith('family_')) refreshFamily();
+    if (n.type === 'family_proposal') loadProposals();
+    // A family member edited personal details: reload the profile so the screens and % are current
+    if (n.type === 'family_edit') refreshMe();
     if (viewing) {
       markNotificationsRead([n.id]);
       return;
@@ -396,7 +417,7 @@ export function createSangamStore({ client, onRoute = () => {}, onSystemNotifica
     const current = state.user?.vibes || [];
     let updated;
     if (current.includes(vibe)) updated = current.filter((v) => v !== vibe);
-    else if (current.length >= 6) return { ok: false, error: 'You can pick up to six' };
+    else if (current.length >= 6) return { ok: false, error: t('You can pick up to six') };
     else updated = [...current, vibe];
     set((s) => ({ user: { ...s.user, vibes: updated } }));
     const res = await attempt(() => api.updateVibes(updated));
@@ -486,7 +507,7 @@ export function createSangamStore({ client, onRoute = () => {}, onSystemNotifica
     const userId = state.user?.id;
     const { filters } = state.search;
     const label = describeSearch(filters);
-    if (!userId || label === 'Everyone') return;
+    if (!userId || label === t('Everyone')) return;
     const recent = [{ label, filters }, ...state.recentSearches.filter((r) => r.label !== label)].slice(0, MAX_RECENT_SEARCHES);
     set({ recentSearches: recent });
     writeRecent(userId, recent);
@@ -526,8 +547,8 @@ export function createSangamStore({ client, onRoute = () => {}, onSystemNotifica
   }
 
   // Expressing interest (optionally with an intro message) opens the thread as a request
-  async function openChatWith(candidateId, message) {
-    const res = await attempt(() => api.openConversation(candidateId, message));
+  async function openChatWith(candidateId, message, isSuper = false) {
+    const res = await attempt(() => api.openConversation(candidateId, message, isSuper));
     if (res.ok) {
       markInterest(candidateId, { status: res.data.status, byMe: res.data.requestedByMe, conversationId: res.data.id });
       await openThreadById(res.data.id);
@@ -657,6 +678,14 @@ export function createSangamStore({ client, onRoute = () => {}, onSystemNotifica
       verified: f.verified === 'true' || f.verified === true,
       notContacted: f.notContacted === 'true' || f.notContacted === true,
       matchesPreferences: f.matchesPreferences === 'true' || f.matchesPreferences === true,
+      heightMin: f.heightMin ? Number(f.heightMin) : null,
+      heightMax: f.heightMax ? Number(f.heightMax) : null,
+      education: lst(f.education),
+      employedIn: lst(f.employedIn),
+      eatingHabits: lst(f.eatingHabits),
+      motherTongue: lst(f.motherTongue),
+      familyType: lst(f.familyType),
+      maritalStatus: lst(f.maritalStatus),
       sort: f.sort || 'fit',
     });
   }
@@ -706,6 +735,81 @@ export function createSangamStore({ client, onRoute = () => {}, onSystemNotifica
       await refreshMe();
       loadInterestLimits();
     }
+    return res;
+  }
+
+  // ---------- premium extras ----------
+
+  // Premium actions that return the overview refresh it and the profile (tier, features)
+  const premiumAction = (fn) => async (...args) => {
+    const res = await attempt(() => fn(...args));
+    if (res.ok) {
+      set({ premium: res.data });
+      await refreshMe();
+      loadInterestLimits();
+    }
+    return res;
+  };
+  const startTrial = premiumAction(api.startTrial);
+  const pausePlan = premiumAction(api.pausePlan);
+  const resumePlan = premiumAction(api.resumePlan);
+  const startSpotlight = premiumAction(api.startSpotlight);
+
+  async function rewind() {
+    const res = await attempt(api.rewind);
+    if (res.ok) await refreshFeed();
+    return res;
+  }
+  const getSimilar = (id) => attempt(() => api.getSimilar(id));
+  const reportLink = (id) => attempt(() => api.reportLink(id));
+
+  async function sendVoice(conversationId, blob, durationMs) {
+    const res = await attempt(() => api.sendVoice(conversationId, blob, durationMs));
+    if (res.ok) {
+      set((s) => {
+        const msgs = s.threadMessages[conversationId] || [];
+        if (msgs.some((m) => m.id === res.data.message.id)) return {};
+        return { threadMessages: { ...s.threadMessages, [conversationId]: [...msgs, res.data.message] } };
+      });
+    }
+    return res;
+  }
+  const voiceBlob = (audioPath) => api.voiceBlob(audioPath);
+
+  async function setContactShared(conversationId, share) {
+    const res = await attempt(() => (share ? api.shareContact(conversationId) : api.unshareContact(conversationId)));
+    if (res.ok) {
+      const { messages, ...summary } = res.data;
+      set((s) => ({ conversations: s.conversations.map((t) => (t.id === conversationId ? { ...t, ...summary } : t)) }));
+    }
+    return res;
+  }
+
+  async function loadProposals() {
+    const res = await attempt(api.getProposals);
+    if (res.ok) set({ proposals: res.data });
+    return res;
+  }
+  async function answerProposal(id, approve) {
+    const res = await attempt(() => api.answerProposal(id, approve));
+    if (res.ok) {
+      set((s) => ({ proposals: s.proposals.map((p) => (p.id === id ? { ...p, status: res.data.status } : p)) }));
+      if (approve) {
+        refreshConversations();
+        refreshFeed();
+      }
+    }
+    return res;
+  }
+
+  async function loadAssisted() {
+    const res = await attempt(api.getAssisted);
+    if (res.ok) set({ assisted: res.data });
+    return res;
+  }
+  async function requestAssisted(body) {
+    const res = await attempt(() => api.requestAssisted(body));
+    if (res.ok) set({ assisted: res.data });
     return res;
   }
 
@@ -760,7 +864,7 @@ export function createSangamStore({ client, onRoute = () => {}, onSystemNotifica
       id: tempId,
       sender: 'me',
       text: clean,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: formatTime(new Date()),
       pending: true,
     };
     const patch = (fn) =>
@@ -799,7 +903,7 @@ export function createSangamStore({ client, onRoute = () => {}, onSystemNotifica
   // Shares one or more profiles with a family member
   async function shareWithFamily({ candidateIds, familyLinkId, expiresIn, note, permissions }) {
     if (!candidateIds?.length || !familyLinkId) {
-      return { ok: false, error: 'Pick a profile and a family member first.' };
+      return { ok: false, error: t('Pick a profile and a family member first.') };
     }
     const res = await attempt(() => api.shareWithFamily({ candidateIds, familyLinkId, expiresIn, note, permissions }));
     if (res.ok) await refreshFamily();
@@ -877,6 +981,20 @@ export function createSangamStore({ client, onRoute = () => {}, onSystemNotifica
       withdrawStory,
       loadFamilyVotes,
       setFamilyManage,
+      startTrial,
+      pausePlan,
+      resumePlan,
+      startSpotlight,
+      rewind,
+      getSimilar,
+      reportLink,
+      sendVoice,
+      voiceBlob,
+      setContactShared,
+      loadProposals,
+      answerProposal,
+      loadAssisted,
+      requestAssisted,
       sendRealtime,
       setCallHandler: (fn) => {
         callHandler = fn;

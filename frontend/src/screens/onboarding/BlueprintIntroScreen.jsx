@@ -4,6 +4,7 @@ import { Wallet, MapPin, Baby, Briefcase, Clock } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { OnboardingScreen, StepBar, FadeIn, Eyebrow, Heading, Accent, Button } from '../../components/ui/kit';
+import { t } from '@shared/i18n';
 
 const { colors, fonts, gradients } = theme;
 
@@ -26,20 +27,20 @@ export const BlueprintIntroScreen = () => {
         <>
           <View style={styles.timeRow}>
             <Clock size={13} color="rgba(255,246,238,0.6)" />
-            <Text style={styles.timeText}>About 4 minutes · revise any answer later</Text>
+            <Text style={styles.timeText}>{t('About 4 minutes · revise any answer later')}</Text>
           </View>
-          <Button label="Begin" variant="gold" onPress={() => setCurrentScreen('blueprint-q1')} />
+          <Button label={t('Begin')} variant="gold" onPress={() => setCurrentScreen('blueprint-q1')} />
         </>
       }
     >
       <FadeIn>
         <View style={styles.header}>
-          <Eyebrow color={colors.gold}>Step 04 / 05 · Blueprint</Eyebrow>
+          <Eyebrow color={colors.gold}>{t('Step 04 / 05 · Blueprint')}</Eyebrow>
           <Heading size={36} color={colors.onDark}>
-            Four questions for the <Accent color={colors.gold}>next 40 years</Accent>
+            {t('Four questions for the')}{' '}<Accent color={colors.gold}>{t('next 40 years')}</Accent>
           </Heading>
           <Text style={styles.lede}>
-            Marriages rarely strain over hobbies. They strain over money, where you live, kids, and whose career bends.
+            {t('Marriages rarely strain over hobbies. They strain over money, where you live, kids, and whose career bends.')}
           </Text>
         </View>
       </FadeIn>
@@ -52,8 +53,8 @@ export const BlueprintIntroScreen = () => {
                 <Icon size={18} color={colors.gold} />
               </View>
               <View style={{ flex: 1, gap: 2 }}>
-                <Text style={styles.pillarTitle}>{title}</Text>
-                <Text style={styles.pillarDesc}>{desc}</Text>
+                <Text style={styles.pillarTitle}>{t(title)}</Text>
+                <Text style={styles.pillarDesc}>{t(desc)}</Text>
               </View>
               <Text style={styles.pillarNum}>{num}</Text>
             </View>

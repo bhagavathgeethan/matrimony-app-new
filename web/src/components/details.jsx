@@ -7,6 +7,7 @@ import {
 } from '@shared/profileFields';
 import { useStore } from '../store';
 import { Button, Modal, Toggle, cx } from './ui';
+import { Select } from './Select';
 import { t } from '@shared/i18n';
 
 export const SECTION_ICONS = { pen: PenLine, id: FileText, book: BookOpen, grad: GraduationCap, pin: MapPin, family: Users, contact: Contact, music: Headphones };
@@ -34,12 +35,12 @@ export function DetailsSections({ person, own = false, onEdit, sections = PROFIL
         if (!own && filled.length === 0) return null;
         const single = fields.length === 1 && fields[0].type === 'longtext';
         return (
-          <section key={section.key} className="details-section" aria-label={section.title}>
+          <section key={section.key} className="details-section" aria-label={t(section.title)}>
             <div className="details-head">
               <Icon size={20} color={ICON_TONES[section.icon]} />
               <h3 className="h3 grow">{t(section.title)}</h3>
               {own && (
-                <button className="icon-btn sm" onClick={() => onEdit(section.key)} aria-label={`Edit ${section.title}`}>
+                <button className="icon-btn sm" onClick={() => onEdit(section.key)} aria-label={t('Edit {title}', { title: t(section.title) })}>
                   <Pencil size={15} />
                 </button>
               )}
@@ -79,47 +80,41 @@ export function FieldInput({ field, value, onChange, values = {} }) {
   switch (field.type) {
     case 'longtext':
       return (
-        <textarea id={id} className="input" rows={5} maxLength={field.max} placeholder={field.placeholder}
+        <textarea id={id} className="input" rows={5} maxLength={field.max} placeholder={t(field.placeholder)}
           value={value ?? ''} onChange={(e) => onChange(e.target.value)} />
       );
     case 'text':
       return (
-        <input id={id} className="input" maxLength={field.max} placeholder={field.placeholder}
+        <input id={id} className="input" maxLength={field.max} placeholder={t(field.placeholder)}
           value={value ?? ''} onChange={(e) => onChange(e.target.value)} />
       );
     case 'select':
       return (
-        <select id={id} className="input" value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
-          <option value="">{t('Select')}</option>
-          {field.options.map((o) => <option key={o} value={o}>{t(o)}</option>)}
-        </select>
+        <Select id={id} value={value ?? ''} onChange={(v) => onChange(v || null)}
+          options={[['', t('Not set')], ...field.options.map((o) => [o, t(o)])]} />
       );
     case 'height':
     case 'weight': {
       const list = field.type === 'height' ? HEIGHT_OPTIONS : WEIGHT_OPTIONS;
       const fmt = field.type === 'height' ? formatHeight : formatWeight;
       return (
-        <select id={id} className="input" value={value ?? ''} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}>
-          <option value="">Select</option>
-          {list.map((n) => <option key={n} value={n}>{fmt(n)}</option>)}
-        </select>
+        <Select id={id} value={value ?? ''} onChange={(v) => onChange(v === '' ? null : Number(v))}
+          options={[['', t('Not set')], ...list.map((n) => [n, fmt(n)])]} />
       );
     }
     case 'count': {
       const max = field.upTo ? Number(values[field.upTo]) || 0 : 9;
       return (
-        <select id={id} className="input" value={value ?? ''} onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}>
-          <option value="">Select</option>
-          {Array.from({ length: max + 1 }, (_, n) => <option key={n} value={n}>{n}</option>)}
-        </select>
+        <Select id={id} value={value ?? ''} onChange={(v) => onChange(v === '' ? null : Number(v))}
+          options={[['', t('Not set')], ...Array.from({ length: max + 1 }, (_, n) => [n, String(n)])]} />
       );
     }
     case 'bool':
-      return <Toggle value={Boolean(value)} onChange={onChange} label={field.label} />;
+      return <Toggle value={Boolean(value)} onChange={onChange} label={t(field.label)} />;
     case 'multi': {
       const list = value || [];
       return (
-        <div className="row wrap" style={{ '--gap': '6px' }} role="group" aria-label={field.label}>
+        <div className="row wrap" style={{ '--gap': '6px' }} role="group" aria-label={t(field.label)}>
           {field.options.map((o) => {
             const on = list.includes(o);
             return (

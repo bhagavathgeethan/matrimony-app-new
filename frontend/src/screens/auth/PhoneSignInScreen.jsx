@@ -5,6 +5,7 @@ import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { OnboardingScreen, TopBar, FadeIn, Eyebrow, Heading, Accent, Body, Button, Card } from '../../components/ui/kit';
 import { Lockup } from '../../components/brand/Logo';
+import { t } from '@shared/i18n';
 
 const { colors, fonts, radii } = theme;
 
@@ -32,24 +33,26 @@ export const PhoneSignInScreen = () => {
       footer={
         <>
           {error && <Text style={styles.error}>{error}</Text>}
-          <Button label={sending ? 'Sending…' : 'Send OTP'} disabled={!canSend} onPress={handleSend} />
-          <Text style={styles.footer}>Parents: use the invite link your child sent you.</Text>
+          <Button label={sending ? t('Sending…') : t('Send OTP')} disabled={!canSend} onPress={handleSend} />
+          <Text style={styles.footer} onPress={() => setCurrentScreen('family-signin')}>
+            {t('Invited by your family?')}{' '}<Text style={styles.footerLink}>{t('Family sign in')}</Text>
+          </Text>
         </>
       }
     >
       <FadeIn>
         <View style={styles.header}>
-          <Eyebrow>Sign in</Eyebrow>
+          <Eyebrow>{t('Sign in')}</Eyebrow>
           <Heading size={34}>
-            Your number, <Accent>your account</Accent>
+            {t('Your number,')}{' '}<Accent>{t('your account')}</Accent>
           </Heading>
-          <Body size={14}>One profile per verified phone. It keeps the platform real.</Body>
+          <Body size={14}>{t('One profile per verified phone. It keeps the platform real.')}</Body>
         </View>
       </FadeIn>
 
       <FadeIn delay={80}>
         <Card style={{ gap: 12 }} padding={16}>
-          <Text style={styles.label}>Mobile number</Text>
+          <Text style={styles.label}>{t('Mobile number')}</Text>
           <View style={styles.phoneRow}>
             <View style={styles.countryCode}>
               <Text style={styles.flag}>🇮🇳</Text>
@@ -70,7 +73,7 @@ export const PhoneSignInScreen = () => {
               {consentSms && <Check size={13} color={colors.white} strokeWidth={3} />}
             </View>
             <Text style={styles.consentText}>
-              Send me an OTP by SMS. I consent to processing my number for authentication only.
+              {t('Send me an OTP by SMS. I consent to processing my number for authentication only.')}
             </Text>
           </TouchableOpacity>
         </Card>
@@ -184,8 +187,12 @@ const styles = StyleSheet.create({
   },
   footer: {
     fontFamily: fonts.sans,
-    fontSize: 12,
+    fontSize: 12.5,
     color: colors.textMuted,
     textAlign: 'center',
+  },
+  footerLink: {
+    fontWeight: '700',
+    color: colors.accent,
   },
 });

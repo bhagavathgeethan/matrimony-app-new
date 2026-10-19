@@ -5,6 +5,7 @@ const db = require('../config/db');
 const { getProfile } = require('./profile');
 const { dailyPicks } = require('./matches');
 const { notify } = require('./notifications');
+const { tx } = require('../lib/i18n');
 const { VISIBLE_USER_SQL, todayIST, hourIST } = require('../lib/members');
 
 // After DAILY_PICKS_HOUR_IST, tell each active member their picks are ready (once a day, only if there are any)
@@ -30,8 +31,8 @@ async function notifyDailyPicks(now = new Date()) {
     if (!picks.length) continue;
     await notify(id, {
       type: 'daily_picks',
-      title: `Your ${picks.length} picks for today`,
-      body: `${picks[0].firstName} and others, chosen for how closely your blueprints align.`,
+      title: tx('Your {n} picks for today', { n: picks.length }),
+      body: tx('{name} and others, chosen for how closely your blueprints align.', { name: picks[0].firstName }),
       data: { day },
       groupKey: `daily:${day}`,
     });
@@ -59,10 +60,10 @@ async function nudgeIncompleteProfiles() {
     const section = c.sections.find((s) => !s.complete);
     await notify(id, {
       type: 'profile_nudge',
-      title: `Your profile is ${c.percent}% complete`,
+      title: tx('Your profile is {n}% complete', { n: c.percent }),
       body: section
-        ? `Add your ${section.title.toLowerCase()} — complete profiles get more interests.`
-        : 'A few small things left — complete profiles get more interests.',
+        ? tx('Add your {section} — complete profiles get more interests.', { section: section.title })
+        : tx('A few small things left — complete profiles get more interests.'),
       data: { section: section?.key || null },
       groupKey: 'profile-nudge',
     });
@@ -71,9 +72,17 @@ async function nudgeIncompleteProfiles() {
   return sent;
 }
 
+// Free members' saved-search matches go out as one digest a day, in the morning
+async function savedSearchDigests(now = new Date()) {
+  if (hourIST(now) < env.DAILY_PICKS_HOUR_IST) return 0;
+  return require('./search').sendSavedSearchDigests();
+}
+
 async function runJobsOnce(now = new Date()) {
-  const [picks, nudges] = [await notifyDailyPicks(now), await nudgeIncompleteProfiles()];
-  return { picks, nudges };
+  const picks = await notifyDailyPicks(now);
+  const nudges = await nudgeIncompleteProfiles();
+  const digests = await savedSearchDigests(now);
+  return { picks, nudges, digests };
 }
 
 function startJobs() {

@@ -4,7 +4,7 @@ import { useStore } from '../../store';
 import { Button, Empty } from '../../components/ui';
 import { ProfileTile } from '../../components/tiles';
 import { CandidateModal, InterestButton } from '../../components/candidate';
-import { t } from '@shared/i18n';
+import { t, formatDate } from '@shared/i18n';
 
 // Today's picks: a short, curated list chosen once a day
 export function TodayPage() {
@@ -21,18 +21,18 @@ export function TodayPage() {
     <div className="page">
       <div className="page-head">
         <div className="stack" style={{ '--gap': '6px' }}>
-          <span className="eyebrow">Today · {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+          <span className="eyebrow">{t('Today · {date}', { date: formatDate(new Date(), { weekday: 'long', day: 'numeric', month: 'long' }) })}</span>
           <h1 className="h1">{t('Your picks for today')}</h1>
-          <span className="small muted">Chosen each morning for how closely your blueprints align. New picks tomorrow.</span>
+          <span className="small muted">{t('Chosen each morning for how closely your blueprints align. New picks tomorrow.')}</span>
         </div>
       </div>
-      {dailyPicks.status === 'loading' && picks.length === 0 && <span className="small muted">Choosing your picks…</span>}
+      {dailyPicks.status === 'loading' && picks.length === 0 && <span className="small muted">{t('Choosing your picks…')}</span>}
       {dailyPicks.status === 'error' && (
-        <Empty icon={RotateCw} title="Couldn’t load today’s picks"><Button size="sm" variant="soft" onClick={loadDailyPicks}>Try again</Button></Empty>
+        <Empty icon={RotateCw} title={t('Couldn’t load today’s picks')}><Button size="sm" variant="soft" onClick={loadDailyPicks}>{t('Try again')}</Button></Empty>
       )}
       {dailyPicks.status === 'ready' && picks.length === 0 && (
-        <Empty icon={Sun} title="No new picks today">
-          <span className="small">You’ve reached out to everyone who fits right now. As more people join, they’ll show up here.</span>
+        <Empty icon={Sun} title={t('No new picks today')}>
+          <span className="small">{t('You’ve reached out to everyone who fits right now. As more people join, they’ll show up here.')}</span>
         </Empty>
       )}
       <div className="browse-grid">
@@ -43,7 +43,7 @@ export function TodayPage() {
             onOpen={() => setOpen(c.id)}
             footer={(
               <div className="stack" style={{ '--gap': '8px', marginTop: 6 }}>
-                <span className="pick-reason">{c.pickReason}</span>
+                <span className="pick-reason">{t(c.pickReason)}</span>
                 <div onClick={(e) => e.stopPropagation()} role="presentation"><InterestButton candidate={c} size="sm" className="block" /></div>
               </div>
             )}

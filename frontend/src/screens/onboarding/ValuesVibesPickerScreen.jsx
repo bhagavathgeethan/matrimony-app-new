@@ -4,6 +4,7 @@ import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { VibeTileGrid } from '../../components/vibes/VibeTileGrid';
 import { OnboardingScreen, StepBar, FadeIn, Eyebrow, Heading, Accent, Body, Button } from '../../components/ui/kit';
+import { t } from '@shared/i18n';
 
 const { colors, fonts, gradients } = theme;
 
@@ -16,9 +17,9 @@ export const ValuesVibesPickerScreen = () => {
       top={<StepBar step={5} total={5} />}
       footer={
         <View style={styles.actions}>
-          <Button label="Skip" variant="secondary" style={{ flex: 1 }} onPress={() => setCurrentScreen('photos')} />
+          <Button label={t('Skip')} variant="secondary" style={{ flex: 1 }} onPress={() => setCurrentScreen('photos')} />
           <Button
-            label={user?.onboarding?.completed ? 'Done' : 'Next · photos'}
+            label={user?.onboarding?.completed ? t('Done') : t('Next · photos')}
             style={{ flex: 2 }}
             onPress={() => setCurrentScreen(user?.onboarding?.completed ? 'blueprint-summary' : 'photos')}
           />
@@ -27,17 +28,17 @@ export const ValuesVibesPickerScreen = () => {
     >
       <FadeIn>
         <View style={styles.header}>
-          <Eyebrow>Step 05 / 05 · Vibes</Eyebrow>
+          <Eyebrow>{t('Step 05 / 05 · Vibes')}</Eyebrow>
           <Heading size={32}>
-            Six that feel like your <Accent>Sunday</Accent>
+            {t('Six that feel like your')}{' '}<Accent>{t('Sunday')}</Accent>
           </Heading>
-          <Body size={13.5}>Visual, not verbal — the texture of daily life.</Body>
+          <Body size={13.5}>{t('Visual, not verbal — the texture of daily life.')}</Body>
         </View>
       </FadeIn>
 
       <FadeIn delay={60}>
         <View style={styles.progressRow}>
-          <Text style={styles.progressText}>Chosen {selectedCount} of 6</Text>
+          <Text style={styles.progressText}>{t('Chosen {selectedCount} of 6', { selectedCount })}</Text>
           <View style={styles.dots}>
             {Array.from({ length: 6 }).map((_, i) => (
               <View key={i} style={[styles.dot, i < selectedCount && styles.dotOn]} />

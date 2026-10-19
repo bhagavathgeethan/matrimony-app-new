@@ -10,15 +10,15 @@ const { colors, fonts, gradients, radii } = theme;
 
 export const ConversationsListScreen = () => {
   const { conversations: all, openThreadById, sentRecords } = useApp();
-  const requests = all.filter((t) => t.needsMyResponse);
+  const requests = all.filter((conv) => conv.needsMyResponse);
   const [tab, setTab] = useState(requests.length ? 'requests' : 'chats');
-  const conversations = tab === 'requests' ? requests : all.filter((t) => !t.needsMyResponse);
-  const previewFor = (t) => (t.needsMyResponse
-    ? `Interested in you${t.lastMessage ? ` — “${t.lastMessage}”` : ''}`
-    : t.status === 'requested' ? 'Interest sent · waiting'
-      : t.status === 'declined' ? 'Not available' : t.lastMessage || 'Say hello — no messages yet');
+  const conversations = tab === 'requests' ? requests : all.filter((conv) => !conv.needsMyResponse);
+  const previewFor = (item) => (item.needsMyResponse
+    ? (item.lastMessage ? t('Interested in you — “{message}”', { message: item.lastMessage }) : t('Interested in you'))
+    : item.status === 'requested' ? t('Interest sent · waiting')
+      : item.status === 'declined' ? t('Not available') : item.lastMessage || t('Say hello — no messages yet'));
 
-  const unreadCount = all.filter((t) => t.unread).length;
+  const unreadCount = all.filter((conv) => conv.unread).length;
   const latestParentResponse = sentRecords.find((r) => r.status !== 'awaiting');
 
   return (
@@ -26,8 +26,8 @@ export const ConversationsListScreen = () => {
       <FadeIn>
         <View style={styles.titleRow}>
           <View style={{ gap: 4 }}>
-            <Eyebrow>Messages</Eyebrow>
-            <Heading size={38}>Conversations</Heading>
+            <Eyebrow>{t('Messages')}</Eyebrow>
+            <Heading size={38}>{t('Conversations')}</Heading>
           </View>
           {unreadCount > 0 && <Badge label={`${unreadCount} new`} tone="accent" style={{ marginBottom: 8 }} />}
         </View>
@@ -36,7 +36,7 @@ export const ConversationsListScreen = () => {
       <View style={styles.tabs} accessibilityRole="tablist">
         {[['chats', t('Chats')], ['requests', `${t('Requests')}${requests.length ? ` (${requests.length})` : ''}`]].map(([key, label]) => (
           <TouchableOpacity key={key} onPress={() => setTab(key)} style={[styles.tab, tab === key && styles.tabOn]} accessibilityRole="tab" accessibilityState={{ selected: tab === key }}>
-            <Text style={[styles.tabText, tab === key && { color: colors.accent }]}>{label}</Text>
+            <Text style={[styles.tabText, tab === key && { color: colors.accent }]}>{t(label)}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -59,9 +59,9 @@ export const ConversationsListScreen = () => {
               </View>
               <View style={{ flex: 1, gap: 4 }}>
                 <View style={styles.nameRow}>
-                  <Text style={styles.name}>{thread.candidateName}</Text>
+                  <Text style={styles.name}>{thread.isSuper && thread.needsMyResponse ? '⭐ ' : ''}{thread.candidateName}</Text>
                   {thread.overlapScore != null && <Text style={styles.score}>{thread.overlapScore}%</Text>}
-                  <Text style={styles.time}>{thread.lastMessageTime || ''}</Text>
+                  <Text style={styles.time}>{t(thread.lastMessageTime || '')}</Text>
                 </View>
                 <Text
                   style={[styles.preview, thread.unread && styles.previewUnread]}
@@ -81,7 +81,7 @@ export const ConversationsListScreen = () => {
         {conversations.length === 0 && (
           <Card variant="tinted" style={{ alignItems: 'center', gap: 10, paddingVertical: 30 }}>
             {tab === 'requests' ? <Inbox size={26} color={colors.gold} /> : <MessageCircle size={26} color={colors.gold} />}
-            <Body style={{ textAlign: 'center' }}>{tab === 'requests' ? 'No interest requests waiting.' : 'No conversations yet. Express interest from your feed.'}</Body>
+            <Body style={{ textAlign: 'center' }}>{tab === 'requests' ? t('No interest requests waiting.') : t('No conversations yet. Express interest from your feed.')}</Body>
           </Card>
         )}
       </View>
@@ -89,16 +89,15 @@ export const ConversationsListScreen = () => {
       {latestParentResponse && (
         <FadeIn delay={260}>
           <View style={{ gap: 10 }}>
-            <SectionLabel>Shared with parents</SectionLabel>
+            <SectionLabel>{t('Shared with parents')}</SectionLabel>
             <Card variant="gold" style={styles.parentCard}>
               <View style={styles.parentIcon}>
                 <Users size={16} color="#8A6A2E" />
               </View>
               <Text style={styles.parentText}>
-                {latestParentResponse.recipientParentName}{' '}
-                {latestParentResponse.status === 'approved' ? 'approved' : 'raised a concern about'}{' '}
+                {t(latestParentResponse.status === 'approved' ? '{parent} approved' : '{parent} raised a concern about', { parent: latestParentResponse.recipientParentName })}{' '}
                 <Text style={styles.parentStrong}>{latestParentResponse.candidateName}</Text> ·{' '}
-                {latestParentResponse.sentAt}
+                {t(latestParentResponse.sentAt)}
               </Text>
             </Card>
           </View>
