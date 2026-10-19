@@ -22,7 +22,8 @@ const MAX_MESSAGE_LENGTH = 2000;
 const MAX_VOICE_MS = 60000;
 const VOICE_TYPES = { 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a', 'audio/mpeg': 'mp3', 'audio/aac': 'aac', 'audio/x-m4a': 'm4a' };
 const voiceUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1.5 * 1024 * 1024, files: 1 } });
-const WEEK_START_SQL = `date_trunc('week', NOW() + INTERVAL '330 minutes') - INTERVAL '330 minutes'`;
+// Monday 00:00 IST of this week. AT TIME ZONE keeps it right whatever the database session's time zone is.
+const WEEK_START_SQL = `(date_trunc('week', NOW() AT TIME ZONE 'Asia/Kolkata') AT TIME ZONE 'Asia/Kolkata')`;
 
 const ordered = (x, y) => (x < y ? [x, y] : [y, x]);
 
@@ -177,7 +178,7 @@ async function getConversation(userId, conversationId) {
 async function interestsSentToday(userId) {
   const res = await db.query(
     `SELECT COUNT(*)::int AS n FROM conversations
-     WHERE requested_by = $1 AND (created_at + INTERVAL '330 minutes')::date = $2::date`,
+     WHERE requested_by = $1 AND (created_at AT TIME ZONE 'Asia/Kolkata')::date = $2::date`,
     [userId, todayIST()]
   );
   return res.rows[0].n;

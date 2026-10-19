@@ -20,7 +20,8 @@ const USER_COLS = 'id, first_name, plan, premium_until, plan_paused_at, paused_r
 const loadUser = async (userId) => (await db.query(`SELECT ${USER_COLS} FROM users WHERE id = $1`, [userId])).rows[0];
 
 // Start of the current week (Monday, India time) for weekly allowances
-const WEEK_START_SQL = `date_trunc('week', NOW() + INTERVAL '330 minutes') - INTERVAL '330 minutes'`;
+// Monday 00:00 IST of this week. AT TIME ZONE keeps it right whatever the database session's time zone is.
+const WEEK_START_SQL = `(date_trunc('week', NOW() AT TIME ZONE 'Asia/Kolkata') AT TIME ZONE 'Asia/Kolkata')`;
 
 async function activeSpotlight(userId) {
   return (await db.query('SELECT * FROM spotlights WHERE user_id = $1 AND ends_at > NOW() ORDER BY ends_at DESC LIMIT 1', [userId])).rows[0] || null;

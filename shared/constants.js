@@ -9,6 +9,14 @@ export const APP_FULL_NAME = '3Knot Matrimony';
 export const APP_NAME_SUFFIX = 'Matrimony';
 export const APP_TAGLINE = 'Where two lives meet';
 
+// Store listings. The Android app id is fixed (frontend/capacitor.config.json); there is no iOS listing yet, so the
+// App Store badge shows "Coming soon" until a URL is set. The web app can override both at build time with
+// VITE_PLAY_STORE_URL / VITE_APP_STORE_URL.
+export const STORE_LINKS = {
+  android: 'https://play.google.com/store/apps/details?id=com.stucompany.matrimony',
+  ios: '',
+};
+
 // Logo: a pure-gold Tamil thaali pendant. Its three top lobes each carry a gold bead, one for each of the
 // three knots (moondru mudichu) that tie it.
 export const LOGO_PATHS = {

@@ -5,6 +5,7 @@ import { PILLARS, VIBE_ART, profileStrengthHint, blueprintSummary } from '@share
 import { useStore } from '../../store';
 import { Avatar, Meter, ScoreRing, IconBadge } from '../../components/ui';
 import { t, formatDate } from '@shared/i18n';
+import { StoreBadges } from '../../components/StoreBadges';
 
 export function ProfilePage() {
   const { user } = useStore();
@@ -108,6 +109,11 @@ export function ProfilePage() {
                 </Link>
               </React.Fragment>
             ))}
+          </div>
+          {/* The sidebar (with its store links) is hidden on phones, so the apps are offered here too */}
+          <div className="card stack store-card" style={{ '--gap': '10px' }}>
+            <span className="h3">{t('Get the app')}</span>
+            <StoreBadges />
           </div>
         </div>
       </div>

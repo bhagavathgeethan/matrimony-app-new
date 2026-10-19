@@ -6,6 +6,7 @@ import { Brand, Avatar } from '../../components/ui';
 import { ToastStack } from '../../components/notifications';
 import { CallLayer } from '../../components/calls';
 import { t } from '@shared/i18n';
+import { StoreBadgesCompact } from '../../components/StoreBadges';
 
 export function AppLayout() {
   const { user, conversations, sentRecords, unreadNotifications, logout } = useStore();
@@ -60,6 +61,7 @@ export function AppLayout() {
             </NavLink>
           )}
         </nav>
+        <StoreBadgesCompact />
         <div className="me-card">
           <NavLink to="/profile" className="row grow" style={{ '--gap': '10px', minWidth: 0 }}>
             <Avatar src={user?.photos?.[0]?.url} name={user?.firstName} size={38} />

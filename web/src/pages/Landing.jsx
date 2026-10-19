@@ -5,6 +5,7 @@ import { APP_NAME, PILLARS } from '@shared/constants';
 import { Brand, ScoreRing, IconBadge } from '../components/ui';
 import { api } from '../store';
 import { LanguagePicker } from '../components/LanguagePicker';
+import { StoreBadges } from '../components/StoreBadges';
 import { t } from '@shared/i18n';
 
 // Published success stories (both partners confirmed, reviewed by the team)
@@ -70,6 +71,7 @@ export function LandingPage() {
               <Link to="/signin" className="btn btn-gold">{t('Create my blueprint')}</Link>
               <Link to="/signin" className="btn btn-light">{t('I already have an account')}</Link>
             </div>
+            <StoreBadges light />
           </div>
 
           <div className="hero-collage fade-in" style={{ animationDelay: '120ms' }}>
@@ -178,11 +180,13 @@ export function LandingPage() {
           </h2>
           <p style={{ color: 'rgba(255,246,238,0.78)' }}>{t('It takes about four minutes to build your blueprint.')}</p>
           <Link to="/signin" className="btn btn-gold">{t('Create my blueprint')}</Link>
+          <StoreBadges light className="center" />
         </div>
       </section>
 
       <footer className="footer">
         <span>© {new Date().getFullYear()} {APP_NAME}</span>
+        <StoreBadges className="small" />
         <span>{t('DPDP-compliant · Values-led matchmaking')}</span>
       </footer>
     </div>
