@@ -5,7 +5,7 @@ const db = require('../config/db');
 const sms = require('../services/sms');
 const realtime = require('../services/realtime');
 const notifications = require('./notifications');
-const storage = require('../services/storage');
+const { photoUrl } = require('./media');
 const { computeMatchScore } = require('../services/blueprintEngine');
 const { blueprintFromRow, detailValues, updateDetails } = require('./profile');
 const { getCandidate } = require('./matches');
@@ -128,7 +128,7 @@ async function listShares(userId) {
   const res = await db.query(
     `SELECT s.*, l.name AS parent_name, u.first_name, u.birth_year, u.birth_month, u.city,
             row_to_json(b.*) AS bp,
-            (SELECT p.blur_key FROM photos p WHERE p.user_id = u.id ORDER BY p.position LIMIT 1) AS blur_key
+            (SELECT row_to_json(p.*) FROM photos p WHERE p.user_id = u.id ORDER BY p.position LIMIT 1) AS photo
      FROM family_shares s
      JOIN family_links l ON l.id = s.family_link_id
      JOIN users u ON u.id = s.candidate_id
@@ -144,7 +144,7 @@ async function listShares(userId) {
     candidateName: r.first_name,
     candidateAge: ageFrom(r.birth_year, r.birth_month),
     candidateCity: r.city,
-    candidatePhoto: r.blur_key ? storage.url(r.blur_key) : null,
+    candidatePhoto: r.photo ? photoUrl(r.photo, true) : null,
     overlapScore: myBp && r.bp ? computeMatchScore(myBp, blueprintFromRow(r.bp)).overall : null,
     recipientParentId: r.family_link_id,
     recipientParentName: r.parent_name,
@@ -267,7 +267,7 @@ async function getPortal(token) {
         idVerified: Boolean(r.id_verified_at),
         overlapScore: p.showBlueprintScore && scores ? scores.overall : null,
         pillarScores: p.showBlueprintScore ? scores : null,
-        photo: r.photo ? storage.url(p.showPhoto ? r.photo.storage_key : r.photo.blur_key) : null,
+        photo: r.photo ? photoUrl(r.photo, !p.showPhoto) : null,
         photoBlurred: !p.showPhoto,
         childNote: r.child_note,
         status: r.status,

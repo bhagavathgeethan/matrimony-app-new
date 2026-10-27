@@ -2,7 +2,7 @@
 // Admins are members whose phone is listed in ADMIN_PHONES (granted at sign-in).
 const express = require('express');
 const db = require('../config/db');
-const storage = require('../services/storage');
+const { photoUrl, sendSigned } = require('./media');
 const verification = require('./verification');
 const stories = require('./stories');
 const { httpError, ageFrom, maskPhone, newId } = require('../lib/util');
@@ -111,21 +111,21 @@ async function members(q) {
 async function listVerifications() {
   const res = await db.query(
     `SELECT v.*, row_to_json(u.*) AS member,
-            (SELECT storage_key FROM photos p WHERE p.user_id = v.user_id ORDER BY position LIMIT 1) AS photo_key
+            (SELECT row_to_json(p.*) FROM photos p WHERE p.user_id = v.user_id ORDER BY position LIMIT 1) AS photo
      FROM verifications v JOIN users u ON u.id = v.user_id
      WHERE v.status = 'pending' ORDER BY v.created_at`
   );
   return res.rows.map((v) => ({
     id: v.id, submittedAt: v.created_at, member: memberSummary(v.member),
-    profilePhoto: v.photo_key ? storage.url(v.photo_key) : null,
+    profilePhoto: v.photo ? photoUrl(v.photo) : null,
     selfieUrl: `/api/admin/verifications/${v.id}/selfie`,
   }));
 }
 
 async function selfie(id) {
-  const v = (await db.query('SELECT selfie_key FROM verifications WHERE id = $1 AND status = $2', [id, 'pending'])).rows[0];
+  const v = (await db.query('SELECT selfie_bucket, selfie_key FROM verifications WHERE id = $1 AND status = $2', [id, 'pending'])).rows[0];
   if (!v) throw httpError(404, 'Not found');
-  return storage.private.read(v.selfie_key);
+  return v;
 }
 
 // ---------- assisted service ----------
@@ -203,10 +203,10 @@ router.get('/members', route(async (req, res) => res.json(await members(req.quer
 router.post('/members/:id/hide', route(async (req, res) => res.json(await setHidden(req.params.id, true))));
 router.post('/members/:id/unhide', route(async (req, res) => res.json(await setHidden(req.params.id, false))));
 router.get('/verifications', route(async (req, res) => res.json(await listVerifications())));
+// Redirects to a 5-minute signed link (?format=json returns { url })
 router.get('/verifications/:id/selfie', route(async (req, res) => {
-  res.setHeader('Content-Type', 'image/jpeg');
-  res.setHeader('Cache-Control', 'no-store');
-  res.send(await selfie(req.params.id));
+  const v = await selfie(req.params.id);
+  await sendSigned(req, res, v.selfie_bucket, v.selfie_key);
 }));
 router.post('/verifications/:id', route(async (req, res) => {
   res.json(await verification.review(req.userId, req.params.id, req.body?.decision, req.body?.note));

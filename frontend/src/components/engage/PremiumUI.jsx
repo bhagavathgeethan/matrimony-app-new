@@ -87,16 +87,15 @@ export const VoiceRecorderButton = ({ conversationId }) => {
 };
 
 export const VoiceNote = ({ message, mine }) => {
-  const { voiceBlob } = useApp();
+  const { voiceUrl } = useApp();
   const [url, setUrl] = useState(null);
   const [playing, setPlaying] = useState(false);
   const audio = useRef(null);
-  useEffect(() => () => url && URL.revokeObjectURL(url), [url]);
   const toggle = async () => {
     if (!url) {
-      const blob = await voiceBlob(message.audioPath).catch(() => null);
-      if (!blob) return;
-      setUrl(URL.createObjectURL(blob));
+      const signed = await voiceUrl(message.audioPath).catch(() => null);
+      if (!signed) return;
+      setUrl(signed);
       setTimeout(() => audio.current?.play(), 0);
       return;
     }
@@ -110,7 +109,7 @@ export const VoiceNote = ({ message, mine }) => {
       </TouchableOpacity>
       <View style={[styles.wave, mine && { backgroundColor: 'rgba(255,255,255,0.4)' }]} />
       <Text style={[styles.dur, mine && { color: colors.white }]}>{formatDuration(message.durationMs || 0)}</Text>
-      {url && <audio ref={audio} src={url} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} />}
+      {url && <audio ref={audio} src={url} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} onError={() => { setUrl(null); setPlaying(false); }} />}
     </View>
   );
 };

@@ -84,9 +84,9 @@ function Reports() {
 function Selfie({ path }) {
   const [url, setUrl] = useState(null);
   useEffect(() => {
-    let objectUrl;
-    api.admin.selfieBlob(path).then((b) => { objectUrl = URL.createObjectURL(b); setUrl(objectUrl); }).catch(() => {});
-    return () => objectUrl && URL.revokeObjectURL(objectUrl);
+    let live = true;
+    api.admin.selfieUrl(path).then((u) => live && setUrl(u)).catch(() => {});
+    return () => { live = false; };
   }, [path]);
   return url ? <img src={url} alt={t('Selfie')} className="verify-img" /> : <div className="verify-img" />;
 }

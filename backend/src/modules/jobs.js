@@ -82,7 +82,8 @@ async function runJobsOnce(now = new Date()) {
   const picks = await notifyDailyPicks(now);
   const nudges = await nudgeIncompleteProfiles();
   const digests = await savedSearchDigests(now);
-  return { picks, nudges, digests };
+  const abandonedUploads = await require('./uploads').sweepAbandoned();
+  return { picks, nudges, digests, abandonedUploads };
 }
 
 function startJobs() {

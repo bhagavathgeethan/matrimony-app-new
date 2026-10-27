@@ -4,6 +4,7 @@ const os = require('os');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { startFakeDepot } = require('./fakeDepot');
 
 async function startTestStack() {
   const { default: EmbeddedPostgres } = await import('embedded-postgres');
@@ -23,15 +24,16 @@ async function startTestStack() {
   await pg.initialise();
   await pg.start();
   await pg.createDatabase('sangam_test');
+  const depot = await startFakeDepot();
 
   process.env.NODE_ENV = 'test';
   process.env.DATABASE_URL = `postgresql://postgres:test@localhost:${port}/sangam_test`;
-  process.env.UPLOAD_DIR = path.join(tmp, 'uploads');
+  process.env.STORAGE_URL = depot.url;
+  process.env.STORAGE_API_KEY = depot.apiKey;
   process.env.OTP_DEV_ECHO = 'true';
   process.env.OTP_RESEND_SECONDS = '0';
   process.env.OTP_MAX_PER_HOUR = '50';
   process.env.WEB_DIST_DIR = path.join(tmp, 'no-web');
-  process.env.PRIVATE_UPLOAD_DIR = path.join(tmp, 'private');
   process.env.ADMIN_PHONES = '+919999999999';
   process.env.INTEREST_DAILY_LIMIT = '3';
   process.env.REPORT_HIDE_THRESHOLD = '2';
@@ -44,11 +46,14 @@ async function startTestStack() {
   console.log = origLog;
   const base = `http://localhost:${server.address().port}`;
   process.env.PUBLIC_BASE_URL = base;
+  // The port is only known now; links built from here on (e.g. photo links) point at the test server
+  require('../../src/config/env').PUBLIC_BASE_URL = base;
 
   async function stop() {
     await new Promise((resolve) => server.close(resolve));
     await require('../../src/config/db').pool.end();
     await pg.stop();
+    await depot.stop();
     // Windows can hold the data folder briefly after Postgres stops
     try {
       fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
@@ -57,7 +62,7 @@ async function startTestStack() {
     }
   }
 
-  return { base, stop, uploadDir: process.env.UPLOAD_DIR, privateDir: process.env.PRIVATE_UPLOAD_DIR, pgUrl: process.env.DATABASE_URL };
+  return { base, stop, depot, pgUrl: process.env.DATABASE_URL };
 }
 
 module.exports = { startTestStack };

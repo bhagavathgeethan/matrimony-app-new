@@ -1,10 +1,11 @@
 // The signed-in user's own profile: basics, consent, privacy, blueprint, vibes, photos, onboarding
 const express = require('express');
-const multer = require('multer');
 const sharp = require('sharp');
 const env = require('../config/env');
 const db = require('../config/db');
 const storage = require('../services/storage');
+const uploads = require('./uploads');
+const { photoUrl } = require('./media');
 const { synthesizeArchetype } = require('../services/blueprintEngine');
 const {
   httpError, newId, parseBirthYearMonth, formatBirthYearMonth, ageFrom,
@@ -48,7 +49,7 @@ function blueprintFromRow(bp) {
   };
 }
 
-const photoUrls = (p) => ({ id: p.id, url: storage.url(p.storage_key), blurUrl: storage.url(p.blur_key), position: p.position });
+const photoUrls = (p) => ({ id: p.id, url: photoUrl(p), blurUrl: photoUrl(p, true), position: p.position });
 
 // Column-backed personal fields, by the key the apps use
 const DETAIL_COLUMNS = { firstName: 'first_name', city: 'city', profession: 'profession' };
@@ -401,60 +402,92 @@ async function updateBlueprint(userId, body) {
 
 // ---------- photos ----------
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: env.MAX_UPLOAD_BYTES, files: 1 },
-});
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
 
-async function addPhoto(userId, file) {
-  if (!file) throw httpError(400, 'Attach a photo in the "photo" field');
+async function assertPhotoRoom(userId) {
   const count = Number((await db.query('SELECT COUNT(*) FROM photos WHERE user_id = $1', [userId])).rows[0].count);
   if (count >= env.MAX_PHOTOS) throw httpError(400, `You can add up to ${env.MAX_PHOTOS} photos`);
+}
 
-  // Trust the decoded image, not the client's content-type
-  let meta;
+// The browser uploads the raw file to a private staging key; POST /me/photos { key } then processes it here
+uploads.registerPurpose('photo', {
+  bucket: storage.BUCKET,
+  types: IMAGE_TYPES,
+  maxBytes: env.MAX_UPLOAD_BYTES,
+  keyFor: (userId, filename) => storage.buildKey('uploads', userId, filename),
+  authorize: assertPhotoRoom,
+});
+
+async function addPhoto(userId, key) {
+  await assertPhotoRoom(userId);
+  const { upload } = await uploads.claim(userId, 'photo', key);
+  let original;
+  let blurred;
   try {
-    meta = await sharp(file.buffer).metadata();
-  } catch {
-    throw httpError(400, 'That file is not a supported image');
-  }
-  if (!['jpeg', 'png', 'webp', 'heif'].includes(meta.format)) {
-    throw httpError(400, 'Use a JPG, PNG, WEBP or HEIC photo');
-  }
-
-  // Normalise: auto-rotate, cap size, re-encode as JPEG and drop EXIF (location etc.)
-  const original = await sharp(file.buffer).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
-    .jpeg({ quality: 84, mozjpeg: true }).toBuffer();
-  const blurred = await sharp(original).resize({ width: 480, withoutEnlargement: true }).blur(28)
-    .jpeg({ quality: 70 }).toBuffer();
-
-  const id = newId();
-  const storageKey = `users/${userId}/${id}.jpg`;
-  const blurKey = `users/${userId}/${id}-blur.jpg`;
-  await storage.put(storageKey, original, 'image/jpeg');
-  await storage.put(blurKey, blurred, 'image/jpeg');
-
-  try {
-    await db.query(
-      `INSERT INTO photos (id, user_id, storage_key, blur_key, mime, size_bytes, position)
-       VALUES ($1, $2, $3, $4, 'image/jpeg', $5,
-               (SELECT COALESCE(MAX(position) + 1, 0) FROM photos WHERE user_id = $2))`,
-      [id, userId, storageKey, blurKey, original.length]
-    );
+    const raw = await storage.getObject(upload.bucket, upload.key);
+    // Trust the decoded image, not the client's content-type
+    let meta;
+    try {
+      meta = await sharp(raw).metadata();
+    } catch {
+      throw httpError(400, 'That file is not a supported image');
+    }
+    if (!['jpeg', 'png', 'webp', 'heif'].includes(meta.format)) {
+      throw httpError(400, 'Use a JPG, PNG, WEBP or HEIC photo');
+    }
+    // Normalise: auto-rotate, cap size, re-encode as JPEG and drop EXIF (location etc.)
+    original = await sharp(raw).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 84, mozjpeg: true }).toBuffer();
+    blurred = await sharp(original).resize({ width: 480, withoutEnlargement: true }).blur(28)
+      .jpeg({ quality: 70 }).toBuffer();
   } catch (err) {
-    await storage.remove(storageKey);
-    await storage.remove(blurKey);
+    // A bad file can't succeed on retry: drop it
+    if (err.status === 400) {
+      await storage.deleteObject(upload.bucket, upload.key).catch(() => {});
+      await uploads.consume(upload);
+    } else {
+      await uploads.release(upload);
+    }
     throw err;
   }
+
+  const id = newId();
+  const storageKey = `users/${userId}/photos/${id}.jpg`;
+  const blurKey = `users/${userId}/photos/${id}-blur.jpg`;
+  try {
+    await storage.putObject(storage.BUCKET, storageKey, original, 'image/jpeg');
+    await storage.putObject(storage.BUCKET, blurKey, blurred, 'image/jpeg');
+    await db.transaction(async (client) => {
+      await client.query(
+        `INSERT INTO photos (id, user_id, storage_bucket, storage_key, blur_bucket, blur_key, mime, size_bytes, position)
+         VALUES ($1, $2, $3, $4, $5, $6, 'image/jpeg', $7,
+                 (SELECT COALESCE(MAX(position) + 1, 0) FROM photos WHERE user_id = $2))`,
+        [id, userId, storage.BUCKET, storageKey, storage.BUCKET, blurKey, original.length]
+      );
+      await uploads.consume(upload, client);
+    });
+  } catch (err) {
+    await storage.deleteObject(storage.BUCKET, storageKey).catch(() => {});
+    await storage.deleteObject(storage.BUCKET, blurKey).catch(() => {});
+    await uploads.release(upload);
+    throw err;
+  }
+  // The raw upload (with its EXIF) has been replaced by the processed copies
+  await storage.deleteObject(upload.bucket, upload.key).catch(() => {});
   return getProfile(userId);
 }
 
+// Storage objects go first, then the row
+async function deletePhotoFiles(photo) {
+  await storage.deleteObject(photo.storage_bucket, photo.storage_key);
+  await storage.deleteObject(photo.blur_bucket, photo.blur_key);
+}
+
 async function deletePhoto(userId, photoId) {
-  const res = await db.query('DELETE FROM photos WHERE id = $1 AND user_id = $2 RETURNING *', [photoId, userId]);
-  const photo = res.rows[0];
+  const photo = (await db.query('SELECT * FROM photos WHERE id = $1 AND user_id = $2', [photoId, userId])).rows[0];
   if (!photo) throw httpError(404, 'Photo not found');
-  await storage.remove(photo.storage_key);
-  await storage.remove(photo.blur_key);
+  await deletePhotoFiles(photo);
+  await db.query('DELETE FROM photos WHERE id = $1', [photo.id]);
   await renumberPhotos(userId);
   return getProfile(userId);
 }
@@ -504,9 +537,9 @@ router.put('/language', route(async (req, res) => res.json(await updateLanguage(
 router.put('/privacy', route(async (req, res) => res.json(await updatePrivacy(req.userId, req.body || {}))));
 router.put('/vibes', route(async (req, res) => res.json({ vibes: await updateVibes(req.userId, req.body?.vibes) })));
 router.put('/blueprint', route(async (req, res) => res.json({ blueprint: await updateBlueprint(req.userId, req.body || {}) })));
-router.post('/photos', upload.single('photo'), route(async (req, res) => res.status(201).json(await addPhoto(req.userId, req.file))));
+router.post('/photos', route(async (req, res) => res.status(201).json(await addPhoto(req.userId, req.body?.key))));
 router.delete('/photos/:id', route(async (req, res) => res.json(await deletePhoto(req.userId, req.params.id))));
 router.put('/photos/:id/primary', route(async (req, res) => res.json(await makePrimary(req.userId, req.params.id))));
 router.post('/onboarding/complete', route(async (req, res) => res.json(await completeOnboarding(req.userId))));
 
-module.exports = { router, getProfile, blueprintFromRow, detailValues, updateDetails, VIBES };
+module.exports = { router, getProfile, blueprintFromRow, detailValues, updateDetails, deletePhotoFiles, VIBES };

@@ -395,6 +395,7 @@ export function PhotosStep() {
   const [blur, setBlur] = useState(user?.photoBlurredUntilMutual ?? true);
   const [hideSearch, setHideSearch] = useState(user?.hideFromSearchEngines ?? true);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState(null);
   const fileInput = useRef(null);
@@ -405,8 +406,9 @@ export function PhotosStep() {
     e.target.value = '';
     if (!file) return;
     setUploading(true);
+    setProgress(0);
     setError(null);
-    const res = await uploadPhoto(file);
+    const res = await uploadPhoto(file, { onProgress: setProgress });
     setUploading(false);
     if (!res.ok) setError(res.error);
   };
@@ -444,7 +446,7 @@ export function PhotosStep() {
           ))}
           {photos.length < 6 && (
             <button type="button" className="photo-tile photo-add" disabled={uploading} onClick={() => fileInput.current?.click()}>
-              {uploading ? <span className="spinner" /> : <><Plus size={24} />{photos.length ? t('Add photo') : t('Add your first photo')}</>}
+              {uploading ? <><span className="spinner" /><span className="tiny muted">{Math.round(progress * 100)}%</span></> : <><Plus size={24} />{photos.length ? t('Add photo') : t('Add your first photo')}</>}
             </button>
           )}
         </div>

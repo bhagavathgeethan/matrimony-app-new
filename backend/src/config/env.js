@@ -38,16 +38,24 @@ module.exports = {
   // Members who score at least this much with a newcomer get a "new aligned match" notification
   MATCH_ALERT_THRESHOLD: Number(process.env.MATCH_ALERT_THRESHOLD || 80),
 
-  // 'local' stores files under UPLOAD_DIR; 'r2' will be added for Cloudflare R2
-  STORAGE_DRIVER: process.env.STORAGE_DRIVER || 'local',
-  UPLOAD_DIR: path.resolve(__dirname, '..', '..', process.env.UPLOAD_DIR || 'uploads'),
+  // File storage on Depot. The API key is server-side only: never log it or send it to a client.
+  STORAGE_URL: (process.env.STORAGE_URL || 'https://depot.thestucompany.com').replace(/\/$/, ''),
+  STORAGE_API_KEY: process.env.STORAGE_API_KEY || '',
+  // One private bucket holds every file; nothing is publicly readable
+  STORAGE_BUCKET: process.env.STORAGE_BUCKET || 'knotfiles',
+  STORAGE_TIMEOUT_MS: Number(process.env.STORAGE_TIMEOUT_MS || 20000),
+  // Signs the /api/media links for private photos. Set it in production so links survive restarts.
+  MEDIA_URL_SECRET: process.env.MEDIA_URL_SECRET || require('crypto').randomBytes(32).toString('hex'),
   MAX_UPLOAD_BYTES: Number(process.env.MAX_UPLOAD_BYTES || 5 * 1024 * 1024),
   MAX_PHOTOS: Number(process.env.MAX_PHOTOS || 6),
+  // Large files (multipart uploads; admin-only for now)
+  MAX_VIDEO_BYTES: Number(process.env.MAX_VIDEO_BYTES || 2 * 1024 * 1024 * 1024),
+  // Legacy local folders, read only by scripts/migrate-local-uploads.js
+  UPLOAD_DIR: path.resolve(__dirname, '..', '..', process.env.UPLOAD_DIR || 'uploads'),
 
   ERASURE_DELAY_HOURS: Number(process.env.ERASURE_DELAY_HOURS || 72),
   ERASURE_SWEEP_MINUTES: Number(process.env.ERASURE_SWEEP_MINUTES || 10),
 
-  // Files that must never be public (verification selfies); served only through admin endpoints
   PRIVATE_UPLOAD_DIR: path.resolve(__dirname, '..', '..', process.env.PRIVATE_UPLOAD_DIR || 'uploads-private'),
 
   // Interest requests a free member may send per day (premium: unlimited)

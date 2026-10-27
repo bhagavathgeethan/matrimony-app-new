@@ -11,6 +11,7 @@ export function VerificationPage() {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState(null);
   const input = useRef(null);
 
@@ -27,8 +28,9 @@ export function VerificationPage() {
   };
   const send = async () => {
     setBusy(true);
+    setProgress(0);
     setError(null);
-    const res = await submitVerification(file);
+    const res = await submitVerification(file, { onProgress: setProgress });
     setBusy(false);
     if (!res.ok) return setError(res.error);
     setFile(null);
@@ -73,7 +75,7 @@ export function VerificationPage() {
           {error && <span className="error-text">{error}</span>}
           <div className="row" style={{ '--gap': '10px' }}>
             <Button variant="secondary" icon={Camera} onClick={() => input.current?.click()}>{file ? t('Retake') : t('Take a selfie')}</Button>
-            <Button icon={ShieldCheck} loading={busy} disabled={!file || busy} onClick={send}>{t('Submit for review')}</Button>
+            <Button icon={ShieldCheck} loading={busy} disabled={!file || busy} onClick={send}>{busy ? `${Math.round(progress * 100)}%` : t('Submit for review')}</Button>
           </div>
         </div>
       )}

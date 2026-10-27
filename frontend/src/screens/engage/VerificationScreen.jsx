@@ -14,6 +14,7 @@ export const VerificationScreen = () => {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState(null);
   const input = useRef(null);
 
@@ -29,8 +30,9 @@ export const VerificationScreen = () => {
   };
   const send = async () => {
     setBusy(true);
+    setProgress(0);
     setError(null);
-    const res = await submitVerification(file);
+    const res = await submitVerification(file, { onProgress: setProgress });
     setBusy(false);
     if (!res.ok) return setError(res.error);
     setFile(null);
@@ -60,7 +62,7 @@ export const VerificationScreen = () => {
           <input ref={input} type="file" accept="image/*" capture="user" onChange={pick} style={{ display: 'none' }} aria-label={t('Selfie')} />
           {error && <Text style={styles.error}>{error}</Text>}
           <Button variant="secondary" icon={Camera} label={file ? t('Retake') : t('Take a selfie')} onPress={() => input.current?.click()} />
-          <Button icon={ShieldCheck} label={busy ? t('Sending…') : t('Submit for review')} disabled={!file || busy} onPress={send} />
+          <Button icon={ShieldCheck} label={busy ? `${t('Sending…')} ${Math.round(progress * 100)}%` : t('Submit for review')} disabled={!file || busy} onPress={send} />
         </Card>
       )}
     </Screen>

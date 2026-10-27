@@ -774,7 +774,8 @@ export function createSangamStore({ client, onRoute = () => {}, onSystemNotifica
     }
     return res;
   }
-  const voiceBlob = (audioPath) => api.voiceBlob(audioPath);
+  // Short-lived signed link for an <audio> element
+  const voiceUrl = (audioPath) => api.voiceUrl(audioPath);
 
   async function setContactShared(conversationId, share) {
     const res = await attempt(() => (share ? api.shareContact(conversationId) : api.unshareContact(conversationId)));
@@ -820,8 +821,8 @@ export function createSangamStore({ client, onRoute = () => {}, onSystemNotifica
     if (res.ok) set({ verification: res.data });
     return res;
   }
-  async function submitVerification(file) {
-    const res = await attempt(() => api.submitVerification(file));
+  async function submitVerification(file, options) {
+    const res = await attempt(() => api.submitVerification(file, options));
     if (res.ok) set({ verification: res.data });
     return res;
   }
@@ -989,7 +990,7 @@ export function createSangamStore({ client, onRoute = () => {}, onSystemNotifica
       getSimilar,
       reportLink,
       sendVoice,
-      voiceBlob,
+      voiceUrl,
       setContactShared,
       loadProposals,
       answerProposal,

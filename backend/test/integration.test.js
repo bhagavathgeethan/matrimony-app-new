@@ -1,7 +1,6 @@
 // End-to-end API tests against a real (embedded) PostgreSQL with several real users.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('fs');
 const path = require('path');
 const { startTestStack } = require('./helpers/testServer');
 
@@ -39,16 +38,37 @@ async function api(pathname, { method = 'GET', body, token, form } = {}) {
   return { status: res.status, data };
 }
 
-const fileOnDisk = (url) => path.join(stack.uploadDir, decodeURIComponent(new URL(url).pathname.replace(/^\/uploads\//, '')));
+// Signs a direct upload and PUTs the bytes to storage exactly as a browser would. Returns { status, key } (or the failed sign).
+async function uploadTo(token, purpose, buffer, contentType, extra = {}) {
+  const signed = await api('/me/uploads/sign', { method: 'POST', token, body: { purpose, contentType, size: buffer.length, filename: 'file.bin', ...extra } });
+  if (signed.status !== 200) return signed;
+  const put = await fetch(signed.data.url, { method: 'PUT', headers: signed.data.headers, body: buffer });
+  assert.equal(put.status, 200, 'storage accepted the signed PUT');
+  return { status: 200, key: signed.data.key };
+}
 
-async function imageForm(color = '#a81e3c', { format = 'png', withExif = false } = {}) {
+async function imageBuffer(color = '#a81e3c', { format = 'png', withExif = false } = {}) {
   let img = sharp({ create: { width: 640, height: 800, channels: 3, background: color } });
   if (withExif) img = img.withExif({ IFD0: { Copyright: 'secret-location-test' } });
-  const buffer = await img[format]().toBuffer();
-  const form = new FormData();
-  form.append('photo', new Blob([buffer], { type: `image/${format}` }), `photo.${format}`);
-  return form;
+  return img[format]().toBuffer();
 }
+
+// sign → upload → complete
+async function addPhoto(token, color, { format = 'png', withExif = false } = {}) {
+  const up = await uploadTo(token, 'photo', await imageBuffer(color, { format, withExif }), `image/${format}`);
+  assert.equal(up.status, 200, JSON.stringify(up.data));
+  return api('/me/photos', { method: 'POST', token, body: { key: up.key } });
+}
+
+// A private link (/api/media/… or a signed-link endpoint) followed through to storage
+async function openPrivate(url, headers = {}) {
+  const first = await fetch(url, { redirect: 'manual', headers });
+  if (first.status !== 302) return first;
+  return fetch(first.headers.get('location'));
+}
+
+// Every stored key, in either bucket, containing text
+const storedKeys = (text) => stack.depot.keys('knotfiles').filter((k) => k.includes(text));
 
 let phoneSeq = 9000000000;
 async function signIn(phone = `+91${phoneSeq++}`) {
@@ -74,7 +94,7 @@ async function makeMember({ name, gender, birth = 'Mar 1995', city = 'Bengaluru'
   assert.equal((await api('/me/details', { method: 'PUT', token: t, body: ONBOARDING_DETAILS })).status, 200);
   assert.equal((await api('/me/blueprint', { method: 'PUT', token: t, body: blueprint })).status, 200);
   if (vibes.length) assert.equal((await api('/me/vibes', { method: 'PUT', token: t, body: { vibes } })).status, 200);
-  assert.equal((await api('/me/photos', { method: 'POST', token: t, form: await imageForm() })).status, 201);
+  assert.equal((await addPhoto(t)).status, 201);
   const done = await api('/me/onboarding/complete', { method: 'POST', token: t });
   assert.equal(done.status, 200, JSON.stringify(done.data));
   return { ...u, id: done.data.id, name };
@@ -316,36 +336,77 @@ test.describe('profile and onboarding', () => {
     assert.equal(res.data.code, 'ONBOARDING_INCOMPLETE');
   });
 
-  test('photos: non-images rejected; uploads saved to the project folder with a blurred copy and no EXIF', async () => {
-    const bad = new FormData();
-    bad.append('photo', new Blob([Buffer.from('not an image')], { type: 'image/png' }), 'x.png');
-    assert.equal((await api('/me/photos', { method: 'POST', token: u.token, form: bad })).status, 400);
-    assert.equal((await api('/me/photos', { method: 'POST', token: u.token })).status, 400);
+  test('photos: validated before signing; only server-issued keys; bad files rejected and removed', async () => {
+    const sign = (body, token = u.token) => api('/me/uploads/sign', { method: 'POST', token, body });
+    assert.equal((await sign({ purpose: 'photo', contentType: 'application/pdf', size: 100 })).status, 400, 'type');
+    assert.equal((await sign({ purpose: 'photo', contentType: 'image/png', size: 50 * 1024 * 1024 })).status, 413, 'size');
+    assert.equal((await sign({ purpose: 'photo', contentType: 'image/png' })).status, 400, 'size required');
+    assert.equal((await sign({ purpose: 'nope', contentType: 'image/png', size: 10 })).status, 400, 'purpose');
+    assert.equal((await sign({ purpose: 'photo', contentType: 'image/png', size: 10 }, null)).status, 401);
 
-    const res = await api('/me/photos', { method: 'POST', token: u.token, form: await imageForm('#123456', { format: 'jpeg', withExif: true }) });
-    assert.equal(res.status, 201);
+    assert.equal((await api('/me/photos', { method: 'POST', token: u.token })).status, 400, 'key required');
+    assert.equal((await api('/me/photos', { method: 'POST', token: u.token, body: { key: 'uploads/x/made-up.png' } })).status, 400, 'key never issued');
+    const signedOnly = await sign({ purpose: 'photo', contentType: 'image/png', size: 10, filename: '../../Evil Name.PNG' });
+    assert.match(signedOnly.data.key, /^uploads\/[0-9a-f-]{36}\/[0-9a-f-]{36}-evil-name\.png$/, 'server-built, sanitised key');
+    assert.equal((await api('/me/photos', { method: 'POST', token: u.token, body: { key: signedOnly.data.key } })).status, 400, 'never uploaded');
+    const other = await signIn();
+    const theirs = await uploadTo(other.token, 'photo', await imageBuffer(), 'image/png');
+    assert.equal((await api('/me/photos', { method: 'POST', token: u.token, body: { key: theirs.key } })).status, 400, 'someone else’s upload');
+
+    // The storage signature covers the content type
+    const s = await sign({ purpose: 'photo', contentType: 'image/png', size: 10 });
+    assert.equal((await fetch(s.data.url, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: 'x' })).status, 403);
+
+    const bad = await uploadTo(u.token, 'photo', Buffer.from('not an image'), 'image/png');
+    assert.equal((await api('/me/photos', { method: 'POST', token: u.token, body: { key: bad.key } })).status, 400);
+    assert.equal(stack.depot.object('knotfiles', bad.key), null, 'rejected upload deleted');
+  });
+
+  test('photos: private bucket; original and blurred copy behind separate expiring links; EXIF stripped', async () => {
+    const res = await addPhoto(u.token, '#123456', { format: 'jpeg', withExif: true });
+    assert.equal(res.status, 201, JSON.stringify(res.data));
     const photo = res.data.photos[0];
-    const original = fileOnDisk(photo.url);
-    const blurred = fileOnDisk(photo.blurUrl);
-    assert.ok(original.startsWith(stack.uploadDir), 'stored under UPLOAD_DIR');
-    assert.ok(fs.existsSync(original) && fs.existsSync(blurred));
-    const meta = await sharp(original).metadata();
+    const meId = (await api('/me', { token: u.token })).data.id;
+
+    assert.match(photo.url, /\/api\/media\/photos\/[0-9a-f-]+\?exp=\d+&sig=[0-9a-f]{64}$/);
+    const served = await openPrivate(photo.url);
+    assert.equal(served.status, 200);
+    assert.equal(served.headers.get('content-type'), 'image/jpeg');
+    const meta = await sharp(Buffer.from(await served.arrayBuffer())).metadata();
     assert.equal(meta.format, 'jpeg');
     assert.equal(meta.exif, undefined, 'EXIF stripped');
 
-    const served = await fetch(`${base}${new URL(photo.url).pathname}`);
-    assert.equal(served.status, 200);
-    assert.equal(served.headers.get('content-type'), 'image/jpeg');
+    assert.equal(stack.depot.isPublic('knotfiles'), false, 'bucket created private');
+    assert.match(photo.blurUrl, /\/api\/media\/photos\/[0-9a-f-]+\?blur=1&exp=\d+&sig=[0-9a-f]{64}$/);
+    const blurred = await openPrivate(photo.blurUrl);
+    assert.equal(blurred.status, 200);
+    assert.ok((await sharp(Buffer.from(await blurred.arrayBuffer())).metadata()).width <= 480, 'the blurred copy');
+    assert.equal((await fetch(photo.blurUrl.replace('blur=1&', ''), { redirect: 'manual' })).status, 403, 'a blurred link can’t be turned into the original');
+    assert.deepEqual(stack.depot.keys('knotfiles', `uploads/${meId}/`), [], 'raw upload (with EXIF) removed');
+    assert.equal(stack.depot.keys('knotfiles', `users/${meId}/photos/`).length, 2);
+    assert.equal((await db.query('SELECT COUNT(*)::int AS n FROM uploads WHERE user_id = $1 AND completed_at IS NOT NULL', [meId])).rows[0].n, 0);
+
+    // Our link: tampered or expired links don't open
+    assert.equal((await fetch(photo.url.replace(/sig=[0-9a-f]/, 'sig=x'), { redirect: 'manual' })).status, 403);
+    const { photoLink } = require('../src/modules/media');
+    assert.equal((await fetch(photoLink(photo.id, { now: Date.now() - 3 * 3600 * 1000 }), { redirect: 'manual' })).status, 403, 'expired link');
+    // Storage's signed URL stops working after it expires
+    const signedUrl = (await fetch(photo.url, { redirect: 'manual' })).headers.get('location');
+    assert.equal((await fetch(signedUrl)).status, 200);
+    stack.depot.advance(301);
+    assert.equal((await fetch(signedUrl)).status, 403, 'signed URL expired');
+    stack.depot.advance(-301);
   });
 
   test('photos: reorder primary and delete removes the files', async () => {
-    const second = (await api('/me/photos', { method: 'POST', token: u.token, form: await imageForm('#00aa00') })).data.photos[1];
+    const second = (await addPhoto(u.token, '#00aa00')).data.photos[1];
+    assert.equal(storedKeys(second.id).length, 2, 'original and blurred copy stored');
     const primary = await api(`/me/photos/${second.id}/primary`, { method: 'PUT', token: u.token });
     assert.equal(primary.data.photos[0].id, second.id);
     const del = await api(`/me/photos/${second.id}`, { method: 'DELETE', token: u.token });
     assert.equal(del.data.photos.length, 1);
     assert.equal(del.data.photos[0].position, 0);
-    assert.ok(!fs.existsSync(fileOnDisk(second.url)));
+    assert.deepEqual(storedKeys(second.id), [], 'both objects deleted');
     assert.equal((await api('/me/photos/not-a-uuid', { method: 'DELETE', token: u.token })).status, 404);
   });
 
@@ -400,7 +461,7 @@ test.describe('multi-user flows', () => {
   test('photos are blurred server-side until mutual interest', async () => {
     const r = (await api('/matches', { token: ananya.token })).data.find((c) => c.firstName === 'Rohan');
     assert.equal(r.photoBlurred, true);
-    assert.match(r.photos[0], /-blur\.jpg$/);
+    assert.match(r.photos[0], /[?&]blur=1&/);
   });
 
   test('80+ filter and pass work', async () => {
@@ -443,7 +504,7 @@ test.describe('multi-user flows', () => {
     await api(`/conversations/${opened.data.id}/messages`, { method: 'POST', token: rohan.token, body: { text: 'Hello Ananya' } });
     const r = (await api(`/matches/${rohan.id}`, { token: ananya.token })).data;
     assert.equal(r.photoBlurred, false, 'mutual interest reveals photos');
-    assert.doesNotMatch(r.photos[0], /-blur\.jpg$/);
+    assert.doesNotMatch(r.photos[0], /[?&]blur=1&/);
 
     rohanWs.ws.close(); meeraWs.ws.close();
   });
@@ -496,7 +557,7 @@ test.describe('multi-user flows', () => {
     const rec = portal.data.records[0];
     assert.equal(rec.candidateName, 'Rohan');
     assert.equal(rec.photoBlurred, true);
-    assert.match(rec.photo, /-blur\.jpg$/);
+    assert.match(rec.photo, /[?&]blur=1&/);
     assert.equal(rec.phone, undefined);
     assert.equal(rec.candidateId, undefined);
     const links = (await api('/family/links', { token: ananya.token })).data;
@@ -564,13 +625,13 @@ test.describe('multi-user flows', () => {
     assert.ok((await api('/matches', { token: ananya.token })).data.some((c) => c.firstName === 'Rohan'), 'visible again');
 
     await api('/me/erasure', { method: 'POST', token: rohan.token });
-    const photoUrl = (await api('/me', { token: rohan.token })).data.photos[0].url;
+    assert.ok(storedKeys(rohan.id).length > 0);
     await db.query(`UPDATE erasure_requests SET scheduled_for = NOW() - INTERVAL '1 minute' WHERE user_id = $1`, [rohan.id]);
     const { runErasureSweep } = require('../src/modules/privacy');
     assert.equal(await runErasureSweep({ log: () => {} }), 1);
 
     assert.equal((await api('/me', { token: rohan.token })).status, 401, 'sessions gone');
-    assert.ok(!fs.existsSync(fileOnDisk(photoUrl)), 'photo files deleted');
+    assert.deepEqual(storedKeys(rohan.id), [], 'photo files deleted');
     assert.equal((await db.query('SELECT 1 FROM users WHERE id = $1', [rohan.id])).rows.length, 0);
     const audit = (await db.query('SELECT * FROM erasure_requests WHERE completed_at IS NOT NULL')).rows;
     assert.equal(audit.length, 1);
@@ -1120,30 +1181,66 @@ test.describe('engagement, safety and operations', () => {
   });
 
   test('ID verification: private selfie, admin review, verified badge', async () => {
-    const selfieForm = async () => {
-      const form = new FormData();
-      form.append('selfie', new Blob([await sharp({ create: { width: 400, height: 400, channels: 3, background: '#996655' } }).jpeg().toBuffer()], { type: 'image/jpeg' }), 's.jpg');
-      return form;
-    };
+    const selfie = async () => uploadTo(dev.token, 'selfie', await sharp({ create: { width: 400, height: 400, channels: 3, background: '#996655' } }).jpeg().toBuffer(), 'image/jpeg');
     assert.equal((await api('/me/verification', { token: dev.token })).data.verified, false);
-    const sent = await api('/me/verification', { method: 'POST', token: dev.token, form: await selfieForm() });
+    const sent = await api('/me/verification', { method: 'POST', token: dev.token, body: { key: (await selfie()).key } });
     assert.equal(sent.status, 201, JSON.stringify(sent.data));
     assert.equal(sent.data.request.status, 'pending');
-    assert.equal((await api('/me/verification', { method: 'POST', token: dev.token, form: await selfieForm() })).status, 409);
-    assert.ok(!fs.readdirSync(stack.uploadDir, { recursive: true }).some((f) => String(f).includes('verifications')), 'not in public uploads');
+    assert.equal((await selfie()).status, 409, 'checked before signing');
+    assert.equal(stack.depot.keys('knotfiles', 'verifications/').length, 1);
 
     const queue = (await api('/admin/verifications', { token: admin.token })).data;
     const item = queue.find((v) => v.member.firstName === 'Devan');
     assert.ok(item.profilePhoto);
-    const selfie = await fetch(`${base}${item.selfieUrl}`, { headers: { Authorization: `Bearer ${admin.token}` } });
-    assert.equal(selfie.status, 200);
-    assert.equal(selfie.headers.get('content-type'), 'image/jpeg');
-    assert.equal((await fetch(`${base}${item.selfieUrl}`, { headers: { Authorization: `Bearer ${dev.token}` } })).status, 403);
+    const opened = await openPrivate(`${base}${item.selfieUrl}`, { Authorization: `Bearer ${admin.token}` });
+    assert.equal(opened.status, 200);
+    assert.equal(opened.headers.get('content-type'), 'image/jpeg');
+    assert.equal((await fetch(`${base}${item.selfieUrl}`, { redirect: 'manual', headers: { Authorization: `Bearer ${dev.token}` } })).status, 403);
 
     await api(`/admin/verifications/${item.id}`, { method: 'POST', token: admin.token, body: { decision: 'approved' } });
+    assert.equal(stack.depot.keys('knotfiles', 'verifications/').length, 0, 'selfie deleted after review');
     assert.equal((await me(dev.token)).verified, true);
     assert.ok((await inbox(dev.token)).some((n) => n.type === 'account' && n.title === 'You’re verified'));
     assert.equal((await api('/matches', { token: asha.token })).data.find((c) => c.firstName === 'Devan').verified, true);
+  });
+
+  test('large files: multipart upload (admins only for now), view through a signed link, delete; abandoned uploads swept', async () => {
+    const body = { purpose: 'video', contentType: 'video/mp4', size: 25 * 1024 * 1024 + 123, filename: 'Intro Clip.MP4' };
+    assert.equal((await api('/me/uploads/multipart', { method: 'POST', token: asha.token, body })).status, 403, 'members cannot yet');
+    assert.equal((await api('/me/uploads/sign', { method: 'POST', token: admin.token, body: { ...body, size: 150 * 1024 * 1024 } })).status, 400, 'too big for one PUT');
+
+    const started = await api('/me/uploads/multipart', { method: 'POST', token: admin.token, body });
+    assert.equal(started.status, 201, JSON.stringify(started.data));
+    const { id, partSize, partCount } = started.data;
+    assert.equal(partCount, 3);
+    assert.equal((await api(`/me/uploads/multipart/${id}/parts`, { method: 'POST', token: admin.token, body: { partNumbers: [4] } })).status, 400);
+    assert.equal((await api(`/me/uploads/multipart/${id}/parts`, { method: 'POST', token: asha.token, body: { partNumbers: [1] } })).status, 404, 'not theirs');
+    const { parts } = (await api(`/me/uploads/multipart/${id}/parts`, { method: 'POST', token: admin.token, body: { partNumbers: [1, 2, 3] } })).data;
+
+    const file = Buffer.alloc(body.size, 7);
+    const done = await Promise.all(parts.map(async ({ partNumber, url }) => {
+      const res = await fetch(url, { method: 'PUT', body: file.subarray((partNumber - 1) * partSize, partNumber * partSize) });
+      return { partNumber, etag: res.headers.get('etag') };
+    }));
+    const completed = await api(`/me/uploads/multipart/${id}/complete`, { method: 'POST', token: admin.token, body: { parts: done } });
+    assert.equal(completed.status, 200, JSON.stringify(completed.data));
+    assert.equal(completed.data.size, body.size);
+    assert.match(completed.data.key, /^users\/[0-9a-f-]+\/videos\/[0-9a-f-]{36}-intro-clip\.mp4$/);
+    assert.equal(stack.depot.object('knotfiles', completed.data.key).body.length, body.size);
+
+    assert.equal((await fetch(`${base}/api/me/uploads/${id}/view`, { redirect: 'manual', headers: { Authorization: `Bearer ${asha.token}` } })).status, 404);
+    const viewed = await openPrivate(`${base}/api/me/uploads/${id}/view`, { Authorization: `Bearer ${admin.token}` });
+    assert.equal(viewed.status, 200);
+    assert.equal(viewed.headers.get('content-type'), 'video/mp4');
+    assert.equal((await api(`/me/uploads/${id}`, { method: 'DELETE', token: admin.token })).status, 204);
+    assert.equal(stack.depot.object('knotfiles', completed.data.key), null, 'deleted from storage');
+
+    // Signed but never finished: the sweep deletes the object and the row
+    const abandoned = await uploadTo(asha.token, 'photo', await imageBuffer(), 'image/png');
+    await db.query(`UPDATE uploads SET created_at = NOW() - INTERVAL '2 days' WHERE key = $1`, [abandoned.key]);
+    assert.ok(await require('../src/modules/uploads').sweepAbandoned() >= 1);
+    assert.equal(stack.depot.object('knotfiles', abandoned.key), null);
+    assert.equal((await db.query('SELECT 1 FROM uploads WHERE key = $1', [abandoned.key])).rows.length, 0);
   });
 
   test('success stories: partner confirms, admin publishes, public page lists it', async () => {
@@ -1206,7 +1303,7 @@ test.describe('engagement, safety and operations', () => {
     const nudge = (await inbox(vasanth.token)).find((n) => n.type === 'profile_nudge');
     assert.match(nudge.title, /^Your profile is \d+% complete$/);
     const again = await runJobsOnce(morning);
-    assert.deepEqual(again, { picks: 0, nudges: 0, digests: 0 }, 'idempotent');
+    assert.deepEqual(again, { picks: 0, nudges: 0, digests: 0, abandonedUploads: 0 }, 'idempotent');
     const early = new Date(morning);
     early.setUTCHours(0, 0, 0, 0); // 05:30 IST: before picks time
     assert.equal((await runJobsOnce(early)).picks, 0);
@@ -1413,23 +1510,24 @@ test.describe('premium tiers', () => {
 
   test('voice notes (Premium to send) and phone-number exchange by mutual consent', async () => {
     const thread = (await api('/conversations', { token: tara.token })).data.find((t) => t.candidateName === 'Ravi');
-    const voiceForm = (ms) => {
-      const form = new FormData();
-      form.append('audio', new Blob([Buffer.from('fake-webm-audio')], { type: 'audio/webm' }), 'note.webm');
-      form.append('durationMs', String(ms));
-      return form;
-    };
-    assert.equal((await api(`/conversations/${thread.id}/voice`, { method: 'POST', token: ravi.token, form: voiceForm(3000) })).status, 403, 'not accepted yet');
+    const record = (token) => uploadTo(token, 'voice', Buffer.from('fake-webm-audio'), 'audio/webm', { conversationId: thread.id, filename: 'voice.webm' });
+    const send = (token, key, ms) => api(`/conversations/${thread.id}/voice`, { method: 'POST', token, body: { key, durationMs: ms } });
+    assert.equal((await record(ravi.token)).status, 403, 'not accepted yet');
     await api(`/conversations/${thread.id}/accept`, { method: 'POST', token: tara.token });
-    assert.equal((await api(`/conversations/${thread.id}/voice`, { method: 'POST', token: tara.token, form: voiceForm(3000) })).status, 403, 'free cannot send');
-    assert.equal((await api(`/conversations/${thread.id}/voice`, { method: 'POST', token: ravi.token, form: voiceForm(70000) })).status, 400);
-    const sent = await api(`/conversations/${thread.id}/voice`, { method: 'POST', token: ravi.token, form: voiceForm(3000) });
+    assert.equal((await record(tara.token)).status, 403, 'free cannot send');
+    const { key } = await record(ravi.token);
+    assert.ok(key.startsWith(`conversations/${thread.id}/voice/`) && key.endsWith('-voice.webm'), key);
+    assert.equal((await send(ravi.token, key, 70000)).status, 400);
+    const sent = await send(ravi.token, key, 3000);
     assert.equal(sent.status, 201, JSON.stringify(sent.data));
     assert.equal(sent.data.message.kind, 'voice');
-    const audio = await fetch(`${base}/api${sent.data.message.audioPath}`, { headers: { Authorization: `Bearer ${tara.token}` } });
+    assert.equal((await send(ravi.token, key, 3000)).status, 400, 'an upload is used once');
+    const audio = await openPrivate(`${base}/api${sent.data.message.audioPath}`, { Authorization: `Bearer ${tara.token}` });
     assert.equal(audio.status, 200);
     assert.equal(audio.headers.get('content-type'), 'audio/webm');
-    assert.equal((await fetch(`${base}/api${sent.data.message.audioPath}`, { headers: { Authorization: `Bearer ${gopal.token}` } })).status, 404);
+    const link = await api(`${sent.data.message.audioPath}?format=json`, { token: tara.token });
+    assert.ok(link.data.url.startsWith(stack.depot.url));
+    assert.equal((await fetch(`${base}/api${sent.data.message.audioPath}`, { redirect: 'manual', headers: { Authorization: `Bearer ${gopal.token}` } })).status, 404);
 
     assert.equal((await api(`/conversations/${thread.id}/contact`, { method: 'POST', token: tara.token })).status, 403, 'free cannot offer first');
     const offered = await api(`/conversations/${thread.id}/contact`, { method: 'POST', token: ravi.token });
@@ -1554,4 +1652,5 @@ test('unknown routes and bad JSON give clean errors; health checks the database'
   assert.equal(bad.status, 400);
   const health = await api('/health');
   assert.equal(health.data.database, 'connected');
+  assert.equal(health.data.storage, 'connected');
 });

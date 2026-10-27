@@ -35,7 +35,15 @@ cd web && npm run build      # creates web/dist, served by the backend
 ## Services still to connect
 
 - **SMS** — `backend/src/services/sms.js` uses a dummy provider (logs codes; returns them to the app outside production). The real provider implements `sendOtp` and `sendFamilyInvite`.
-- **File storage** — `backend/src/services/storage.js` saves to `backend/uploads/`. A Cloudflare R2 driver implements `put`, `remove` and `url`.
+
+## File storage (Depot)
+
+Files live in Depot (`STORAGE_URL`, `STORAGE_API_KEY`, `STORAGE_BUCKET` in `backend/.env`; the key is server-side only). One private bucket, `knotfiles`, holds photos (original and blurred copy), verification selfies and voice notes. Files open only through short-lived signed links that the backend hands to people allowed to see them. The database stores bucket + key.
+
+- Browsers upload straight to storage: `POST /api/me/uploads/sign` → `PUT` to the signed URL with the returned headers → the feature's endpoint with `{ key }` (e.g. `POST /api/me/photos`). Files over 100 MB use `/api/me/uploads/multipart` (10 MB parts; admins only until a feature needs it). Client helper: `shared/uploads.js`.
+- The storage CORS policy must allow `PUT` and `GET` from the web and app origins and expose the `ETag` header (multipart).
+- `npm run storage:smoke` runs sign → upload → complete → view → delete (and a 210 MB multipart video) against a running dev backend and the real Depot.
+- `npm run storage:migrate-local` moves files saved by the old local driver (`backend/uploads*`) into Depot, once.
 
 ## Tests
 

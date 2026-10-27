@@ -1,18 +1,17 @@
 // ID verification: the member uploads a live selfie; an admin compares it with their profile photos and
-// approves or rejects. Selfies live in private storage and are only readable through admin endpoints.
+// approves or rejects. Selfies are only viewable through admin endpoints (short-lived signed links).
 // (A government-ID provider such as DigiLocker can replace the manual review later.)
 const express = require('express');
-const multer = require('multer');
 const sharp = require('sharp');
 const env = require('../config/env');
 const db = require('../config/db');
 const storage = require('../services/storage');
+const uploads = require('./uploads');
 const { httpError, newId } = require('../lib/util');
 const { tx } = require('../lib/i18n');
 const { route } = require('../lib/http');
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: env.MAX_UPLOAD_BYTES, files: 1 } });
 
 const toDto = (v) => (v
   ? { id: v.id, status: v.status, note: v.note, submittedAt: v.created_at, reviewedAt: v.reviewed_at }
@@ -28,28 +27,62 @@ async function status(userId) {
   return { verified: Boolean(u?.id_verified_at), verifiedAt: u?.id_verified_at || null, request: toDto(await latest(userId)) };
 }
 
-async function submit(userId, file) {
-  if (!file) throw httpError(400, 'Attach a selfie in the "selfie" field');
+async function assertCanSubmit(userId) {
   const current = await status(userId);
   if (current.verified) throw httpError(409, 'Your profile is already verified');
   if (current.request?.status === 'pending') throw httpError(409, 'Your selfie is already being reviewed');
   const photos = (await db.query('SELECT COUNT(*)::int AS n FROM photos WHERE user_id = $1', [userId])).rows[0].n;
   if (!photos) throw httpError(400, 'Add a profile photo first so we can compare it with your selfie');
+}
 
-  let meta;
+// Raw selfie goes to a private staging key; POST /me/verification { key } re-encodes it (no EXIF) and files it
+uploads.registerPurpose('selfie', {
+  bucket: storage.BUCKET,
+  types: ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'],
+  maxBytes: env.MAX_UPLOAD_BYTES,
+  keyFor: (userId, filename) => storage.buildKey('uploads', userId, filename),
+  authorize: assertCanSubmit,
+});
+
+async function submit(userId, uploadKey) {
+  await assertCanSubmit(userId);
+  const { upload } = await uploads.claim(userId, 'selfie', uploadKey);
+  let image;
   try {
-    meta = await sharp(file.buffer).metadata();
-  } catch {
-    throw httpError(400, 'That file is not a supported image');
+    const raw = await storage.getObject(upload.bucket, upload.key);
+    let meta;
+    try {
+      meta = await sharp(raw).metadata();
+    } catch {
+      throw httpError(400, 'That file is not a supported image');
+    }
+    if (!['jpeg', 'png', 'webp', 'heif'].includes(meta.format)) throw httpError(400, 'Use a JPG, PNG, WEBP or HEIC photo');
+    image = await sharp(raw).rotate().resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 82 }).toBuffer();
+  } catch (err) {
+    if (err.status === 400) {
+      await storage.deleteObject(upload.bucket, upload.key).catch(() => {});
+      await uploads.consume(upload);
+    } else {
+      await uploads.release(upload);
+    }
+    throw err;
   }
-  if (!['jpeg', 'png', 'webp', 'heif'].includes(meta.format)) throw httpError(400, 'Use a JPG, PNG, WEBP or HEIC photo');
-  const image = await sharp(file.buffer).rotate().resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true })
-    .jpeg({ quality: 82 }).toBuffer();
 
   const id = newId();
   const key = `verifications/${userId}/${id}.jpg`;
-  await storage.private.put(key, image);
-  await db.query('INSERT INTO verifications (id, user_id, selfie_key) VALUES ($1, $2, $3)', [id, userId, key]);
+  try {
+    await storage.putObject(storage.BUCKET, key, image, 'image/jpeg');
+    await db.transaction(async (client) => {
+      await client.query('INSERT INTO verifications (id, user_id, selfie_bucket, selfie_key) VALUES ($1, $2, $3, $4)', [id, userId, storage.BUCKET, key]);
+      await uploads.consume(upload, client);
+    });
+  } catch (err) {
+    await storage.deleteObject(storage.BUCKET, key).catch(() => {});
+    await uploads.release(upload);
+    throw err;
+  }
+  await storage.deleteObject(upload.bucket, upload.key).catch(() => {});
   return status(userId);
 }
 
@@ -75,11 +108,11 @@ async function review(adminId, verificationId, decision, note) {
     data: { target: 'verification' },
   });
   // The selfie has done its job once reviewed
-  await storage.private.remove(v.selfie_key).catch(() => {});
+  await storage.deleteObject(v.selfie_bucket, v.selfie_key).catch(() => {});
   return { id: verificationId, status: decision };
 }
 
 router.get('/', route(async (req, res) => res.json(await status(req.userId))));
-router.post('/', upload.single('selfie'), route(async (req, res) => res.status(201).json(await submit(req.userId, req.file))));
+router.post('/', route(async (req, res) => res.status(201).json(await submit(req.userId, req.body?.key))));
 
 module.exports = { router, review, status };

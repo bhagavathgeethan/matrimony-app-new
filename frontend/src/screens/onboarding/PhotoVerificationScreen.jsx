@@ -16,6 +16,7 @@ export const PhotoVerificationScreen = () => {
   const [blurMutual, setBlurMutual] = useState(user?.photoBlurredUntilMutual ?? true);
   const [hideSearch, setHideSearch] = useState(user?.hideFromSearchEngines ?? true);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState(null);
   const fileInput = useRef(null);
@@ -26,8 +27,9 @@ export const PhotoVerificationScreen = () => {
     e.target.value = '';
     if (!file) return;
     setUploading(true);
+    setProgress(0);
     setError(null);
-    const res = await uploadPhoto(file);
+    const res = await uploadPhoto(file, { onProgress: setProgress });
     setUploading(false);
     if (!res.ok) setError(res.error);
   };
@@ -112,7 +114,10 @@ export const PhotoVerificationScreen = () => {
               style={[styles.tile, styles.addSlot]}
             >
               {uploading ? (
-                <ActivityIndicator color={colors.accent} />
+                <>
+                  <ActivityIndicator color={colors.accent} />
+                  <Text style={styles.addText}>{Math.round(progress * 100)}%</Text>
+                </>
               ) : (
                 <>
                   <Plus size={22} color={colors.accent} />

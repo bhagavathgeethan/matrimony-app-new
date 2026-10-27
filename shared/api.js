@@ -4,6 +4,7 @@
 //   web:    '/api' (same origin — the backend serves the web app)
 
 import { t } from './i18n.js';
+import { uploadFile, uploadLargeFile } from './uploads.js';
 
 const TOKEN_KEY = 'sangam.session';
 
@@ -40,9 +41,9 @@ export function createApiClient({ baseUrl }) {
   const TIMEOUT_MS = 12000;
 
   // One fetch with a timeout, so a stalled connection fails instead of hanging forever
-  async function fetchWithTimeout(url, options) {
+  async function fetchWithTimeout(url, options, timeoutMs = TIMEOUT_MS) {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timer = controller ? setTimeout(() => controller.abort(), TIMEOUT_MS) : null;
+    const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
     try {
       return await fetch(url, { ...options, ...(controller ? { signal: controller.signal } : {}) });
     } finally {
@@ -51,7 +52,7 @@ export function createApiClient({ baseUrl }) {
   }
 
   // Throws an Error carrying .status and .code on any non-2xx response
-  async function request(path, { method = 'GET', body, form, auth = true } = {}) {
+  async function request(path, { method = 'GET', body, form, auth = true, timeout } = {}) {
     const headers = {};
     const token = session.get();
     if (auth && token) headers.Authorization = `Bearer ${token}`;
@@ -62,7 +63,7 @@ export function createApiClient({ baseUrl }) {
     // Reads are retried once on a network failure or timeout; writes are not (they may have gone through)
     for (let attempt = 0; attempt < (method === 'GET' ? 2 : 1) && !res; attempt += 1) {
       try {
-        res = await fetchWithTimeout(`${API_BASE}${path}`, options);
+        res = await fetchWithTimeout(`${API_BASE}${path}`, options, timeout);
       } catch {
         if (attempt === (method === 'GET' ? 1 : 0)) {
           const err = new Error(t('Can’t reach 3Knot. Check your connection and try again.'));
@@ -83,6 +84,16 @@ export function createApiClient({ baseUrl }) {
     return data;
   }
 
+  // Signed direct upload to storage; errors read like other request errors
+  async function upload(file, options) {
+    try {
+      return await uploadFile(request, file, options);
+    } catch (err) {
+      if (!/^Upload failed/.test(err.message)) throw err;
+      throw Object.assign(new Error(err.status ? t('Request failed ({status})', { status: err.status }) : t('Can’t reach 3Knot. Check your connection and try again.')), { status: err.status });
+    }
+  }
+
   const api = {
     health: () => request('/health', { auth: false }),
 
@@ -100,10 +111,10 @@ export function createApiClient({ baseUrl }) {
     updateLanguage: (language) => request('/me/language', { method: 'PUT', body: { language } }),
     updateVibes: (vibes) => request('/me/vibes', { method: 'PUT', body: { vibes } }),
     updateBlueprint: (blueprint) => request('/me/blueprint', { method: 'PUT', body: blueprint }),
-    uploadPhoto: (file) => {
-      const form = new FormData();
-      form.append('photo', file);
-      return request('/me/photos', { method: 'POST', form });
+    // onProgress(fraction) while the file uploads; the server then processes it (resize, strip EXIF, blur)
+    uploadPhoto: async (file, { onProgress } = {}) => {
+      const key = await upload(file, { purpose: 'photo', onProgress });
+      return request('/me/photos', { method: 'POST', body: { key }, timeout: 30000 });
     },
     deletePhoto: (id) => request(`/me/photos/${id}`, { method: 'DELETE' }),
     makePhotoPrimary: (id) => request(`/me/photos/${id}/primary`, { method: 'PUT' }),
@@ -112,10 +123,9 @@ export function createApiClient({ baseUrl }) {
     updatePrompts: (prompts) => request('/me/prompts', { method: 'PUT', body: { prompts } }),
     updateStatus: (status) => request('/me/status', { method: 'PUT', body: status }),
     getVerification: () => request('/me/verification'),
-    submitVerification: (file) => {
-      const form = new FormData();
-      form.append('selfie', file);
-      return request('/me/verification', { method: 'POST', form });
+    submitVerification: async (file, { onProgress } = {}) => {
+      const key = await upload(file, { purpose: 'selfie', onProgress });
+      return request('/me/verification', { method: 'POST', body: { key }, timeout: 30000 });
     },
     exportData: () => request('/me/export'),
     requestErasure: () => request('/me/erasure', { method: 'POST' }),
@@ -180,18 +190,18 @@ export function createApiClient({ baseUrl }) {
     rewind: () => request('/matches/rewind', { method: 'POST' }),
     getSimilar: (id) => request(`/matches/${id}/similar`),
     reportLink: (id) => request(`/matches/${id}/report-link`, { method: 'POST' }),
-    sendVoice: (conversationId, blob, durationMs) => {
-      const form = new FormData();
+    sendVoice: async (conversationId, blob, durationMs) => {
       const ext = (blob.type || '').includes('mp4') ? 'm4a' : (blob.type || '').includes('ogg') ? 'ogg' : 'webm';
-      form.append('audio', blob, `voice.${ext}`);
-      form.append('durationMs', String(Math.round(durationMs)));
-      return request(`/conversations/${conversationId}/voice`, { method: 'POST', form });
+      const key = await upload(blob, { purpose: 'voice', conversationId, filename: `voice.${ext}` });
+      return request(`/conversations/${conversationId}/voice`, { method: 'POST', body: { key, durationMs: Math.round(durationMs) } });
     },
-    // Voice notes need the session header, so they are fetched as blobs
-    voiceBlob: async (audioPath) => {
-      const res = await fetch(`${API_BASE}${audioPath}`, { headers: { Authorization: `Bearer ${session.get()}` } });
-      if (!res.ok) throw new Error(t('Could not load the voice note'));
-      return res.blob();
+    // A short-lived signed link to play the voice note (the backend checks you're in the conversation)
+    voiceUrl: async (audioPath) => {
+      try {
+        return (await request(`${audioPath}?format=json`)).url;
+      } catch {
+        throw new Error(t('Could not load the voice note'));
+      }
     },
     shareContact: (conversationId) => request(`/conversations/${conversationId}/contact`, { method: 'POST' }),
     unshareContact: (conversationId) => request(`/conversations/${conversationId}/contact`, { method: 'DELETE' }),
@@ -209,6 +219,13 @@ export function createApiClient({ baseUrl }) {
     // Calls
     getCallConfig: () => request('/calls/config'),
 
+    // Large files (multipart, admins only for now): returns { id, key, size, … }; view() gives a short-lived link
+    uploads: {
+      uploadLarge: (file, { purpose = 'video', onProgress } = {}) => uploadLargeFile((path, opts) => request(path, { ...opts, timeout: 120000 }), file, { purpose, onProgress }),
+      view: async (id) => (await request(`/me/uploads/${id}/view?format=json`)).url,
+      remove: (id) => request(`/me/uploads/${id}`, { method: 'DELETE' }),
+    },
+
     // Admin console
     admin: {
       stats: () => request('/admin/stats'),
@@ -219,11 +236,13 @@ export function createApiClient({ baseUrl }) {
       unhideMember: (id) => request(`/admin/members/${id}/unhide`, { method: 'POST' }),
       verifications: () => request('/admin/verifications'),
       reviewVerification: (id, decision, note) => request(`/admin/verifications/${id}`, { method: 'POST', body: { decision, note } }),
-      // Selfies need the session header, so they are fetched as blobs
-      selfieBlob: async (path) => {
-        const res = await fetch(`${API_BASE}${path.replace(/^\/api/, '')}`, { headers: { Authorization: `Bearer ${session.get()}` } });
-        if (!res.ok) throw new Error(t('Could not load the selfie'));
-        return res.blob();
+      // A short-lived signed link to the selfie
+      selfieUrl: async (path) => {
+        try {
+          return (await request(`${path.replace(/^\/api/, '')}?format=json`)).url;
+        } catch {
+          throw new Error(t('Could not load the selfie'));
+        }
       },
       stories: () => request('/admin/stories'),
       reviewStory: (id, decision) => request(`/admin/stories/${id}`, { method: 'POST', body: { decision } }),

@@ -80,17 +80,15 @@ export function VoiceRecorderButton({ conversationId }) {
 }
 
 export function VoiceNote({ message }) {
-  const { voiceBlob } = useStore();
+  const { voiceUrl } = useStore();
   const [url, setUrl] = useState(null);
   const [playing, setPlaying] = useState(false);
   const audio = useRef(null);
-  useEffect(() => () => url && URL.revokeObjectURL(url), [url]);
   const toggle = async () => {
     if (!url) {
-      const blob = await voiceBlob(message.audioPath).catch(() => null);
-      if (!blob) return;
-      const u = URL.createObjectURL(blob);
-      setUrl(u);
+      const signed = await voiceUrl(message.audioPath).catch(() => null);
+      if (!signed) return;
+      setUrl(signed);
       setTimeout(() => audio.current?.play(), 0);
       return;
     }
@@ -104,7 +102,7 @@ export function VoiceNote({ message }) {
       </button>
       <span className="voice-wave" aria-hidden="true" />
       <span className="tiny">{formatDuration(message.durationMs || 0)}</span>
-      {url && <audio ref={audio} src={url} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} />}
+      {url && <audio ref={audio} src={url} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} onError={() => { setUrl(null); setPlaying(false); }} />}
     </span>
   );
 }

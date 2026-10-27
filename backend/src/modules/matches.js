@@ -2,7 +2,7 @@
 const express = require('express');
 const env = require('../config/env');
 const db = require('../config/db');
-const storage = require('../services/storage');
+const { photoUrl } = require('./media');
 const realtime = require('../services/realtime');
 const { computeMatchScore, calculatePillarOverlap } = require('../services/blueprintEngine');
 const { blueprintFromRow, detailValues } = require('./profile');
@@ -80,7 +80,7 @@ function visiblePhotos(owner, photos, ctx) {
   const context = typeof ctx === 'boolean' ? { isMutual: ctx } : ctx || {};
   const blurred = !photosClearFor(owner, context);
   return {
-    photos: (photos || []).map((p) => storage.url(blurred ? p.blur_key : p.storage_key)),
+    photos: (photos || []).map((p) => photoUrl(p, blurred)),
     photoBlurred: blurred,
   };
 }

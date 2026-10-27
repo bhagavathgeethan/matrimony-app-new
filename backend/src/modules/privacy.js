@@ -3,7 +3,8 @@ const express = require('express');
 const env = require('../config/env');
 const db = require('../config/db');
 const storage = require('../services/storage');
-const { getProfile } = require('./profile');
+const { getProfile, deletePhotoFiles } = require('./profile');
+const uploads = require('./uploads');
 const { listConversations } = require('./chat');
 const { listLinks, listShares } = require('./family');
 const { httpError, newId, sha256, randomToken } = require('../lib/util');
@@ -87,11 +88,11 @@ async function cancelErasure(userId) {
 // Erases one account: files first, then the user row (cascades to everything they own;
 // their messages stay in the other person's history with no sender — "Former member")
 async function eraseUser(userId) {
-  const photos = await db.query('SELECT storage_key, blur_key FROM photos WHERE user_id = $1', [userId]);
-  for (const p of photos.rows) {
-    await storage.remove(p.storage_key);
-    await storage.remove(p.blur_key);
-  }
+  const photos = await db.query('SELECT * FROM photos WHERE user_id = $1', [userId]);
+  for (const p of photos.rows) await deletePhotoFiles(p);
+  const selfies = await db.query('SELECT selfie_bucket, selfie_key FROM verifications WHERE user_id = $1', [userId]);
+  for (const v of selfies.rows) await storage.deleteObject(v.selfie_bucket, v.selfie_key);
+  await uploads.deleteAllFor(userId);
   await db.transaction(async (client) => {
     await client.query(
       'UPDATE erasure_requests SET completed_at = NOW(), user_id = NULL WHERE user_id = $1 AND completed_at IS NULL AND cancelled_at IS NULL',

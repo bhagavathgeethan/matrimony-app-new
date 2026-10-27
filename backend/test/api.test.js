@@ -133,6 +133,33 @@ test('every literal t() and tx() string in the apps has a translation', () => {
   };
   for (const dir of ['web/src', 'frontend/src', 'shared', 'backend/src']) walk(path.join(root, dir));
   const missing = new Set();
+  const call = /(?:t|tx)\(\s*(['"])((?:\.|(?!).)*)\s*[,)]/g;
+  for (const file of files) {
+    const src = fs.readFileSync(file, 'utf8');
+    for (const m of src.matchAll(call)) {
+      const key = m[2].replace(/\(['"\])/g, '$1').replace(/\n/g, '
+');
+      if (!(key in ta)) missing.add(`${path.relative(root, file)}: ${key}`);
+    }
+  }
+  assert.deepEqual([...missing], []);
+});
+
+test('every literal t() and tx() string in the apps has a translation', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const root = path.join(__dirname, '..', '..');
+  const ta = require('../../shared/locales/ta.js').default;
+  const files = [];
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) { if (e.name !== 'node_modules' && e.name !== 'locales') walk(p); }
+      else if (/\.(jsx?|mjs)$/.test(e.name)) files.push(p);
+    }
+  };
+  for (const dir of ['web/src', 'frontend/src', 'shared', 'backend/src']) walk(path.join(root, dir));
+  const missing = new Set();
   const call = /\b(?:t|tx)\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*[,)]/g;
   for (const file of files) {
     const src = fs.readFileSync(file, 'utf8');

@@ -7,13 +7,14 @@
     "start": "node src/server.js",
     "dev": "node src/server.js",
     "migrate": "node src/db/migrate.js",
-    "test": "node --test --test-concurrency=1 test/api.test.js test/integration.test.js"
+    "test": "node --test --test-concurrency=1 test/api.test.js test/integration.test.js",
+    "storage:smoke": "node scripts/storage-smoke.js",
+    "storage:migrate-local": "node scripts/migrate-local-uploads.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "multer": "^2.4.0",
     "pdfkit": "^0.15.0",
     "pg": "^8.23.0",
     "sharp": "^0.34.5",

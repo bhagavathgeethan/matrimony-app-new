@@ -1,4 +1,4 @@
-# 3Knot Matrimony backend: REST API + WebSocket (/ws) + uploaded photos (/uploads), on port 5000.
+# 3Knot Matrimony backend: REST API + WebSocket (/ws), on port 5000. Files live in Depot object storage.
 # Needs ../shared, so build from the repository root:
 #   docker build -f backend/Dockerfile -t 3knot-backend .
 # Settings come from the environment (see backend/.env.example); migrations run on start.
@@ -17,9 +17,10 @@ WORKDIR /app/backend
 COPY --from=deps --chown=node:node /app/backend/node_modules ./node_modules
 COPY --chown=node:node backend/package.json ./
 COPY --chown=node:node backend/src ./src
+COPY --chown=node:node backend/scripts ./scripts
 COPY --chown=node:node shared /app/shared
 
-# Photos and verification selfies: mount volumes here so they survive restarts and rebuilds
+# Legacy local uploads: kept only so scripts/migrate-local-uploads.js can move them to Depot
 RUN mkdir -p uploads uploads-private && chown node:node uploads uploads-private
 VOLUME ["/app/backend/uploads", "/app/backend/uploads-private"]
 

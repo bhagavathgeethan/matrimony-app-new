@@ -2,9 +2,10 @@
 // A conversation starts as an interest request (optionally with one intro message). The recipient accepts —
 // explicitly or by replying — or declines. Accepted interest is "mutual": photos unblur and chat and calls unlock.
 const express = require('express');
-const multer = require('multer');
 const env = require('../config/env');
 const storage = require('../services/storage');
+const uploads = require('./uploads');
+const { sendSigned } = require('./media');
 const db = require('../config/db');
 const realtime = require('../services/realtime');
 const notifications = require('./notifications');
@@ -21,7 +22,7 @@ const router = express.Router();
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_VOICE_MS = 60000;
 const VOICE_TYPES = { 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a', 'audio/mpeg': 'mp3', 'audio/aac': 'aac', 'audio/x-m4a': 'm4a' };
-const voiceUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1.5 * 1024 * 1024, files: 1 } });
+const MAX_VOICE_BYTES = 1.5 * 1024 * 1024;
 // Monday 00:00 IST of this week. AT TIME ZONE keeps it right whatever the database session's time zone is.
 const WEEK_START_SQL = `(date_trunc('week', NOW() AT TIME ZONE 'Asia/Kolkata') AT TIME ZONE 'Asia/Kolkata')`;
 
@@ -402,26 +403,53 @@ router.put('/:id/read', route(async (req, res) => res.json(await markRead(req.us
 
 // ---------- voice notes (Premium to send; anyone in the thread can listen) ----------
 
-async function sendVoice(userId, conversationId, file, durationMs) {
-  if (!file) throw httpError(400, 'Attach the recording in the "audio" field');
+async function assertCanSendVoice(userId, conversationId) {
   const me = (await db.query('SELECT plan, premium_until, plan_paused_at FROM users WHERE id = $1', [userId])).rows[0];
   requireFeature(me, 'voiceNotes');
   const c = await threadFor(conversationId, userId);
   if (!c.other || c.status !== 'accepted') throw httpError(403, 'Voice notes work once you have both accepted interest');
   if (await isBlockedBetween(userId, c.other)) throw httpError(404, 'Conversation not found');
-  const type = String(file.mimetype || '').split(';')[0];
-  const ext = VOICE_TYPES[type];
-  if (!ext) throw httpError(400, 'Unsupported audio format');
+  return c;
+}
+
+// Recorded in the browser and uploaded straight to storage, under the conversation
+uploads.registerPurpose('voice', {
+  bucket: storage.BUCKET,
+  types: Object.keys(VOICE_TYPES),
+  maxBytes: MAX_VOICE_BYTES,
+  keyFor: (userId, filename, { conversationId }) => storage.buildKey('conversations', `${conversationId}/voice`, filename),
+  async authorize(userId, body) {
+    if (typeof body.conversationId !== 'string') throw httpError(400, 'conversationId is required');
+    await assertCanSendVoice(userId, body.conversationId);
+    return { conversationId: body.conversationId };
+  },
+});
+
+async function sendVoice(userId, conversationId, key, durationMs) {
+  const c = await assertCanSendVoice(userId, conversationId);
   const duration = Math.round(Number(durationMs) || 0);
   if (duration <= 0 || duration > MAX_VOICE_MS) throw httpError(400, 'Voice notes can be up to one minute');
+  const { upload, object } = await uploads.claim(userId, 'voice', key);
+  if (upload.context.conversationId !== conversationId) {
+    await uploads.release(upload);
+    throw httpError(400, 'That recording was uploaded for another conversation');
+  }
   const id = newId();
-  const key = `voice/${conversationId}/${id}.${ext}`;
-  await storage.private.put(key, file.buffer);
-  const row = (await db.query(
-    `INSERT INTO messages (id, conversation_id, sender_id, body, kind, media_key, duration_ms)
-     VALUES ($1, $2, $3, $4, 'voice', $5, $6) RETURNING *`,
-    [id, conversationId, userId, '🎤 Voice note', key, duration]
-  )).rows[0];
+  let row;
+  try {
+    row = await db.transaction(async (client) => {
+      const inserted = (await client.query(
+        `INSERT INTO messages (id, conversation_id, sender_id, body, kind, media_bucket, media_key, media_size, media_type, duration_ms)
+         VALUES ($1, $2, $3, $4, 'voice', $5, $6, $7, $8, $9) RETURNING *`,
+        [id, conversationId, userId, '🎤 Voice note', upload.bucket, upload.key, object.size, upload.content_type, duration]
+      )).rows[0];
+      await uploads.consume(upload, client);
+      return inserted;
+    });
+  } catch (err) {
+    await uploads.release(upload);
+    throw err;
+  }
   await markRead(userId, conversationId);
   realtime.notify(c.other, 'message:new', { conversationId, message: toMessage(row, c.other) });
   realtime.notify(userId, 'message:new', { conversationId, message: toMessage(row, userId) });
@@ -434,21 +462,18 @@ async function sendVoice(userId, conversationId, file, durationMs) {
 
 async function voiceFile(userId, conversationId, messageId) {
   await threadFor(conversationId, userId);
-  const m = (await db.query(`SELECT media_key FROM messages WHERE id = $1 AND conversation_id = $2 AND kind = 'voice'`, [messageId, conversationId])).rows[0];
+  const m = (await db.query(`SELECT media_bucket, media_key FROM messages WHERE id = $1 AND conversation_id = $2 AND kind = 'voice'`, [messageId, conversationId])).rows[0];
   if (!m) throw httpError(404, 'Not found');
-  const ext = m.media_key.split('.').pop();
-  const mime = Object.entries(VOICE_TYPES).find(([, e]) => e === ext)?.[0] || 'application/octet-stream';
-  return { buffer: await storage.private.read(m.media_key), mime };
+  return m;
 }
 
-router.post('/:id/voice', voiceUpload.single('audio'), route(async (req, res) => {
-  res.status(201).json({ message: await sendVoice(req.userId, req.params.id, req.file, req.body?.durationMs) });
+router.post('/:id/voice', route(async (req, res) => {
+  res.status(201).json({ message: await sendVoice(req.userId, req.params.id, req.body?.key, req.body?.durationMs) });
 }));
+// Redirects to a 5-minute signed link (?format=json returns { url })
 router.get('/:id/voice/:messageId', route(async (req, res) => {
-  const { buffer, mime } = await voiceFile(req.userId, req.params.id, req.params.messageId);
-  res.setHeader('Content-Type', mime);
-  res.setHeader('Cache-Control', 'private, max-age=3600');
-  res.send(buffer);
+  const m = await voiceFile(req.userId, req.params.id, req.params.messageId);
+  await sendSigned(req, res, m.media_bucket, m.media_key);
 }));
 
 // ---------- phone-number sharing (Premium to offer first; either can accept) ----------

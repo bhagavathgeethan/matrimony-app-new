@@ -1,7 +1,7 @@
 # 3Knot Matrimony backend behind a free Cloudflare Tunnel. Runs on your PC or a VPS; the web app itself is hosted on
 # Cloudflare Workers (web/wrangler.jsonc) and forwards /api, /uploads and /ws to this backend.
 #
-#   backend      API, WebSocket and photos (backend/Dockerfile, port 5000)
+#   backend      API and WebSocket (backend/Dockerfile, port 5000); files are in Depot object storage
 #   cloudflared  Cloudflare Tunnel → backend, at your API hostname (e.g. api.example.com)
 #   web          optional: the web app on nginx for running everything here instead of Workers
 #                (docker compose --profile local-web up)
@@ -27,6 +27,7 @@ services:
       PORT: "5000"
       # Photo URLs and family-portal links start with this: use the web app's public address
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?Set PUBLIC_BASE_URL in .env, e.g. https://3knot.example.com}
+    # Legacy local uploads (until scripts/migrate-local-uploads.js has moved them to Depot)
     volumes:
       - uploads:/app/backend/uploads
       - uploads-private:/app/backend/uploads-private
