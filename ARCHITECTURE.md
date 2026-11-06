@@ -103,3 +103,22 @@ RootNavigator
 2. **Preserve JSX Containers**: Retain outer container wrappers (`<View>`, `<ScrollView>`, `<SafeAreaView>`) when replacing code blocks.
 3. **Safe React Hook Dependencies**: Destructure primitive properties (`id`, `status`, `length`) instead of placing raw complex objects into `useEffect` or `useMemo` dependency arrays.
 4. **No Automated Testing on Auth**: Per user guidelines, automated tests for signup/auth flows are prohibited; all auth validation is verified interactively.
+
+---
+
+## 7. Hosting & Production Deployment Architecture (Hostinger)
+
+### 7.1 Unified Single-Domain Topology
+- **Platform**: Hostinger Node.js Application Deployment (Express framework, Node 22.x).
+- **Domain**: `3knotmatrimony.com`
+- **Root Directory**: `backend`
+- **Unified Gateway Model**: Express acts as both the API server, WebSocket server, and static Single Page Application (SPA) file server:
+  - `/api/*`: REST endpoints (`auth`, `profile`, `matches`, `chat`, `family`, `privacy`, `notifications`).
+  - `/ws`: Real-time WebSocket connection for instant chat & family feedback.
+  - `/*`: Serves the pre-compiled React SPA assets from `backend/public/` (with `index.html` fallback for client-side routing).
+- **Zero-CORS Advantage**: The browser communicates with `/api` and `/ws` over the same origin (`https://3knotmatrimony.com`), eliminating cross-origin preflight requests and cookie/session domain conflicts.
+
+### 7.2 Build & Asset Pipeline
+- **Frontend Source**: `frontend/` (React Native Web + Vite).
+- **Build Automation**: `backend/scripts/build-frontend.js` triggers Vite build in `frontend/` and synchronizes the output bundle into `backend/public/`.
+- **Git Deployment Integration**: `backend/public/` is tracked in version control, ensuring Hostinger deploys the pre-built frontend immediately without requiring heavy devDependencies or long build times inside the host container.

@@ -98,30 +98,49 @@ CREATE TABLE blueprints (
   ambition INT DEFAULT 84,
   ambition_flexibility VARCHAR(16) DEFAULT 'firm',
   summary_text TEXT,
-  profile_strength INT DEFAULT 86,
-  updated_at TIMESTAMP DEFAULT NOW()
+  created_at TIMESTAMP DEFAULT NOW()
 );
 ```
 
-### Parent Share Record Schema (`shared_to_family` table)
+### Family Sharing Schema (`family_links` & `shared_to_family` tables)
 ```sql
+CREATE TABLE family_links (
+  id VARCHAR(64) PRIMARY KEY,
+  user_id VARCHAR(64) REFERENCES users(id) ON DELETE CASCADE,
+  relationship VARCHAR(32) NOT NULL, -- 'amma', 'appa'
+  masked_phone VARCHAR(32) NOT NULL,
+  status VARCHAR(32) DEFAULT 'active',
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
 CREATE TABLE shared_to_family (
   id VARCHAR(64) PRIMARY KEY,
-  sender_user_id VARCHAR(64) REFERENCES users(id) ON DELETE CASCADE,
+  user_id VARCHAR(64) REFERENCES users(id) ON DELETE CASCADE,
   candidate_id VARCHAR(64) REFERENCES users(id) ON DELETE CASCADE,
-  candidate_name VARCHAR(64),
-  candidate_age INT,
-  candidate_city VARCHAR(64),
-  overlap_score INT,
-  recipient_parent_id VARCHAR(64) REFERENCES family_links(id) ON DELETE CASCADE,
-  recipient_parent_name VARCHAR(64),
-  sent_at VARCHAR(64),
-  status VARCHAR(32) DEFAULT 'awaiting',
-  status_badge VARCHAR(64),
-  feedback_note TEXT,
-  permissions JSONB DEFAULT '{}'::jsonb,
-  expires_in VARCHAR(16) DEFAULT '30d',
-  child_note TEXT,
+  access_rule VARCHAR(32) DEFAULT '30d',
+  family_status VARCHAR(32) DEFAULT 'pending', -- 'pending', 'approved', 'concern'
+  family_note TEXT,
+  shared_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### Real-Time Chat Schema (`conversations` & `messages` tables)
+```sql
+CREATE TABLE conversations (
+  id VARCHAR(64) PRIMARY KEY,
+  user1_id VARCHAR(64) REFERENCES users(id) ON DELETE CASCADE,
+  user2_id VARCHAR(64) REFERENCES users(id) ON DELETE CASCADE,
+  last_message_text TEXT,
+  last_message_at TIMESTAMP DEFAULT NOW(),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE messages (
+  id VARCHAR(64) PRIMARY KEY,
+  conversation_id VARCHAR(64) REFERENCES conversations(id) ON DELETE CASCADE,
+  sender_id VARCHAR(64) REFERENCES users(id) ON DELETE CASCADE,
+  text TEXT NOT NULL,
+  is_suggested_opener BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT NOW()
 );
 ```
@@ -130,3 +149,20 @@ CREATE TABLE shared_to_family (
 
 ## 4. Updates & Maintenance
 Whenever new screens, helper functions, or state variables are introduced, update the respective rows and schemas in this document immediately.
+
+---
+
+## 5. Deployment & Infrastructure
+
+| Component | Path | Purpose |
+| :--- | :--- | :--- |
+| **Frontend Build Automation** | `backend/scripts/build-frontend.js` | Cross-platform build script: compiles `frontend/` with Vite and copies to `backend/public/` |
+| **Self-Contained SPA Assets** | `backend/public/` | Pre-compiled static SPA bundle served directly by Express at `/` with SPA route fallback |
+| **VPS Setup Script** | `backend/deploy/setup-server.sh` | One-time Hostinger VPS provisioning: Node.js 24, PM2, Nginx, Certbot, firewall, deploy user |
+| **Deploy Script** | `backend/deploy/deploy.sh` | Pull code, install deps, build web app, start/restart PM2 |
+| **Nginx Config** | `backend/deploy/nginx.conf` | Reverse proxy with WebSocket upgrade, SSL, security headers, gzip |
+| **PM2 Config** | `backend/deploy/ecosystem.config.js` | Process management: restart policy, memory limits, logging |
+| **Production Env** | `backend/.env.production` | Pre-filled production env template with TODO markers |
+| **Deploy README** | `backend/deploy/README.md` | Step-by-step deployment instructions and troubleshooting |
+| **Frontend Dist Package** | `frontend-dist.zip` | Production static bundle for Hostinger hPanel File Manager upload |
+| **Frontend .htaccess** | `frontend/public/.htaccess` | Apache/LiteSpeed SPA rewrite rule for React Router |

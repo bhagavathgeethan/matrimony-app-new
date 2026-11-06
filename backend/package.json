@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node src/server.js",
+    "build:frontend": "node scripts/build-frontend.js",
+    "build": "node scripts/build-frontend.js",
     "migrate": "node src/db/migrate.js",
     "test": "node --test --test-concurrency=1 test/api.test.js test/integration.test.js",
     "storage:smoke": "node scripts/storage-smoke.js",
