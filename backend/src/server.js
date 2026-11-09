@@ -1,6 +1,4 @@
 const http = require('http');
-const fs = require('fs');
-const path = require('path');
 const env = require('./config/env');
 const { pool } = require('./config/db');
 const { migrate } = require('./db/migrate');
@@ -35,9 +33,7 @@ async function start(port = env.PORT, { jobs = true } = {}) {
   });
 
   await new Promise((resolve) => server.listen(port, resolve));
-  const webAppReady = fs.existsSync(path.join(env.WEB_DIST_DIR, 'index.html'));
   console.log(`3Knot backend on http://localhost:${server.address().port} (SMS: ${env.SMS_PROVIDER}, storage: ${store.ok ? 'depot' : 'UNAVAILABLE'})`);
-  console.log(`Frontend SPA serving from "${env.WEB_DIST_DIR}": ${webAppReady ? 'READY' : 'NOT FOUND'}`);
   return server;
 }
 

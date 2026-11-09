@@ -156,7 +156,6 @@ Whenever new screens, helper functions, or state variables are introduced, updat
 
 | Component | Path | Purpose |
 | :--- | :--- | :--- |
-| **Self-Contained SPA Assets** | `backend/public/` | Pre-compiled static SPA bundle served directly by Express at `/` with SPA route fallback |
 | **VPS Setup Script** | `backend/deploy/setup-server.sh` | One-time Hostinger VPS provisioning: Node.js 24, PM2, Nginx, Certbot, firewall, deploy user |
 | **Deploy Script** | `backend/deploy/deploy.sh` | Pull code, install deps, build web app, start/restart PM2 |
 | **Nginx Config** | `backend/deploy/nginx.conf` | Reverse proxy with WebSocket upgrade, SSL, security headers, gzip |

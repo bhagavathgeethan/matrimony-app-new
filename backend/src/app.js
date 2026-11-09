@@ -1,6 +1,4 @@
-// Express application: routes, static files, error handling (no listening here — see server.js)
-const fs = require('fs');
-const path = require('path');
+// Express application: API routes and error handling only (the web app is deployed separately) (no listening here — see server.js)
 const express = require('express');
 const cors = require('cors');
 const env = require('./config/env');
@@ -64,15 +62,6 @@ app.use('/api/admin', auth.requireAuth, admin.router);
 app.use('/api/calls', auth.requireAuth, calls.router);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
-
-// The built web app; any other GET returns index.html so client-side routes (/matches, /portal/<token>, …) work
-if (fs.existsSync(path.join(env.WEB_DIST_DIR, 'index.html'))) {
-  app.use(express.static(env.WEB_DIST_DIR, { index: false, maxAge: '1h' }));
-  app.get(/^\/(?!api\/|ws$).*/, (req, res) => {
-    res.setHeader('Cache-Control', 'no-cache');
-    res.sendFile(path.join(env.WEB_DIST_DIR, 'index.html'));
-  });
-}
 
 // Errors: known validation errors keep their status; anything else is a logged 500
 app.use((err, req, res, next) => {

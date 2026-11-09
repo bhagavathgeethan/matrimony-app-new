@@ -115,9 +115,7 @@ RootNavigator
 - **Unified Gateway Model**: Express acts as both the API server, WebSocket server, and static Single Page Application (SPA) file server:
   - `/api/*`: REST endpoints (`auth`, `profile`, `matches`, `chat`, `family`, `privacy`, `notifications`).
   - `/ws`: Real-time WebSocket connection for instant chat & family feedback.
-  - `/*`: Serves the pre-compiled React SPA assets from `backend/public/` (with `index.html` fallback for client-side routing).
 - **Zero-CORS Advantage**: The browser communicates with `/api` and `/ws` over the same origin (`https://3knotmatrimony.com`), eliminating cross-origin preflight requests and cookie/session domain conflicts.
 
 ### 7.2 Build & Asset Pipeline
 - **Frontend Source**: `frontend/` (React Native Web + Vite).
-- **Git Deployment Integration**: `backend/public/` is tracked in version control, ensuring Hostinger deploys the pre-built frontend immediately without requiring heavy devDependencies or long build times inside the host container.

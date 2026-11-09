@@ -33,7 +33,6 @@ async function startTestStack() {
   process.env.OTP_DEV_ECHO = 'true';
   process.env.OTP_RESEND_SECONDS = '0';
   process.env.OTP_MAX_PER_HOUR = '50';
-  process.env.WEB_DIST_DIR = path.join(tmp, 'no-web');
   process.env.ADMIN_PHONES = '+919999999999';
   process.env.INTEREST_DAILY_LIMIT = '3';
   process.env.REPORT_HIDE_THRESHOLD = '2';
