@@ -4,7 +4,6 @@ uploads/
 uploads-private/
 *.log
 logs/
-web/dist/
 frontend/dist/
 build/
 *.zip
