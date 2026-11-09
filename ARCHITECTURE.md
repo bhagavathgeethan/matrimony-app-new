@@ -120,5 +120,4 @@ RootNavigator
 
 ### 7.2 Build & Asset Pipeline
 - **Frontend Source**: `frontend/` (React Native Web + Vite).
-- **Build Automation**: `backend/scripts/build-frontend.js` triggers Vite build in `frontend/` and synchronizes the output bundle into `backend/public/`.
 - **Git Deployment Integration**: `backend/public/` is tracked in version control, ensuring Hostinger deploys the pre-built frontend immediately without requiring heavy devDependencies or long build times inside the host container.

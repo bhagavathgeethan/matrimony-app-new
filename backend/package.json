@@ -4,10 +4,9 @@
   "description": "Sangam backend: REST + WebSocket API over PostgreSQL",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
+    "start": "node index.js",
     "dev": "node src/server.js",
-    "build:frontend": "node scripts/build-frontend.js",
-    "build": "node scripts/build-frontend.js",
+    "build": "echo \"Backend: no build step\"",
     "migrate": "node src/db/migrate.js",
     "test": "node --test --test-concurrency=1 test/api.test.js test/integration.test.js",
     "storage:smoke": "node scripts/storage-smoke.js",
