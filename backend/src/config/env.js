@@ -1,4 +1,5 @@
 // Central configuration, read once from the environment (backend/.env)
+const fs = require('fs');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 
@@ -78,6 +79,24 @@ module.exports = {
   NUDGE_AFTER_HOURS: Number(process.env.NUDGE_AFTER_HOURS || 24),
   NUDGE_EVERY_DAYS: Number(process.env.NUDGE_EVERY_DAYS || 3),
 
-  // The built React web app (web/dist) is served at / — including parent-portal links (/portal/<token>)
-  WEB_DIST_DIR: path.resolve(__dirname, '..', '..', process.env.WEB_DIST_DIR || '../web/dist'),
+  // The built React web app: checks backend/public, then custom WEB_DIST_DIR, then frontend/dist, then web/dist
+  WEB_DIST_DIR: (() => {
+    const backendRoot = path.resolve(__dirname, '..', '..');
+    const localPublic = path.join(backendRoot, 'public');
+    if (fs.existsSync(path.join(localPublic, 'index.html'))) {
+      return localPublic;
+    }
+    const customDir = process.env.WEB_DIST_DIR ? path.resolve(backendRoot, process.env.WEB_DIST_DIR) : null;
+    if (customDir && fs.existsSync(path.join(customDir, 'index.html'))) {
+      return customDir;
+    }
+    const candidates = [
+      path.resolve(backendRoot, '../frontend/dist'),
+      path.resolve(backendRoot, '../web/dist'),
+    ];
+    for (const dir of candidates) {
+      if (fs.existsSync(path.join(dir, 'index.html'))) return dir;
+    }
+    return localPublic;
+  })(),
 };
