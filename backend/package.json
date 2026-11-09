@@ -7,6 +7,7 @@
     "start": "node index.js",
     "dev": "node src/server.js",
     "build": "echo \"Backend: no build step\"",
+    "build:frontend": "echo \"Backend only: nothing to build (kept for the Hostinger build command)\"",
     "migrate": "node src/db/migrate.js",
     "test": "node --test --test-concurrency=1 test/api.test.js test/integration.test.js",
     "storage:smoke": "node scripts/storage-smoke.js",
