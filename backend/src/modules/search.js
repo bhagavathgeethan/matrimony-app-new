@@ -1,5 +1,6 @@
 // Member search: values-led filters only (no caste / religion / income), over the same pool as the feed.
 // Also saved searches, which alert their owner when a newcomer fits.
+const requireShared = require('../lib/shared');
 const express = require('express');
 const db = require('../config/db');
 const { computeMatchScore } = require('../services/blueprintEngine');
@@ -7,7 +8,7 @@ const { blueprintFromRow, VIBES } = require('./profile');
 const { loadViewer, buildCards, visibleTo, VISIBLE_USER_SQL } = require('./matches');
 const { detailValues } = require('./profile');
 const { notBlockedSql, has, limitOf, requireFeature } = require('../lib/members');
-const { FIELD_BY_KEY, HEIGHT_RANGE } = require('../../../shared/profileFields.js');
+const { FIELD_BY_KEY, HEIGHT_RANGE } = requireShared('profileFields.js');
 const { httpError, ageFrom, newId } = require('../lib/util');
 const { tx } = require('../lib/i18n');
 const { route } = require('../lib/http');

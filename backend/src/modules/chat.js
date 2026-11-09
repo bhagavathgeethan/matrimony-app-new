@@ -1,6 +1,7 @@
 // Interest requests and one-to-one conversations.
 // A conversation starts as an interest request (optionally with one intro message). The recipient accepts —
 // explicitly or by replying — or declines. Accepted interest is "mutual": photos unblur and chat and calls unlock.
+const requireShared = require('../lib/shared');
 const express = require('express');
 const env = require('../config/env');
 const storage = require('../services/storage');
@@ -16,7 +17,7 @@ const { isBlockedBetween, isPremium, has, limitOf, requireFeature, notBlockedSql
 const { httpError, newId, ageFrom, relativeTime } = require('../lib/util');
 const { tx } = require('../lib/i18n');
 const { route } = require('../lib/http');
-const { CONVERSATION_PROMPTS } = require('../../../shared/engagement.js');
+const { CONVERSATION_PROMPTS } = requireShared('engagement.js');
 
 const router = express.Router();
 const MAX_MESSAGE_LENGTH = 2000;

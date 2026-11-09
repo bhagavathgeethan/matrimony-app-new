@@ -1,4 +1,5 @@
 // Shared rules about members: who is visible, who has blocked whom, and premium entitlements
+const requireShared = require('./shared');
 const db = require('../config/db');
 
 // Users who can appear to others: onboarded, consenting to matching, not paused, not hidden by moderation,
@@ -28,7 +29,7 @@ async function isBlockedBetween(a, b) {
   return res.rows.length > 0;
 }
 
-const { tierHas, tierLimit } = require('../../../shared/plans.js');
+const { tierHas, tierLimit } = requireShared('plans.js');
 
 // The tier a member is on right now: their plan while it is paid up and not paused, otherwise 'free'
 function planOf(row) {
@@ -53,7 +54,7 @@ async function premiumFor(userId) {
 function requireFeature(row, feature, message) {
   if (!has(row, feature)) {
     const { httpError } = require('./util');
-    const { FEATURES, TIER_INFO } = require('../../../shared/plans.js');
+    const { FEATURES, TIER_INFO } = requireShared('plans.js');
     throw httpError(403, message || `${FEATURES[feature].title} is part of 3Knot ${TIER_INFO[FEATURES[feature].tier].name}`, 'PREMIUM_REQUIRED');
   }
 }

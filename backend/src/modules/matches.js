@@ -1,4 +1,5 @@
 // Match feed and discovery: scored cards, daily picks, shortlist, profile views and "why we matched"
+const requireShared = require('../lib/shared');
 const express = require('express');
 const env = require('../config/env');
 const db = require('../config/db');
@@ -10,9 +11,9 @@ const { httpError, ageFrom, relativeTime } = require('../lib/util');
 const { tx } = require('../lib/i18n');
 const { route } = require('../lib/http');
 const { VISIBLE_USER_SQL, notBlockedSql, isPremium, planOf, has, limitOf, requireFeature, todayIST } = require('../lib/members');
-const { preferenceMatch } = require('../../../shared/preferences.js');
-const { activityLabel, PICK_REASONS, CONVERSATION_PROMPTS } = require('../../../shared/engagement.js');
-const { porutham } = require('../../../shared/porutham.js');
+const { preferenceMatch } = requireShared('preferences.js');
+const { activityLabel, PICK_REASONS, CONVERSATION_PROMPTS } = requireShared('engagement.js');
+const { porutham } = requireShared('porutham.js');
 
 const router = express.Router();
 const PILLARS = ['money', 'roots', 'kids', 'ambition'];

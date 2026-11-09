@@ -1,12 +1,13 @@
 // Safety: blocking and reporting members. Reporting also blocks; enough distinct reports hide a profile
 // until an admin reviews it. Blocked members are never told.
+const requireShared = require('../lib/shared');
 const express = require('express');
 const env = require('../config/env');
 const db = require('../config/db');
 const realtime = require('../services/realtime');
 const { httpError, newId, ageFrom } = require('../lib/util');
 const { route, optionalString } = require('../lib/http');
-const { REPORT_REASONS } = require('../../../shared/engagement.js');
+const { REPORT_REASONS } = requireShared('engagement.js');
 
 const router = express.Router();
 const REASON_KEYS = REPORT_REASONS.map(([k]) => k);

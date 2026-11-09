@@ -1,5 +1,6 @@
 // Admin console API: stats, reports queue, ID verifications, success stories and member moderation.
 // Admins are members whose phone is listed in ADMIN_PHONES (granted at sign-in).
+const requireShared = require('../lib/shared');
 const express = require('express');
 const db = require('../config/db');
 const { photoUrl, sendSigned } = require('./media');
@@ -8,7 +9,7 @@ const stories = require('./stories');
 const { httpError, ageFrom, maskPhone, newId } = require('../lib/util');
 const { tx } = require('../lib/i18n');
 const { route } = require('../lib/http');
-const { REPORT_REASONS } = require('../../../shared/engagement.js');
+const { REPORT_REASONS } = requireShared('engagement.js');
 
 const router = express.Router();
 const REASON_LABEL = Object.fromEntries(REPORT_REASONS);

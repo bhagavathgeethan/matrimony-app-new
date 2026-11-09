@@ -1,4 +1,5 @@
 // The signed-in user's own profile: basics, consent, privacy, blueprint, vibes, photos, onboarding
+const requireShared = require('../lib/shared');
 const express = require('express');
 const sharp = require('sharp');
 const env = require('../config/env');
@@ -11,14 +12,14 @@ const {
   httpError, newId, parseBirthYearMonth, formatBirthYearMonth, ageFrom,
 } = require('../lib/util');
 const { route, optionalString, optionalBoolean, oneOf } = require('../lib/http');
-const { validatePreferences } = require('../../../shared/preferences.js');
-const { validatePrompts } = require('../../../shared/engagement.js');
+const { validatePreferences } = requireShared('preferences.js');
+const { validatePrompts } = requireShared('engagement.js');
 const { isPremium, planOf, has, requireFeature } = require('../lib/members');
-const { TIER_INFO, PHOTO_VISIBILITY, featuresOf } = require('../../../shared/plans.js');
-const { LANGUAGE_CODES } = require('../../../shared/i18n.js');
+const { TIER_INFO, PHOTO_VISIBILITY, featuresOf } = requireShared('plans.js');
+const { LANGUAGE_CODES } = requireShared('i18n.js');
 const {
   FIELD_BY_KEY, ONBOARDING_REQUIRED_KEYS, isFilled, validateDetails, crossFieldErrors, profileCompletion,
-} = require('../../../shared/profileFields.js');
+} = requireShared('profileFields.js');
 
 const router = express.Router();
 

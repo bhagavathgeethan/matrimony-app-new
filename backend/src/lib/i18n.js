@@ -1,9 +1,10 @@
 // Server-side translation: loads every interface language from shared/locales so notifications can be
 // written in each member's language. tx() marks text for translation: tx('{name} accepted your interest', { name }).
-const { registerLanguage, translate, LANGUAGE_CODES } = require('../../../shared/i18n.js');
+const requireShared = require('./shared');
+const { registerLanguage, translate, LANGUAGE_CODES } = requireShared('i18n.js');
 
 for (const code of LANGUAGE_CODES) {
-  if (code !== 'en') registerLanguage(code, require(`../../../shared/locales/${code}.js`).default);
+  if (code !== 'en') registerLanguage(code, requireShared(`locales/${code}.js`).default);
 }
 
 const tx = (key, vars) => ({ key, vars });

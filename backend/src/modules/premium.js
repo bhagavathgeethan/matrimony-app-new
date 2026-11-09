@@ -1,6 +1,7 @@
 // Paid tiers and add-ons: checkout through the payment provider, trial, pause/resume, spotlights, gifts from
 // family, and the assisted (relationship manager) service. What each tier includes lives in shared/plans.js and is
 // enforced where each feature lives.
+const requireShared = require('../lib/shared');
 const express = require('express');
 const db = require('../config/db');
 const payments = require('../services/payments');
@@ -10,7 +11,7 @@ const { route, optionalString } = require('../lib/http');
 const { planOf, has, limitOf } = require('../lib/members');
 const {
   TIERS, TIER_INFO, FEATURES, PLAN_CATALOG, ADDONS, TRIAL_DAYS, TRIAL_TIER, SPOTLIGHT_HOURS, featuresOf, priceText,
-} = require('../../../shared/plans.js');
+} = requireShared('plans.js');
 
 const router = express.Router();
 const PRODUCTS = [...PLAN_CATALOG.map((p) => ({ ...p, kind: 'plan' })), ...ADDONS];

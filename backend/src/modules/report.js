@@ -1,5 +1,6 @@
 // Premium compatibility report (PDF), including the horoscope match when both members opted in.
 // The app asks for a short-lived signed link, which then opens in any browser or PDF viewer (no session needed).
+const requireShared = require('../lib/shared');
 const crypto = require('crypto');
 const express = require('express');
 const PDFDocument = require('pdfkit');
@@ -9,7 +10,7 @@ const { compare, getCandidate } = require('./matches');
 const { requireFeature } = require('../lib/members');
 const { httpError } = require('../lib/util');
 const { route } = require('../lib/http');
-const { PILLARS } = require('../../../shared/constants.js');
+const { PILLARS } = requireShared('constants.js');
 
 const router = express.Router();
 const publicRouter = express.Router();
