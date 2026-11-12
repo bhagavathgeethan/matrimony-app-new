@@ -84,20 +84,130 @@ export const TopBar = ({ onBack, title, right, dark = false }) => {
   );
 };
 
-export const StepBar = ({ step, total, dark = false }) => (
-  <View style={styles.stepBar}>
-    {Array.from({ length: total }).map((_, i) => (
-      <View
-        key={i}
-        style={[
-          styles.stepSegment,
-          { backgroundColor: dark ? 'rgba(255,255,255,0.18)' : colors.cardBorder },
-          i < step && (dark ? { backgroundColor: colors.gold } : { backgroundImage: gradients.primary }),
-        ]}
-      />
-    ))}
+export const ONBOARDING_STEP_SCREENS = [
+  'consent',           // Step 1
+  'basics',            // Step 2
+  'personal',          // Step 3
+  'blueprint-intro',   // Step 4
+  'vibes',             // Step 5
+  'photos',            // Step 6
+  'blueprint-summary', // Step 7
+];
+
+export const getOnboardingScreenForStep = (stepNumber) => {
+  return ONBOARDING_STEP_SCREENS[stepNumber - 1] || 'consent';
+};
+
+export const getMaxOnboardingStep = (onboarding) => {
+  if (!onboarding) return 1;
+  if (onboarding.completed) return 7;
+  if (onboarding.photos) return 7;
+  if (onboarding.vibes) return 6;
+  if (onboarding.blueprint) return 5;
+  if (onboarding.personal) return 4;
+  if (onboarding.basics) return 3;
+  if (onboarding.consent) return 2;
+  return 1;
+};
+
+export const StepBar = ({
+  step,
+  total = 7,
+  dark = false,
+  onStepPress,
+  onBack,
+  maxStep,
+  style,
+}) => (
+  <View style={[styles.stepBar, style]}>
+    {Array.from({ length: total }).map((_, i) => {
+      const stepNum = i + 1;
+      const isActive = stepNum === step;
+      const isPast = stepNum < step;
+      const isFuture = stepNum > step;
+      const isCompleted = maxStep ? stepNum <= maxStep : isPast;
+      const isClickable = Boolean((isPast || (isFuture && isCompleted)) && (onStepPress || onBack));
+
+      const handlePress = () => {
+        if (!isClickable) return;
+        if (onStepPress) {
+          onStepPress(stepNum);
+        } else if (onBack && isPast) {
+          onBack();
+        }
+      };
+
+      return (
+        <TouchableOpacity
+          key={i}
+          onPress={handlePress}
+          disabled={!isClickable}
+          activeOpacity={0.7}
+          style={styles.stepTouchTarget}
+          accessibilityRole={isClickable ? 'button' : undefined}
+          accessibilityLabel={t(`Step ${stepNum}`)}
+          accessibilityHint={isClickable ? t(`Go to step ${stepNum}`) : undefined}
+        >
+          <View
+            style={[
+              styles.stepSegment,
+              { backgroundColor: dark ? 'rgba(255,255,255,0.18)' : colors.cardBorder },
+              (isPast || isActive) && (dark ? { backgroundColor: colors.gold } : { backgroundImage: gradients.primary }),
+              isClickable && styles.stepSegmentClickable,
+            ]}
+          />
+        </TouchableOpacity>
+      );
+    })}
   </View>
 );
+
+export const OnboardingHeader = ({
+  step,
+  total = 7,
+  onBack,
+  onStepPress,
+  dark = false,
+  counter = true,
+  right,
+  maxStep,
+}) => {
+  useBackHandler(onBack, 'screen');
+  return (
+    <View style={styles.onboardingHeaderRow}>
+      {onBack ? (
+        <TouchableOpacity
+          onPress={onBack}
+          style={[styles.backBtn, dark && styles.backBtnDark]}
+          accessibilityLabel={t('Back')}
+        >
+          <ChevronLeft size={20} color={dark ? colors.onDark : colors.textPrimary} />
+        </TouchableOpacity>
+      ) : (
+        <View style={{ width: 40 }} />
+      )}
+      <View style={{ flex: 1, marginHorizontal: 8 }}>
+        <StepBar
+          step={step}
+          total={total}
+          dark={dark}
+          onStepPress={onStepPress}
+          onBack={onBack}
+          maxStep={maxStep}
+        />
+      </View>
+      {right ? (
+        right
+      ) : counter ? (
+        <Text style={[styles.onboardingCounter, dark && { color: colors.onDarkMuted }]}>
+          {step} / {total}
+        </Text>
+      ) : (
+        <View style={{ width: 40 }} />
+      )}
+    </View>
+  );
+};
 
 export const Eyebrow = ({ children, color = colors.accent, style }) => (
   <Text style={[styles.eyebrow, { color }, style]}>{children}</Text>
@@ -408,14 +518,37 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.textPrimary,
   },
+  onboardingHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 44,
+  },
+  onboardingCounter: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textMuted,
+    minWidth: 36,
+    textAlign: 'right',
+  },
   stepBar: {
     flexDirection: 'row',
     gap: 6,
+    alignItems: 'center',
+  },
+  stepTouchTarget: {
+    flex: 1,
+    paddingVertical: 10,
+    justifyContent: 'center',
+    cursor: 'pointer',
   },
   stepSegment: {
-    flex: 1,
     height: 4,
     borderRadius: 4,
+  },
+  stepSegmentClickable: {
+    opacity: 0.9,
   },
   eyebrow: {
     fontFamily: fonts.sans,

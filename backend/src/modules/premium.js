@@ -283,4 +283,41 @@ router.post('/spotlight', route(async (req, res) => res.json(await startSpotligh
 router.get('/assisted', route(async (req, res) => res.json(await assistedOverview(req.userId))));
 router.post('/assisted', route(async (req, res) => res.json(await requestAssisted(req.userId, req.body || {}))));
 
-module.exports = { router, PLANS: PLAN_CATALOG, giftCheckout, giftConfirm, assistedOverview, activeSpotlight };
+// ---------- webhooks (provider callbacks) ----------
+
+async function handleWebhook(body, headers) {
+  const signature = headers['x-razorpay-signature'];
+  if (payments.verifyWebhookSignature && !payments.verifyWebhookSignature(body, signature)) {
+    throw httpError(400, 'Invalid webhook signature');
+  }
+  const event = body?.event;
+  if (event === 'payment.captured' || event === 'order.paid') {
+    const paymentEntity = body?.payload?.payment?.entity;
+    const orderId = paymentEntity?.order_id;
+    const paymentId = paymentEntity?.notes?.paymentId;
+    let payment = null;
+    if (orderId) {
+      payment = (await db.query('SELECT * FROM payments WHERE provider_ref = $1', [orderId]).catch(() => ({ rows: [] }))).rows[0];
+    }
+    if (!payment && paymentId) {
+      payment = (await db.query('SELECT * FROM payments WHERE id = $1', [paymentId]).catch(() => ({ rows: [] }))).rows[0];
+    }
+    if (payment && payment.status !== 'paid') {
+      const claimed = await db.query(`UPDATE payments SET status = 'paid', paid_at = NOW() WHERE id = $1 AND status <> 'paid' RETURNING id`, [payment.id]);
+      if (claimed.rows.length) {
+        const label = await applyProduct(payment.beneficiary_id || payment.user_id, productFor(payment.plan_code));
+        if (label && (payment.beneficiary_id || payment.user_id)) {
+          const targetUser = payment.beneficiary_id || payment.user_id;
+          const { notify } = require('./notifications');
+          await notify(targetUser, { type: 'account', title: tx('Payment received'), body: tx('{plan} is active.', { plan: label }), data: { target: 'premium' } }).catch(() => {});
+        }
+      }
+    }
+  }
+  return { received: true };
+}
+
+const webhookRouter = express.Router();
+webhookRouter.post('/webhook', route(async (req, res) => res.json(await handleWebhook(req.body, req.headers))));
+
+module.exports = { router, webhookRouter, PLANS: PLAN_CATALOG, giftCheckout, giftConfirm, assistedOverview, activeSpotlight };

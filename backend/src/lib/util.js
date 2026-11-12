@@ -41,28 +41,85 @@ function maskPhone(phone) {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-// Accepts "Mar 1997", "March 1997", "03/1997" or "1997-03"
+// Accepts "17-07-1994", "17/07/1994", "1994-07-17", "17071994", "Mar 1997", "03/1997" or "1997-03"
 function parseBirthYearMonth(input) {
   if (typeof input !== 'string') return null;
   const s = input.trim();
-  let m = s.match(/^([A-Za-z]{3,9})\s+(\d{4})$/);
+
+  // DD-MM-YYYY or DD/MM/YYYY (e.g. "17-07-1994")
+  let m = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (m) {
+    const day = Number(m[1]);
+    const month = Number(m[2]);
+    const year = Number(m[3]);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return { year, month, day };
+    }
+  }
+
+  // YYYY-MM-DD or YYYY/MM/DD (e.g. "1994-07-17")
+  m = s.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
+  if (m) {
+    const year = Number(m[1]);
+    const month = Number(m[2]);
+    const day = Number(m[3]);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return { year, month, day };
+    }
+  }
+
+  // Raw 8 digits: DDMMYYYY (e.g. "17071994")
+  m = s.match(/^(\d{2})(\d{2})(\d{4})$/);
+  if (m) {
+    const day = Number(m[1]);
+    const month = Number(m[2]);
+    const year = Number(m[3]);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return { year, month, day };
+    }
+  }
+
+  // "17 Jul 1994" or "17 July 1994"
+  m = s.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})$/);
+  if (m) {
+    const day = Number(m[1]);
+    const month = MONTHS.findIndex((name) => m[2].toLowerCase().startsWith(name.toLowerCase())) + 1;
+    const year = Number(m[3]);
+    if (month && day >= 1 && day <= 31) return { year, month, day };
+  }
+
+  // "Mar 1997" or "March 1997"
+  m = s.match(/^([A-Za-z]{3,9})\s+(\d{4})$/);
   if (m) {
     const month = MONTHS.findIndex((name) => m[1].toLowerCase().startsWith(name.toLowerCase())) + 1;
-    return month ? { year: Number(m[2]), month } : null;
+    return month ? { year: Number(m[2]), month, day: 1 } : null;
   }
+
+  // MM/YYYY or MM-YYYY
   m = s.match(/^(\d{1,2})[/-](\d{4})$/);
-  if (m) return { year: Number(m[2]), month: Number(m[1]) };
-  m = s.match(/^(\d{4})-(\d{1,2})$/);
-  if (m) return { year: Number(m[1]), month: Number(m[2]) };
+  if (m) {
+    const month = Number(m[1]);
+    const year = Number(m[2]);
+    if (month >= 1 && month <= 12) return { year, month, day: 1 };
+  }
+
+  // YYYY-MM
+  m = s.match(/^(\d{4})[/-](\d{1,2})$/);
+  if (m) {
+    const year = Number(m[1]);
+    const month = Number(m[2]);
+    if (month >= 1 && month <= 12) return { year, month, day: 1 };
+  }
+
   return null;
 }
 
 const formatBirthYearMonth = (year, month) => (year && month ? `${MONTHS[month - 1]} ${year}` : null);
 
-function ageFrom(year, month, now = new Date()) {
+function ageFrom(year, month, now = new Date(), day = 1) {
   if (!year || !month) return null;
   let age = now.getFullYear() - year;
-  if (now.getMonth() + 1 < month) age -= 1;
+  if (now.getMonth() + 1 < month || (now.getMonth() + 1 === month && now.getDate() < (day || 1))) age -= 1;
   return age;
 }
 

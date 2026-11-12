@@ -5,13 +5,14 @@ import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { Screen, TopBar, Eyebrow, Heading, Body, Card, Button } from '../../components/ui/kit';
 import { Sheet } from '../../components/details/DetailsUI';
+import { openRazorpayCheckout } from '../../services/razorpay';
 import { t, formatDate, formatTime } from '@shared/i18n';
 
 const { colors, fonts } = theme;
 
 // Plans (Plus / Premium / Family), trial, pause, spotlight and add-ons
 export const PremiumScreen = () => {
-  const { premium, loadPremium, startCheckout, confirmPayment, startTrial, pausePlan, resumePlan, startSpotlight, setCurrentScreen } = useApp();
+  const { user, premium, loadPremium, startCheckout, confirmPayment, startTrial, pausePlan, resumePlan, startSpotlight, setCurrentScreen } = useApp();
   const [tier, setTier] = useState('premium');
   const [chosen, setChosen] = useState('premium_3m');
   const [order, setOrder] = useState(null);
@@ -33,7 +34,31 @@ export const PremiumScreen = () => {
   };
   const checkout = (code) => run('checkout', async () => {
     const res = await startCheckout(code);
-    if (res.ok) setOrder(res.data);
+    if (!res.ok) return res;
+    const orderData = res.data;
+    if (orderData?.provider === 'razorpay') {
+      openRazorpayCheckout({
+        order: orderData,
+        prefill: {
+          name: user?.firstName || '',
+          contact: user?.phone || '',
+        },
+        themeColor: colors.accent,
+        onSuccess: async (payload) => {
+          await run('pay', async () => {
+            return await confirmPayment(orderData.paymentId, payload);
+          }, t('Payment received — your purchase is active.'));
+        },
+        onError: (err) => {
+          setMessage(['error', err?.message || t('Payment failed')]);
+        },
+        onDismiss: () => {
+          setBusy(null);
+        },
+      });
+      return res;
+    }
+    setOrder(orderData);
     return res;
   });
   // Test-mode gateway: confirm on our own sheet. A real gateway opens its checkout here instead.

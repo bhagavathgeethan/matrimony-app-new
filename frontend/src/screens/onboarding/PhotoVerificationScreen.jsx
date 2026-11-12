@@ -4,7 +4,8 @@ import { Plus, EyeOff, SearchX, BadgeCheck, Star, X } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import {
-  OnboardingScreen, TopBar, FadeIn, Eyebrow, Heading, Accent, Button, Card, Toggle, IconBadge, Badge, Divider,
+  OnboardingScreen, OnboardingHeader, TopBar, FadeIn, Eyebrow, Heading, Accent, Button, Card, Toggle, IconBadge, Badge, Divider,
+  getMaxOnboardingStep, getOnboardingScreenForStep,
 } from '../../components/ui/kit';
 import { t } from '@shared/i18n';
 
@@ -55,7 +56,15 @@ export const PhotoVerificationScreen = () => {
 
   return (
     <OnboardingScreen
-      top={<TopBar onBack={() => setCurrentScreen(user?.onboarding?.completed ? 'blueprint-summary' : 'vibes')} />}
+      top={
+        <OnboardingHeader
+          step={6}
+          total={7}
+          onBack={() => setCurrentScreen(user?.onboarding?.completed ? 'blueprint-summary' : 'vibes')}
+          onStepPress={(s) => setCurrentScreen(getOnboardingScreenForStep(s))}
+          maxStep={getMaxOnboardingStep(user?.onboarding)}
+        />
+      }
       footer={
         <>
           {error ? (
@@ -69,7 +78,7 @@ export const PhotoVerificationScreen = () => {
     >
       <FadeIn>
         <View style={styles.header}>
-          <Eyebrow>{t('Photos & verification')}</Eyebrow>
+          <Eyebrow>{t('Step 06 / 07 · Photos & privacy')}</Eyebrow>
           <Heading size={32}>
             {t('Photos, on')}{' '}<Accent>{t('your terms')}</Accent>
           </Heading>

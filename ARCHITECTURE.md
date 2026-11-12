@@ -119,3 +119,20 @@ RootNavigator
 
 ### 7.2 Build & Asset Pipeline
 - **Frontend Source**: `frontend/` (React Native Web + Vite).
+
+---
+
+## 8. Payment Gateway Architecture (Razorpay & Premium System)
+
+### 8.1 Gateway Topology & Dual-Mode Provider Pattern
+- **Payment Gateway**: **Razorpay** Standard Checkout with seamless fallback to `dummy` provider in offline/test mode.
+- **Provider Abstraction**: Abstracted via `backend/src/services/payments.js` exposing:
+  - `createOrder({ paymentId, amountPaise })`: Issues order with Razorpay Orders API (`POST https://api.razorpay.com/v1/orders`), registers `provider_ref` (Razorpay Order ID) into the database, and returns client checkout options (`orderId`, `key`, `amount`, `currency`).
+  - `verify({ orderRef, payload })`: Computes timing-safe HMAC-SHA256 signature matching `razorpay_order_id|razorpay_payment_id` against `RAZORPAY_KEY_SECRET`, with secondary status verification.
+- **Webhook Pipeline**: `POST /api/public/payments/webhook` validates `x-razorpay-signature` via `RAZORPAY_WEBHOOK_SECRET` for asynchronous fulfillment (`payment.captured`, `order.paid`).
+
+### 8.2 Client-Side Integration & Theme Alignment
+- **Universal Checkout Utility**: `openRazorpayCheckout` in `frontend/src/services/razorpay.js` and `web/src/services/razorpay.js`.
+- **Dynamic Loader**: Lazily injects `https://checkout.razorpay.com/v1/checkout.js` without inflating bundle size.
+- **Brand Alignment**: Razorpay checkout modal styled with signature crimson `#A81E3C` matching the Editorial Luxe design tokens.
+- **Member & Family Flows**: Supported in `PremiumScreen.jsx` (member upgrades) and `ParentPortalScreen.jsx` (parent gifting).

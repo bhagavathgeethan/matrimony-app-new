@@ -3,7 +3,11 @@ import { View, Text, StyleSheet, TextInput } from 'react-native';
 import { Ban } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
-import { OnboardingScreen, StepBar, FadeIn, Eyebrow, Heading, Accent, Button, Card, Chip } from '../../components/ui/kit';
+import {
+  OnboardingScreen, OnboardingHeader, StepBar, FadeIn, Eyebrow, Heading, Accent, Button, Card, Chip,
+  getMaxOnboardingStep, getOnboardingScreenForStep,
+} from '../../components/ui/kit';
+import { formatBirthDateInput, parseBirthDateInput } from '@shared/constants';
 import { t } from '@shared/i18n';
 
 const { colors, fonts, radii } = theme;
@@ -12,14 +16,19 @@ const GENDERS = [['woman', 'Woman'], ['man', 'Man']];
 const TIMELINES = [['Marriage this year', 'This year'], ['Marriage in 1–2 years', 'In 1–2 years'], ['Open, no timeline', 'Open']];
 const INVOLVEMENT = ['I decide alone', 'I consult my parents', 'Parents lead'];
 
-const Field = ({ label, value, onChangeText, placeholder, style }) => (
+const Field = ({ label, value, onChangeText, placeholder, style, keyboardType, maxLength, hint, hintError }) => (
   <View style={[{ gap: 6 }, style]}>
-    <Text style={styles.label}>{t(label)}</Text>
+    <View style={styles.labelRow}>
+      <Text style={styles.label}>{t(label)}</Text>
+      {hint ? <Text style={[styles.birthHint, hintError && styles.birthError]}>{hint}</Text> : null}
+    </View>
     <TextInput
       value={value}
       onChangeText={onChangeText}
       placeholder={placeholder}
       placeholderTextColor={colors.textLight}
+      keyboardType={keyboardType}
+      maxLength={maxLength}
       style={styles.input}
     />
   </View>
@@ -47,7 +56,31 @@ export const BasicsIntentScreen = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  const complete = firstName.trim() && gender && born.trim() && city.trim();
+  const handleBornChange = (text) => {
+    const formatted = formatBirthDateInput(text, born);
+    setBorn(formatted);
+  };
+
+  const parsedBirth = parseBirthDateInput(born);
+  let birthAge = null;
+  let birthErrorText = null;
+  if (parsedBirth) {
+    const now = new Date();
+    birthAge = now.getFullYear() - parsedBirth.year;
+    if (
+      now.getMonth() + 1 < parsedBirth.month ||
+      (now.getMonth() + 1 === parsedBirth.month && now.getDate() < (parsedBirth.day || 1))
+    ) {
+      birthAge -= 1;
+    }
+    if (birthAge < 18) {
+      birthErrorText = t('Must be 18+');
+    } else if (birthAge > 80) {
+      birthErrorText = t('Check year');
+    }
+  }
+
+  const complete = firstName.trim() && gender && parsedBirth && !birthErrorText && city.trim();
 
   const handleNext = async () => {
     if (!complete || saving) return;
@@ -68,7 +101,15 @@ export const BasicsIntentScreen = () => {
 
   return (
     <OnboardingScreen
-      top={<StepBar step={2} total={5} />}
+      top={
+        <OnboardingHeader
+          step={2}
+          total={7}
+          onBack={() => setCurrentScreen('consent')}
+          onStepPress={(s) => setCurrentScreen(getOnboardingScreenForStep(s))}
+          maxStep={getMaxOnboardingStep(user?.onboarding)}
+        />
+      }
       footer={
         <>
           {error ? (
@@ -85,7 +126,7 @@ export const BasicsIntentScreen = () => {
     >
       <FadeIn>
         <View style={styles.header}>
-          <Eyebrow>{t('Step 02 / 05 · Basics')}</Eyebrow>
+          <Eyebrow>{t('Step 02 / 07 · Basics')}</Eyebrow>
           <Heading size={34}>
             {t('The short version')}{' '}<Accent>{t('of you')}</Accent>
           </Heading>
@@ -96,7 +137,23 @@ export const BasicsIntentScreen = () => {
         <Card style={{ gap: 12 }} padding={16}>
           <Field label={t('First name')} value={firstName} onChangeText={setFirstName} placeholder={t('Your first name')} />
           <View style={styles.twoCol}>
-            <Field label={t('Born')} value={born} onChangeText={setBorn} placeholder={t('e.g. Mar 1997')} style={{ flex: 1 }} />
+            <Field
+              label={t('Born')}
+              value={born}
+              onChangeText={handleBornChange}
+              placeholder="DD-MM-YYYY"
+              keyboardType="numeric"
+              maxLength={10}
+              hint={
+                birthErrorText
+                  ? birthErrorText
+                  : birthAge !== null
+                  ? t('Age: {n}', { n: birthAge })
+                  : null
+              }
+              hintError={Boolean(birthErrorText)}
+              style={{ flex: 1 }}
+            />
             <Field label={t('Lives in')} value={city} onChangeText={setCity} placeholder={t('e.g. Bengaluru')} style={{ flex: 1 }} />
           </View>
         </Card>
@@ -131,6 +188,20 @@ const styles = StyleSheet.create({
     letterSpacing: 1.4,
     color: colors.textMuted,
     textTransform: 'uppercase',
+  },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  birthHint: {
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.gold,
+  },
+  birthError: {
+    color: colors.accent,
   },
   input: {
     height: 46,

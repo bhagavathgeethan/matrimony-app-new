@@ -4,7 +4,10 @@ import { Wallet, MapPin, Baby, Briefcase, Info } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { BlueprintSlider } from '../../components/blueprint/BlueprintSlider';
-import { OnboardingScreen, StepBar, FadeIn, Eyebrow, Heading, Accent, Button } from '../../components/ui/kit';
+import {
+  OnboardingScreen, OnboardingHeader, StepBar, FadeIn, Eyebrow, Heading, Accent, Button,
+  getMaxOnboardingStep, getOnboardingScreenForStep,
+} from '../../components/ui/kit';
 import { PILLARS } from '@shared/constants';
 import { t } from '@shared/i18n';
 
@@ -54,7 +57,15 @@ export const BlueprintTunerScreen = () => {
 
   return (
     <OnboardingScreen
-      top={<StepBar step={4} total={5} />}
+      top={
+        <OnboardingHeader
+          step={4}
+          total={7}
+          onBack={() => setCurrentScreen('blueprint-q1')}
+          onStepPress={(s) => setCurrentScreen(getOnboardingScreenForStep(s))}
+          maxStep={getMaxOnboardingStep(user?.onboarding)}
+        />
+      }
       footer={
         <>
           <View style={styles.hint}>
@@ -68,7 +79,7 @@ export const BlueprintTunerScreen = () => {
     >
       <FadeIn>
         <View style={styles.header}>
-          <Eyebrow>{t('Step 04 / 05 · Blueprint')}</Eyebrow>
+          <Eyebrow>{t('Step 04 / 07 · Blueprint')}</Eyebrow>
           <Heading size={32}>
             {t('Your')}{' '}<Accent>{t('shared future')}</Accent>
           </Heading>

@@ -43,6 +43,7 @@ app.use('/api/auth', auth.router);
 app.use('/api/portal', family.portalRouter);
 app.use('/api/public/stories', stories.publicRouter);
 app.use('/api/public/report', report.publicRouter);
+app.use('/api/public/payments', premium.webhookRouter);
 // Private photo links carry their own signature (img tags can't send the session header)
 app.use('/api/media', media.router);
 
