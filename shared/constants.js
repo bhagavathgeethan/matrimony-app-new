@@ -77,16 +77,67 @@ export const TIMELINES = [
 ];
 export const INVOLVEMENT = ['I decide alone', 'I consult my parents', 'Parents lead'];
 
-// Blueprint question 1 (money); score feeds the money pillar
-export const MONEY_QUESTION = {
-  title: 'A ₹3 lakh bonus lands. What actually happens?',
-  options: [
-    { key: 'invest', title: 'Straight into investments', desc: 'The plan doesn’t change for a windfall', score: 72 },
-    { key: 'split', title: 'Split it — half saved, half enjoyed', desc: 'A trip, and the rest to the fund', score: 55 },
-    { key: 'family', title: 'Family first — parents, siblings', desc: 'Obligations before personal goals', score: 65 },
-    { key: 'spend', title: 'Spend it on living well now', desc: 'Life is short and money returns', score: 30 },
-  ],
-};
+// Blueprint questions for the four core pillars (money, roots, kids, ambition)
+export const BLUEPRINT_QUESTIONS = [
+  {
+    key: 'money',
+    pillar: 'money',
+    num: '01',
+    eyebrow: 'Money philosophy',
+    title: 'A ₹3 lakh bonus lands. What actually happens?',
+    dealbreakerLabel: 'Could you live with someone who answered differently?',
+    options: [
+      { key: 'invest', title: 'Straight into investments', desc: 'The plan doesn’t change for a windfall', score: 72, icon: 'TrendingUp' },
+      { key: 'split', title: 'Split it — half saved, half enjoyed', desc: 'A trip, and the rest to the fund', score: 55, icon: 'Plane' },
+      { key: 'family', title: 'Family first — parents, siblings', desc: 'Obligations before personal goals', score: 65, icon: 'Home' },
+      { key: 'spend', title: 'Spend it on living well now', desc: 'Life is short and money returns', score: 30, icon: 'Sparkles' },
+    ],
+  },
+  {
+    key: 'roots',
+    pillar: 'roots',
+    num: '02',
+    eyebrow: 'Roots & geography',
+    title: 'A great career opportunity comes up in another city or abroad. What’s your reaction?',
+    dealbreakerLabel: 'Could you live with someone who answered differently?',
+    options: [
+      { key: 'stay_rooted', title: 'Stay rooted in the same city as our parents', desc: 'Being within driving distance of family matters most', score: 80, icon: 'Home' },
+      { key: 'regional_flight', title: 'Same region or a quick flight away', desc: 'Independent day-to-day, but close enough for weekends', score: 60, icon: 'MapPin' },
+      { key: 'relocate_open', title: 'Open to moving across India or abroad for the right role', desc: 'Roots travel with us — career and family growth lead', score: 35, icon: 'Compass' },
+      { key: 'global_nomad', title: 'Complete geographic freedom — anywhere in the world', desc: 'Eager to live in new countries and experience different cultures', score: 15, icon: 'Globe' },
+    ],
+  },
+  {
+    key: 'kids',
+    pillar: 'kids',
+    num: '03',
+    eyebrow: 'Kids & parenting',
+    title: 'How do children and parenting feature in your future?',
+    dealbreakerLabel: 'Could you live with someone who answered differently?',
+    options: [
+      { key: 'kids_soon', title: 'Definitely want children within 1–3 years, hands-on parenting', desc: 'Raising a family is a central life project we both invest heavily in', score: 80, icon: 'Baby' },
+      { key: 'kids_later', title: 'Want kids, but in a few years after enjoying marriage first', desc: 'Build our partnership first, then welcome children', score: 60, icon: 'Heart' },
+      { key: 'kids_open', title: 'Open to the conversation — let’s see where life leads', desc: 'Partnership and mutual happiness come first; kids if it feels right', score: 45, icon: 'Smile' },
+      { key: 'partnership_first', title: 'Focused on companionship — not planning to have children', desc: 'Fulfilled by shared passions, travel, careers, and each other', score: 20, icon: 'Users' },
+    ],
+  },
+  {
+    key: 'ambition',
+    pillar: 'ambition',
+    num: '04',
+    eyebrow: 'Career ambition',
+    title: 'How does career drive balance against personal and home life?',
+    dealbreakerLabel: 'Could you live with someone who answered differently?',
+    options: [
+      { key: 'high_growth', title: 'All-in on building something big — work is deeply fulfilling', desc: 'Late hours or intense sprints are fine when growing fast', score: 85, icon: 'Rocket' },
+      { key: 'balanced_driven', title: 'Ambitious, but family and health are non-negotiable anchors', desc: 'Give 100% during work hours, shut laptop for dinner and weekends', score: 60, icon: 'Briefcase' },
+      { key: 'sustainable_pace', title: 'Work to live well, not live to work — steady and sustainable', desc: 'Predictable hours, low stress, and ample time for home and hobbies', score: 35, icon: 'Coffee' },
+      { key: 'peace_over_climb', title: 'Prioritise calm, presence, and leisure over corporate climbing', desc: 'Time freedom and peace of mind matter far more than promotions', score: 15, icon: 'Sunrise' },
+    ],
+  },
+];
+
+export const MONEY_QUESTION = BLUEPRINT_QUESTIONS[0];
 
 // Ends of each 0–100 scale. High money = saver and high roots = stays near family, matching the money
 // question's scores and the summaries (synthesizeArchetype in backend/src/services/blueprintEngine.js).
@@ -264,4 +315,100 @@ export function describeSearch(filters) {
   if (filters.q?.trim()) parts.push(`“${filters.q.trim()}”`);
   for (const c of activeFilterChips(filters)) parts.push(c.label);
   return parts.join(' · ') || t('Everyone');
+}
+
+// Auto-formats numeric input like "170719944" into "17-07-1994" (DD-MM-YYYY)
+export function formatBirthDateInput(value, prevValue = '') {
+  if (!value) return '';
+  // If user typed letters (e.g. "Mar 1997"), preserve as-is
+  if (/[a-zA-Z]/.test(value)) return value;
+
+  let digits = value.replace(/\D/g, '');
+  const prevDigits = prevValue ? prevValue.replace(/\D/g, '') : '';
+
+  // If user hit backspace and hit a hyphen delimiter (digit count did not drop),
+  // drop one digit so the user is not trapped on the hyphen
+  if (prevValue && value.length < prevValue.length && digits.length === prevDigits.length && digits.length > 0) {
+    digits = digits.slice(0, -1);
+  }
+
+  digits = digits.slice(0, 8);
+  if (!digits) return '';
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4)}`;
+}
+
+// Comprehensive date parser supporting DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD, raw 8 digits, and month names
+export function parseBirthDateInput(input) {
+  if (typeof input !== 'string') return null;
+  const s = input.trim();
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  // DD-MM-YYYY or DD/MM/YYYY (e.g. "17-07-1994")
+  let m = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (m) {
+    const day = Number(m[1]);
+    const month = Number(m[2]);
+    const year = Number(m[3]);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return { year, month, day };
+    }
+  }
+
+  // YYYY-MM-DD or YYYY/MM/DD
+  m = s.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
+  if (m) {
+    const year = Number(m[1]);
+    const month = Number(m[2]);
+    const day = Number(m[3]);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return { year, month, day };
+    }
+  }
+
+  // Raw digits: DDMMYYYY (e.g. "17071994")
+  m = s.match(/^(\d{2})(\d{2})(\d{4})$/);
+  if (m) {
+    const day = Number(m[1]);
+    const month = Number(m[2]);
+    const year = Number(m[3]);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return { year, month, day };
+    }
+  }
+
+  // MM-YYYY or MM/YYYY
+  m = s.match(/^(\d{1,2})[/-](\d{4})$/);
+  if (m) {
+    const month = Number(m[1]);
+    const year = Number(m[2]);
+    if (month >= 1 && month <= 12) return { year, month, day: 1 };
+  }
+
+  // YYYY-MM
+  m = s.match(/^(\d{4})[/-](\d{1,2})$/);
+  if (m) {
+    const year = Number(m[1]);
+    const month = Number(m[2]);
+    if (month >= 1 && month <= 12) return { year, month, day: 1 };
+  }
+
+  // "17 Jul 1994" or "17 July 1994"
+  m = s.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})$/);
+  if (m) {
+    const day = Number(m[1]);
+    const month = MONTHS.findIndex((name) => m[2].toLowerCase().startsWith(name.toLowerCase())) + 1;
+    const year = Number(m[3]);
+    if (month && day >= 1 && day <= 31) return { year, month, day };
+  }
+
+  // "Mar 1997" or "March 1997"
+  m = s.match(/^([A-Za-z]{3,9})\s+(\d{4})$/);
+  if (m) {
+    const month = MONTHS.findIndex((name) => m[1].toLowerCase().startsWith(name.toLowerCase())) + 1;
+    return month ? { year: Number(m[2]), month, day: 1 } : null;
+  }
+
+  return null;
 }

@@ -3,12 +3,13 @@ import { Link } from 'react-router-dom';
 import { Crown, Check, ShieldCheck, Sparkles, PauseCircle, PlayCircle, Gift, Headset, Zap } from 'lucide-react';
 import { useStore } from '../../store';
 import { Button, Modal, Badge, cx } from '../../components/ui';
+import { openRazorpayCheckout } from '../../services/razorpay';
 import { t, formatDate, formatTime } from '@shared/i18n';
 
 // Plans (Plus / Premium / Family), trial, pause, spotlight and add-ons. Payments go through the configured provider
 // (test mode while the provider is 'dummy').
 export function PremiumPage() {
-  const { premium, loadPremium, startCheckout, confirmPayment, startTrial, pausePlan, resumePlan, startSpotlight } = useStore();
+  const { user, premium, loadPremium, startCheckout, confirmPayment, startTrial, pausePlan, resumePlan, startSpotlight } = useStore();
   const [tier, setTier] = useState('premium');
   const [chosen, setChosen] = useState('premium_3m');
   const [order, setOrder] = useState(null);
@@ -29,7 +30,31 @@ export function PremiumPage() {
   };
   const checkout = (code) => run('checkout', async () => {
     const res = await startCheckout(code);
-    if (res.ok) setOrder(res.data);
+    if (!res.ok) return res;
+    const orderData = res.data;
+    if (orderData?.provider === 'razorpay') {
+      openRazorpayCheckout({
+        order: orderData,
+        prefill: {
+          name: user?.firstName || '',
+          contact: user?.phone || '',
+        },
+        themeColor: '#a81e3c',
+        onSuccess: async (payload) => {
+          await run('pay', async () => {
+            return await confirmPayment(orderData.paymentId, payload);
+          }, t('Payment received — your purchase is active.'));
+        },
+        onError: (err) => {
+          setMessage(['error', err?.message || t('Payment failed')]);
+        },
+        onDismiss: () => {
+          setBusy(null);
+        },
+      });
+      return res;
+    }
+    setOrder(orderData);
     return res;
   });
   // Test-mode gateway: confirm on our own screen. A real gateway opens its checkout here instead.

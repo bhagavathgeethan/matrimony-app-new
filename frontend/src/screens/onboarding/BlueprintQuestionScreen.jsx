@@ -1,74 +1,146 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Check, TrendingUp, Plane, Home, Sparkles } from 'lucide-react';
+import {
+  Check, TrendingUp, Plane, Home, Sparkles, MapPin, Compass, Globe, Baby, Heart, Smile, Users, Rocket, Briefcase, Coffee, Sunrise,
+} from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { OnboardingScreen, TopBar, StepBar, FadeIn, Eyebrow, Heading, Button } from '../../components/ui/kit';
+import { BLUEPRINT_QUESTIONS } from '@shared/constants';
 import { t } from '@shared/i18n';
 
 const { colors, fonts, gradients, radii } = theme;
 
-const OPTIONS = [
-  { title: 'Straight into investments', desc: 'The plan doesn’t change for a windfall', score: 72, icon: TrendingUp },
-  { title: 'Split it — half saved, half enjoyed', desc: 'A trip, and the rest to the fund', score: 55, icon: Plane },
-  { title: 'Family first — parents, siblings', desc: 'Obligations before personal goals', score: 65, icon: Home },
-  { title: 'Spend it on living well now', desc: 'Life is short and money returns', score: 30, icon: Sparkles },
-];
+const ICONS = {
+  TrendingUp,
+  Plane,
+  Home,
+  Sparkles,
+  MapPin,
+  Compass,
+  Globe,
+  Baby,
+  Heart,
+  Smile,
+  Users,
+  Rocket,
+  Briefcase,
+  Coffee,
+  Sunrise,
+};
 
 export const BlueprintQuestionScreen = () => {
-  const { setCurrentScreen, updateBlueprint } = useApp();
-  const [selectedOption, setSelectedOption] = useState(0);
-  const [dealbreakerAcceptsDiff, setDealbreakerAcceptsDiff] = useState('yes');
+  const { setCurrentScreen, user, updateBlueprint } = useApp();
+  const bp = user?.blueprint || {};
+
+  const [qIndex, setQIndex] = useState(0);
+  const [answers, setAnswers] = useState(() => ({
+    money: bp.money !== undefined ? BLUEPRINT_QUESTIONS[0].options.findIndex((o) => Math.abs(o.score - bp.money) < 15) : 0,
+    roots: bp.roots !== undefined ? BLUEPRINT_QUESTIONS[1].options.findIndex((o) => Math.abs(o.score - bp.roots) < 15) : 0,
+    kids: bp.kids !== undefined ? BLUEPRINT_QUESTIONS[2].options.findIndex((o) => Math.abs(o.score - bp.kids) < 15) : 0,
+    ambition: bp.ambition !== undefined ? BLUEPRINT_QUESTIONS[3].options.findIndex((o) => Math.abs(o.score - bp.ambition) < 15) : 0,
+  }));
+  const [flexibility, setFlexibility] = useState(() => ({
+    money: bp.moneyFlexibility || 'open',
+    roots: bp.rootsFlexibility || 'open',
+    kids: bp.kidsFlexibility || 'open',
+    ambition: bp.ambitionFlexibility || 'open',
+  }));
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
+  const currentQ = BLUEPRINT_QUESTIONS[qIndex];
+  const selectedOptionIdx = Math.max(0, answers[currentQ.pillar] ?? 0);
+  const dealbreakerAcceptsDiff = flexibility[currentQ.pillar] === 'firm' ? 'no' : 'yes';
+
+  const selectOption = (optIdx) => {
+    setAnswers((prev) => ({ ...prev, [currentQ.pillar]: optIdx }));
+  };
+
+  const setDealbreaker = (ans) => {
+    setFlexibility((prev) => ({ ...prev, [currentQ.pillar]: ans === 'yes' ? 'open' : 'firm' }));
+  };
+
+  const handleBack = () => {
+    if (qIndex > 0) {
+      setQIndex(qIndex - 1);
+    } else {
+      setCurrentScreen('blueprint-intro');
+    }
+  };
+
   const handleNext = async () => {
+    if (qIndex < BLUEPRINT_QUESTIONS.length - 1) {
+      setQIndex(qIndex + 1);
+      return;
+    }
+
     setSaving(true);
     setError(null);
-    const res = await updateBlueprint({
-      money: OPTIONS[selectedOption].score,
-      moneyFlexibility: dealbreakerAcceptsDiff === 'yes' ? 'open' : 'firm',
-    });
+    const payload = {};
+    for (const q of BLUEPRINT_QUESTIONS) {
+      const optIdx = Math.max(0, answers[q.pillar] ?? 0);
+      const chosenOpt = q.options[optIdx] || q.options[0];
+      payload[q.pillar] = chosenOpt.score;
+      payload[`${q.pillar}Flexibility`] = flexibility[q.pillar] || 'open';
+    }
+
+    const res = await updateBlueprint(payload);
     setSaving(false);
     if (!res.ok) return setError(res.error);
     setCurrentScreen('blueprint-tuner');
   };
+
+  const isLastQuestion = qIndex === BLUEPRINT_QUESTIONS.length - 1;
 
   return (
     <OnboardingScreen
       top={
         <>
           <TopBar
-            onBack={() => setCurrentScreen('blueprint-intro')}
-            title={<View style={{ flex: 1, marginHorizontal: 14 }}><StepBar step={1} total={4} /></View>}
-            right={<Text style={styles.counter}>1 / 4</Text>}
+            onBack={handleBack}
+            title={
+              <View style={{ flex: 1, marginHorizontal: 14 }}>
+                <StepBar
+                  step={qIndex + 1}
+                  total={4}
+                  onStepPress={(targetQ) => targetQ <= qIndex + 1 && setQIndex(targetQ - 1)}
+                  onBack={handleBack}
+                />
+              </View>
+            }
+            right={<Text style={styles.counter}>{qIndex + 1} / 4</Text>}
           />
         </>
       }
       footer={
         <>
           {error && <Text style={styles.error}>{error}</Text>}
-          <Button label={saving ? t('Saving…') : t('Next question')} disabled={saving} onPress={handleNext} />
+          <Button
+            label={saving ? t('Saving…') : isLastQuestion ? t('Save & tune blueprint') : t('Next question')}
+            disabled={saving}
+            onPress={handleNext}
+          />
         </>
       }
     >
-      <FadeIn>
+      <FadeIn key={`head-${currentQ.pillar}`}>
         <View style={styles.header}>
-          <Eyebrow>{t('Money philosophy')}</Eyebrow>
-          <Heading size={32}>{t('A ₹3 lakh bonus lands. What actually happens?')}</Heading>
+          <Eyebrow>{t(currentQ.eyebrow)}</Eyebrow>
+          <Heading size={30}>{t(currentQ.title)}</Heading>
         </View>
       </FadeIn>
 
       <View style={{ gap: 8 }}>
-        {OPTIONS.map((opt, idx) => {
-          const selected = selectedOption === idx;
-          const Icon = opt.icon;
+        {currentQ.options.map((opt, idx) => {
+          const selected = selectedOptionIdx === idx;
+          const Icon = ICONS[opt.icon] || Sparkles;
           return (
-            <FadeIn key={opt.title} delay={60 + idx * 50}>
+            <FadeIn key={`opt-${currentQ.pillar}-${opt.key}`} delay={60 + idx * 50}>
               <TouchableOpacity
                 activeOpacity={0.9}
-                onPress={() => setSelectedOption(idx)}
+                onPress={() => selectOption(idx)}
                 style={[styles.option, selected && styles.optionSelected]}
               >
                 <View style={[styles.optionIcon, selected && styles.optionIconSelected]}>
@@ -87,16 +159,16 @@ export const BlueprintQuestionScreen = () => {
         })}
       </View>
 
-      <FadeIn delay={300}>
+      <FadeIn key={`deal-${currentQ.pillar}`} delay={260}>
         <View style={styles.deal}>
-          <Text style={styles.dealQ}>{t('Could you live with someone who answered differently?')}</Text>
+          <Text style={styles.dealQ}>{t(currentQ.dealbreakerLabel || 'Could you live with someone who answered differently?')}</Text>
           <View style={styles.segment}>
             {[['yes', 'Yes'], ['no', 'No']].map(([key, label]) => {
               const active = dealbreakerAcceptsDiff === key;
               return (
                 <TouchableOpacity
                   key={key}
-                  onPress={() => setDealbreakerAcceptsDiff(key)}
+                  onPress={() => setDealbreaker(key)}
                   style={[styles.segmentBtn, active && styles.segmentBtnActive]}
                 >
                   <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{t(label)}</Text>

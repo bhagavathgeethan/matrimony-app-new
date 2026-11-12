@@ -4,7 +4,8 @@ import { HeartHandshake, Users, FlaskConical, Megaphone, Scale, Lock } from 'luc
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import {
-  OnboardingScreen, StepBar, FadeIn, Eyebrow, Heading, Accent, Body, Button, Card, Toggle, IconBadge, Badge, Divider,
+  OnboardingScreen, OnboardingHeader, StepBar, FadeIn, Eyebrow, Heading, Accent, Body, Button, Card, Toggle, IconBadge, Badge, Divider,
+  getMaxOnboardingStep, getOnboardingScreenForStep,
 } from '../../components/ui/kit';
 import { t } from '@shared/i18n';
 
@@ -39,7 +40,15 @@ export const DPDPConsentScreen = () => {
 
   return (
     <OnboardingScreen
-      top={<StepBar step={1} total={5} />}
+      top={
+        <OnboardingHeader
+          step={1}
+          total={7}
+          onBack={editing ? () => setCurrentScreen('privacy') : null}
+          onStepPress={(s) => setCurrentScreen(getOnboardingScreenForStep(s))}
+          maxStep={getMaxOnboardingStep(user?.onboarding)}
+        />
+      }
       footer={
         <>
           {error && <Text style={styles.error}>{error}</Text>}
@@ -54,7 +63,7 @@ export const DPDPConsentScreen = () => {
     >
       <FadeIn>
         <View style={styles.header}>
-          <Eyebrow>{t('Step 01 / 05 · Consent')}</Eyebrow>
+          <Eyebrow>{t('Step 01 / 07 · Consent')}</Eyebrow>
           <Heading size={34}>
             {t('What you’re')}{' '}<Accent>{t('agreeing to')}</Accent>
           </Heading>

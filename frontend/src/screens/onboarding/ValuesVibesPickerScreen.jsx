@@ -3,7 +3,10 @@ import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { VibeTileGrid } from '../../components/vibes/VibeTileGrid';
-import { OnboardingScreen, StepBar, FadeIn, Eyebrow, Heading, Accent, Body, Button } from '../../components/ui/kit';
+import {
+  OnboardingScreen, OnboardingHeader, StepBar, FadeIn, Eyebrow, Heading, Accent, Body, Button,
+  getMaxOnboardingStep, getOnboardingScreenForStep,
+} from '../../components/ui/kit';
 import { t } from '@shared/i18n';
 
 const { colors, fonts, gradients } = theme;
@@ -14,7 +17,15 @@ export const ValuesVibesPickerScreen = () => {
 
   return (
     <OnboardingScreen
-      top={<StepBar step={5} total={5} />}
+      top={
+        <OnboardingHeader
+          step={5}
+          total={7}
+          onBack={() => setCurrentScreen('blueprint-tuner')}
+          onStepPress={(s) => setCurrentScreen(getOnboardingScreenForStep(s))}
+          maxStep={getMaxOnboardingStep(user?.onboarding)}
+        />
+      }
       footer={
         <View style={styles.actions}>
           <Button label={t('Skip')} variant="secondary" style={{ flex: 1 }} onPress={() => setCurrentScreen('photos')} />
@@ -28,7 +39,7 @@ export const ValuesVibesPickerScreen = () => {
     >
       <FadeIn>
         <View style={styles.header}>
-          <Eyebrow>{t('Step 05 / 05 · Vibes')}</Eyebrow>
+          <Eyebrow>{t('Step 05 / 07 · Vibes')}</Eyebrow>
           <Heading size={32}>
             {t('Six that feel like your')}{' '}<Accent>{t('Sunday')}</Accent>
           </Heading>

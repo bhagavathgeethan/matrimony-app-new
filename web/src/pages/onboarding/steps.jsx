@@ -4,9 +4,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   HeartHandshake, Users, FlaskConical, Megaphone, Scale, Lock, Ban, Wallet, MapPin, Baby, Briefcase, Clock,
   TrendingUp, Plane, Home, Sparkles, Info, Plus, Star, X, EyeOff, SearchX, BadgeCheck, Check, UserRound, Images, Heart,
+  Compass, Globe, Smile, Rocket, Coffee, Sunrise,
 } from 'lucide-react';
 import {
-  GENDERS, TIMELINES, INVOLVEMENT, MONEY_QUESTION, PILLARS, MAX_VIBES, profileStrengthHint, blueprintSummary,
+  GENDERS, TIMELINES, INVOLVEMENT, BLUEPRINT_QUESTIONS, MONEY_QUESTION, PILLARS, MAX_VIBES, profileStrengthHint, blueprintSummary,
+  formatBirthDateInput, parseBirthDateInput,
 } from '@shared/constants';
 import { useStore } from '../../store';
 import { Button, Toggle, IconBadge, Badge, ScoreRing, Meter, Avatar, cx } from '../../components/ui';
@@ -17,7 +19,9 @@ import { StepFooter } from './OnboardingLayout';
 import { t } from '@shared/i18n';
 
 const PILLAR_ICONS = { money: Wallet, roots: MapPin, kids: Baby, ambition: Briefcase };
-const OPTION_ICONS = { invest: TrendingUp, split: Plane, family: Home, spend: Sparkles };
+const OPTION_ICONS = {
+  TrendingUp, Plane, Home, Sparkles, MapPin, Compass, Globe, Baby, Heart, Smile, Users, Rocket, Briefcase, Coffee, Sunrise,
+};
 
 // After saving: members editing their profile go back to it, new members continue
 function useNext() {
@@ -40,6 +44,7 @@ function Header({ eyebrow, children, lede }) {
 export function PersonalStep() {
   const { user, updateDetails } = useStore();
   const next = useNext();
+  const navigate = useNavigate();
   const original = valuesOf(user);
   const fields = ONBOARDING_DETAIL_KEYS.map((k) => FIELD_BY_KEY[k]);
   const [draft, setDraft] = useState(original);
@@ -73,6 +78,7 @@ export function PersonalStep() {
         </div>
       </div>
       <StepFooter hint={error ? <span className="error-text">{error}</span> : <span className="small muted">{t('Religion has a “Prefer not to say” option. Education and occupation are optional.')}</span>}>
+        <Button variant="secondary" onClick={() => navigate('/onboarding/basics')}>{t('Back')}</Button>
         <Button type="submit" loading={busy} disabled={!complete || busy}>{t('Next — the blueprint')}</Button>
       </StepFooter>
     </form>
@@ -148,6 +154,7 @@ export function ConsentStep() {
 export function BasicsStep() {
   const { user, updateBasics } = useStore();
   const next = useNext();
+  const navigate = useNavigate();
   const [firstName, setFirstName] = useState(user?.firstName || '');
   const [gender, setGender] = useState(user?.gender || null);
   const [born, setBorn] = useState(user?.birthYearMonth || '');
@@ -156,7 +163,31 @@ export function BasicsStep() {
   const [involvement, setInvolvement] = useState(user?.familyInvolvement || INVOLVEMENT[1]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const complete = firstName.trim() && gender && born.trim() && city.trim();
+
+  const parsedBirth = parseBirthDateInput(born);
+  let birthAge = null;
+  let birthErrorText = null;
+  if (parsedBirth) {
+    const now = new Date();
+    birthAge = now.getFullYear() - parsedBirth.year;
+    if (
+      now.getMonth() + 1 < parsedBirth.month ||
+      (now.getMonth() + 1 === parsedBirth.month && now.getDate() < (parsedBirth.day || 1))
+    ) {
+      birthAge -= 1;
+    }
+    if (birthAge < 18) {
+      birthErrorText = t('Must be at least 18');
+    } else if (birthAge > 80) {
+      birthErrorText = t('Check your birth year');
+    }
+  }
+
+  const complete = firstName.trim() && gender && parsedBirth && !birthErrorText && city.trim();
+
+  const handleBornChange = (e) => {
+    setBorn(formatBirthDateInput(e.target.value, born));
+  };
 
   const save = async (e) => {
     e?.preventDefault();
@@ -196,8 +227,22 @@ export function BasicsStep() {
           </label>
           <div className="row wrap" style={{ alignItems: 'stretch' }}>
             <label className="field grow" style={{ minWidth: 180 }}>
-              <span className="label">{t('Born')}</span>
-              <input className="input" value={born} onChange={(e) => setBorn(e.target.value)} placeholder={t('e.g. Mar 1997')} />
+              <span className="row between">
+                <span className="label">{t('Date of birth')}</span>
+                {birthErrorText ? (
+                  <span className="small error-text">{birthErrorText}</span>
+                ) : birthAge !== null ? (
+                  <span className="small gold" style={{ fontWeight: 700 }}>{t('Age: {n}', { n: birthAge })}</span>
+                ) : null}
+              </span>
+              <input
+                className="input"
+                value={born}
+                onChange={handleBornChange}
+                placeholder="DD-MM-YYYY"
+                maxLength={10}
+                inputMode="numeric"
+              />
             </label>
             <label className="field grow" style={{ minWidth: 180 }}>
               <span className="label">{t('Lives in')}</span>
@@ -212,6 +257,7 @@ export function BasicsStep() {
       <StepFooter
         hint={error ? <span className="error-text">{error}</span> : <span className="row" style={{ '--gap': '6px' }}><Ban size={14} color="var(--accent)" />{' '}{t('No complexion fields. Matching scores use values only.')}</span>}
       >
+        <Button type="button" variant="secondary" onClick={() => navigate('/onboarding/consent')}>{t('Back')}</Button>
         <Button type="submit" loading={busy} disabled={!complete || busy}>{t('Next — about you')}</Button>
       </StepFooter>
     </form>
@@ -244,6 +290,7 @@ export function BlueprintIntroStep() {
         </div>
       </div>
       <StepFooter hint={<span className="row" style={{ '--gap': '6px' }}><Clock size={14} />{' '}{t('About 4 minutes. You can revise any answer later.')}</span>}>
+        <Button variant="secondary" onClick={() => navigate('/onboarding/personal')}>{t('Back')}</Button>
         <Button onClick={() => navigate('/onboarding/blueprint/question')}>{t('Begin')}</Button>
       </StepFooter>
     </>
@@ -251,31 +298,76 @@ export function BlueprintIntroStep() {
 }
 
 export function BlueprintQuestionStep() {
-  const { updateBlueprint } = useStore();
+  const { user, updateBlueprint } = useStore();
+  const bp = user?.blueprint || {};
   const navigate = useNavigate();
-  const [selected, setSelected] = useState(MONEY_QUESTION.options[0].key);
-  const [accepts, setAccepts] = useState('yes');
+
+  const [qIndex, setQIndex] = useState(0);
+  const [answers, setAnswers] = useState(() => ({
+    money: bp.money !== undefined ? BLUEPRINT_QUESTIONS[0].options.find((o) => Math.abs(o.score - bp.money) < 15)?.key || BLUEPRINT_QUESTIONS[0].options[0].key : BLUEPRINT_QUESTIONS[0].options[0].key,
+    roots: bp.roots !== undefined ? BLUEPRINT_QUESTIONS[1].options.find((o) => Math.abs(o.score - bp.roots) < 15)?.key || BLUEPRINT_QUESTIONS[1].options[0].key : BLUEPRINT_QUESTIONS[1].options[0].key,
+    kids: bp.kids !== undefined ? BLUEPRINT_QUESTIONS[2].options.find((o) => Math.abs(o.score - bp.kids) < 15)?.key || BLUEPRINT_QUESTIONS[2].options[0].key : BLUEPRINT_QUESTIONS[2].options[0].key,
+    ambition: bp.ambition !== undefined ? BLUEPRINT_QUESTIONS[3].options.find((o) => Math.abs(o.score - bp.ambition) < 15)?.key || BLUEPRINT_QUESTIONS[3].options[0].key : BLUEPRINT_QUESTIONS[3].options[0].key,
+  }));
+  const [flexibility, setFlexibility] = useState(() => ({
+    money: bp.moneyFlexibility || 'open',
+    roots: bp.rootsFlexibility || 'open',
+    kids: bp.kidsFlexibility || 'open',
+    ambition: bp.ambitionFlexibility || 'open',
+  }));
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
-  const save = async () => {
+  const currentQ = BLUEPRINT_QUESTIONS[qIndex];
+  const selectedKey = answers[currentQ.pillar] || currentQ.options[0].key;
+  const accepts = flexibility[currentQ.pillar] === 'firm' ? 'no' : 'yes';
+
+  const setSelected = (key) => {
+    setAnswers((prev) => ({ ...prev, [currentQ.pillar]: key }));
+  };
+
+  const setAccepts = (val) => {
+    setFlexibility((prev) => ({ ...prev, [currentQ.pillar]: val === 'yes' ? 'open' : 'firm' }));
+  };
+
+  const handleBack = () => {
+    if (qIndex > 0) setQIndex(qIndex - 1);
+    else navigate('/onboarding/blueprint');
+  };
+
+  const handleNext = async () => {
+    if (qIndex < BLUEPRINT_QUESTIONS.length - 1) {
+      setQIndex(qIndex + 1);
+      return;
+    }
+
     setBusy(true);
     setError(null);
-    const option = MONEY_QUESTION.options.find((o) => o.key === selected);
-    const res = await updateBlueprint({ money: option.score, moneyFlexibility: accepts === 'yes' ? 'open' : 'firm' });
+    const payload = {};
+    for (const q of BLUEPRINT_QUESTIONS) {
+      const chosenKey = answers[q.pillar];
+      const opt = q.options.find((o) => o.key === chosenKey) || q.options[0];
+      payload[q.pillar] = opt.score;
+      payload[`${q.pillar}Flexibility`] = flexibility[q.pillar] || 'open';
+    }
+
+    const res = await updateBlueprint(payload);
     setBusy(false);
     if (!res.ok) return setError(res.error);
     navigate('/onboarding/blueprint/tune');
   };
 
+  const isLast = qIndex === BLUEPRINT_QUESTIONS.length - 1;
+
   return (
     <>
       <div className="ob-content">
-        <Header eyebrow={t('Money philosophy · 1 of 4')}>{t(MONEY_QUESTION.title)}</Header>
+        <Header eyebrow={`${t(currentQ.eyebrow)} · ${qIndex + 1} of 4`}>{t(currentQ.title)}</Header>
         <div className="option-list" role="radiogroup">
-          {MONEY_QUESTION.options.map((o) => {
-            const Icon = OPTION_ICONS[o.key];
-            const on = selected === o.key;
+          {currentQ.options.map((o) => {
+            const Icon = OPTION_ICONS[o.icon] || Sparkles;
+            const on = selectedKey === o.key;
             return (
               <button key={o.key} type="button" role="radio" aria-checked={on} className={cx('option', on && 'selected')} onClick={() => setSelected(o.key)}>
                 <IconBadge icon={Icon} size={38} />
@@ -291,7 +383,7 @@ export function BlueprintQuestionStep() {
           })}
         </div>
         <div className="card tinted row wrap between">
-          <span className="h3">{t('Could you live with someone who answered differently?')}</span>
+          <span className="h3">{t(currentQ.dealbreakerLabel || 'Could you live with someone who answered differently?')}</span>
           <div className="segment">
             {[['yes', 'Yes'], ['no', 'No']].map(([k, l]) => (
               <button key={k} type="button" className={cx(accepts === k && 'active')} onClick={() => setAccepts(k)}>{t(l)}</button>
@@ -300,8 +392,10 @@ export function BlueprintQuestionStep() {
         </div>
       </div>
       <StepFooter hint={error && <span className="error-text">{error}</span>}>
-        <Button variant="secondary" onClick={() => navigate('/onboarding/blueprint')}>{t('Back')}</Button>
-        <Button loading={busy} disabled={busy} onClick={save}>{t('Next question')}</Button>
+        <Button variant="secondary" onClick={handleBack}>{t('Back')}</Button>
+        <Button loading={busy} disabled={busy} onClick={handleNext}>
+          {isLast ? t('Save & tune blueprint') : t('Next question')}
+        </Button>
       </StepFooter>
     </>
   );
@@ -310,6 +404,7 @@ export function BlueprintQuestionStep() {
 export function TunerStep() {
   const { user, updateBlueprint } = useStore();
   const next = useNext();
+  const navigate = useNavigate();
   const bp = user?.blueprint || {};
   const [values, setValues] = useState(() =>
     Object.fromEntries(PILLARS.flatMap((p) => [[p.key, bp[p.key] ?? 50], [`${p.key}Flexibility`, bp[`${p.key}Flexibility`] || 'open']]))
@@ -347,6 +442,7 @@ export function TunerStep() {
         </div>
       </div>
       <StepFooter hint={error ? <span className="error-text">{error}</span> : <span className="row" style={{ '--gap': '6px' }}><Info size={14} color="var(--gold)" />{' '}{t('Gold band = how much difference you’ll accept')}</span>}>
+        <Button variant="secondary" onClick={() => navigate('/onboarding/blueprint/question')}>{t('Back')}</Button>
         <Button loading={busy} disabled={busy} onClick={save}>{t('Save blueprint')}</Button>
       </StepFooter>
     </>
@@ -357,6 +453,7 @@ export function TunerStep() {
 export function VibesStep() {
   const { user, toggleVibe } = useStore();
   const next = useNext();
+  const navigate = useNavigate();
   const [error, setError] = useState(null);
   const count = user?.vibes?.length ?? 0;
   const toggle = async (v) => {
@@ -381,6 +478,7 @@ export function VibesStep() {
         <VibeGrid selected={user?.vibes || []} onToggle={toggle} />
       </div>
       <StepFooter hint={error && <span className="error-text">{error}</span>}>
+        <Button variant="secondary" onClick={() => navigate('/onboarding/blueprint/tune')}>{t('Back')}</Button>
         <Button variant="secondary" onClick={() => next('/onboarding/photos')}>{t('Skip')}</Button>
         <Button onClick={() => next('/onboarding/photos')}>{user?.onboarding?.completed ? t('Done') : t('Next · photos')}</Button>
       </StepFooter>
@@ -392,6 +490,7 @@ export function VibesStep() {
 export function PhotosStep() {
   const { user, uploadPhoto, deletePhoto, makePhotoPrimary, updatePrivacy } = useStore();
   const next = useNext();
+  const navigate = useNavigate();
   const [blur, setBlur] = useState(user?.photoBlurredUntilMutual ?? true);
   const [hideSearch, setHideSearch] = useState(user?.hideFromSearchEngines ?? true);
   const [uploading, setUploading] = useState(false);
@@ -475,6 +574,7 @@ export function PhotosStep() {
         </div>
       </div>
       <StepFooter hint={error ? <span className="error-text">{error}</span> : photos.length === 0 && t('Add at least one photo to continue')}>
+        <Button variant="secondary" onClick={() => navigate('/onboarding/vibes')}>{t('Back')}</Button>
         <Button disabled={photos.length === 0 || uploading} onClick={save}>{t('Continue')}</Button>
       </StepFooter>
     </>
@@ -484,6 +584,7 @@ export function PhotosStep() {
 // ---------- review ----------
 export function ReviewStep() {
   const { user, completeOnboarding } = useStore();
+  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const bp = user?.blueprint || {};
@@ -537,6 +638,7 @@ export function ReviewStep() {
         </div>
       </div>
       <StepFooter hint={error && <span className="error-text">{error}</span>}>
+        <Button variant="secondary" onClick={() => navigate('/onboarding/photos')}>{t('Back')}</Button>
         <Button loading={busy} disabled={busy} onClick={finish}>{t('Finish & see my matches')}</Button>
       </StepFooter>
     </>

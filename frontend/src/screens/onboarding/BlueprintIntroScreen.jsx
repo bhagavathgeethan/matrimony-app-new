@@ -3,7 +3,10 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Wallet, MapPin, Baby, Briefcase, Clock } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
-import { OnboardingScreen, StepBar, FadeIn, Eyebrow, Heading, Accent, Button } from '../../components/ui/kit';
+import {
+  OnboardingScreen, OnboardingHeader, StepBar, FadeIn, Eyebrow, Heading, Accent, Button,
+  getMaxOnboardingStep, getOnboardingScreenForStep,
+} from '../../components/ui/kit';
 import { t } from '@shared/i18n';
 
 const { colors, fonts, gradients } = theme;
@@ -16,13 +19,22 @@ const PILLARS = [
 ];
 
 export const BlueprintIntroScreen = () => {
-  const { setCurrentScreen } = useApp();
+  const { setCurrentScreen, user } = useApp();
 
   return (
     <OnboardingScreen
       dark
       background={gradients.hero}
-      top={<StepBar step={4} total={5} dark />}
+      top={
+        <OnboardingHeader
+          step={4}
+          total={7}
+          dark
+          onBack={() => setCurrentScreen('personal')}
+          onStepPress={(s) => setCurrentScreen(getOnboardingScreenForStep(s))}
+          maxStep={getMaxOnboardingStep(user?.onboarding)}
+        />
+      }
       footer={
         <>
           <View style={styles.timeRow}>
@@ -35,7 +47,7 @@ export const BlueprintIntroScreen = () => {
     >
       <FadeIn>
         <View style={styles.header}>
-          <Eyebrow color={colors.gold}>{t('Step 04 / 05 · Blueprint')}</Eyebrow>
+          <Eyebrow color={colors.gold}>{t('Step 04 / 07 · Blueprint')}</Eyebrow>
           <Heading size={36} color={colors.onDark}>
             {t('Four questions for the')}{' '}<Accent color={colors.gold}>{t('next 40 years')}</Accent>
           </Heading>

@@ -65,8 +65,11 @@ module.exports = {
   // Phone numbers (E.164, comma-separated) that get the admin role when they sign in
   ADMIN_PHONES: (process.env.ADMIN_PHONES || '').split(',').map((s) => s.trim()).filter(Boolean),
 
-  // 'dummy' completes payments without charging until a real gateway (e.g. Razorpay) is connected
-  PAYMENT_PROVIDER: process.env.PAYMENT_PROVIDER || 'dummy',
+  // Payments: 'razorpay' when configured or 'dummy' for testing
+  PAYMENT_PROVIDER: NODE_ENV === 'test' ? 'dummy' : (process.env.PAYMENT_PROVIDER || (process.env.RAZORPAY_KEY_ID ? 'razorpay' : 'dummy')),
+  RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID || '',
+  RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET || '',
+  RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET || '',
 
   // Seconds an unanswered call rings before it counts as missed
   CALL_RING_SECONDS: Number(process.env.CALL_RING_SECONDS || 30),

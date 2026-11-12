@@ -8,6 +8,7 @@ import { Badge, Brand, Button, ScoreRing } from '../components/ui';
 import { DetailsSections, SectionEditModal } from '../components/details';
 import { PLAN_CATALOG, TIER_INFO, priceText } from '@shared/plans';
 import { Modal } from '../components/ui';
+import { openRazorpayCheckout } from '../services/razorpay';
 import { t } from '@shared/i18n';
 import { LanguagePicker } from '../components/LanguagePicker';
 
@@ -43,6 +44,28 @@ export function PortalPage() {
   const giftStart = async (plan) => {
     try {
       const order = await api.giftCheckout(token, plan);
+      if (order?.provider === 'razorpay') {
+        openRazorpayCheckout({
+          order,
+          prefill: {
+            name: portal?.name || '',
+          },
+          themeColor: '#a81e3c',
+          onSuccess: async (payload) => {
+            try {
+              await api.giftConfirm(token, order.paymentId, payload);
+              setNotice(t('Thank you — {child} now has 3Knot {plan}.', { child: portal.childName, plan: t(TIER_INFO[order.product.tier].name) }));
+              await load();
+            } catch (err) {
+              setError(err.message);
+            }
+          },
+          onError: (err) => {
+            setError(err?.message || t('Payment failed'));
+          },
+        });
+        return;
+      }
       setGift({ plan, order });
     } catch (err) {
       setError(err.message);

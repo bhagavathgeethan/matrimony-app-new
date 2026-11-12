@@ -4,6 +4,9 @@ const fs = require('fs');
 const path = require('path');
 
 const local = path.resolve(__dirname, '..', '..', 'shared');
-const SHARED_DIR = fs.existsSync(local) ? local : path.resolve(__dirname, '..', '..', '..', 'shared');
+const repo = path.resolve(__dirname, '..', '..', '..', 'shared');
 
-module.exports = (file) => require(path.join(SHARED_DIR, file));
+module.exports = (file) => {
+  if (fs.existsSync(path.join(local, file))) return require(path.join(local, file));
+  return require(path.join(repo, file));
+};

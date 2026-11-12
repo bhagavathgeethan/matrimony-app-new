@@ -191,8 +191,8 @@ async function updateBasics(userId, body) {
   let birth;
   if (body.birthYearMonth !== undefined) {
     birth = parseBirthYearMonth(body.birthYearMonth);
-    if (!birth) throw httpError(400, 'Enter your birth month and year like "Mar 1997"');
-    const age = ageFrom(birth.year, birth.month);
+    if (!birth) throw httpError(400, 'Enter your birth date as DD-MM-YYYY (e.g. 17-07-1994) or "Mar 1997"');
+    const age = ageFrom(birth.year, birth.month, new Date(), birth.day);
     if (age < 18) throw httpError(400, 'You must be at least 18 to use 3Knot');
     if (age > 80) throw httpError(400, 'Please check your birth year');
   }

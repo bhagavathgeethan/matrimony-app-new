@@ -3,7 +3,10 @@ import { View, Text, StyleSheet } from 'react-native';
 import { FIELD_BY_KEY, ONBOARDING_DETAIL_KEYS, ONBOARDING_REQUIRED_KEYS, isFilled } from '@shared/profileFields';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
-import { OnboardingScreen, StepBar, FadeIn, Eyebrow, Heading, Accent, Button, Card } from '../../components/ui/kit';
+import {
+  OnboardingScreen, OnboardingHeader, StepBar, FadeIn, Eyebrow, Heading, Accent, Button, Card,
+  getMaxOnboardingStep, getOnboardingScreenForStep,
+} from '../../components/ui/kit';
 import { FieldControl, changedValues, useDetailsDraft, valuesOf } from '../../components/details/DetailsUI';
 import { t } from '@shared/i18n';
 
@@ -34,7 +37,15 @@ export const PersonalOnboardingScreen = () => {
 
   return (
     <OnboardingScreen
-      top={<StepBar step={3} total={5} />}
+      top={
+        <OnboardingHeader
+          step={3}
+          total={7}
+          onBack={() => setCurrentScreen('basics')}
+          onStepPress={(s) => setCurrentScreen(getOnboardingScreenForStep(s))}
+          maxStep={getMaxOnboardingStep(user?.onboarding)}
+        />
+      }
       footer={
         <>
           {error ? (
@@ -48,7 +59,7 @@ export const PersonalOnboardingScreen = () => {
     >
       <FadeIn>
         <View style={{ gap: 8 }}>
-          <Eyebrow>{t('Step 03 / 05 · About you')}</Eyebrow>
+          <Eyebrow>{t('Step 03 / 07 · About you')}</Eyebrow>
           <Heading size={32}>
             {t('A little')}{' '}<Accent>{t('about you')}</Accent>
           </Heading>

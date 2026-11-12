@@ -11,11 +11,12 @@ This document maps all application features, frontend screens/components, custom
 | **Welcome Landing** | `2a` | `WelcomeScreen.jsx` | N/A | Navigation |
 | **Phone Sign-In** | `2b` | `PhoneSignInScreen.jsx` | `POST /api/auth/send-otp` | `useAuth()` |
 | **OTP Verification** | `2c` | `OTPVerifyScreen.jsx` | `POST /api/auth/verify-otp` | `useAuth()` |
+| **Onboarding Navigation & Interactive Progress** | `—` | `kit.jsx` (`OnboardingHeader`, `StepBar`)<br>`OnboardingLayout.jsx`<br>`steps.jsx` | N/A | `useApp()` / `useNavigate()` |
 | **DPDP Consent** | `2d` | `DPDPConsentScreen.jsx` | `POST /api/privacy/consent` | `useConsent()` |
-| **Basics & Intent** | `2e` | `BasicsIntentScreen.jsx` | `PUT /api/profile/basics` | `useProfile()` |
+| **Basics & Intent** | `2e` | `BasicsIntentScreen.jsx`<br>`web/src/pages/onboarding/steps.jsx` | `PUT /api/profile/basics`<br>`PUT /api/me` | `useProfile()` / `formatBirthDateInput()` |
 | **Blueprint Intro** | `2f` | `BlueprintIntroScreen.jsx` | N/A | Navigation |
-| **Blueprint Q&A Engine** | `2g` | `BlueprintQuestionScreen.jsx` | `POST /api/blueprint/answers` | `useBlueprint()` |
-| **Blueprint Tuner** | `1a` | `BlueprintTunerScreen.jsx` | `PUT /api/blueprint/weights` | `useBlueprint()` |
+| **Blueprint Q&A Engine (4 Pillars)** | `2g` | `BlueprintQuestionScreen.jsx` | `PUT /api/me/blueprint` | `useApp()` (`updateBlueprint`) |
+| **Blueprint Tuner** | `1a` | `BlueprintTunerScreen.jsx` | `PUT /api/me/blueprint` | `useApp()` (`updateBlueprint`) |
 | **Values & Vibes Picker** | `2h` | `ValuesVibesPickerScreen.jsx` | `POST /api/profile/vibes` | `useVibes()` |
 | **Photo & ID Verification**| `2i` | `PhotoVerificationScreen.jsx` | `POST /api/profile/photos` | `usePhotos()` |
 | **My Blueprint Summary** | `2j` | `MyBlueprintSummaryScreen.jsx` | `GET /api/blueprint/summary` | `useBlueprint()` |
@@ -29,6 +30,9 @@ This document maps all application features, frontend screens/components, custom
 | **Blueprint Chat Thread** | `2l` | `ChatThreadScreen.jsx` | `GET /api/chat/:threadId/messages`<br>`POST /api/chat/:threadId/messages` | `useChatThread()` |
 | **Link a Parent** | `2m` | `LinkParentScreen.jsx` | `POST /api/family/invite`<br>`GET /api/family/links` | `useFamilyLink()` |
 | **Privacy & 72h Erasure** | `2n` | `PrivacyErasureScreen.jsx` | `GET /api/privacy/export-data`<br>`POST /api/privacy/erasure-request` | `usePrivacy()` |
+| **Premium & Add-ons (Razorpay)** | `—` | `PremiumScreen.jsx`<br>`web/src/pages/app/Premium.jsx` | `GET /api/premium`<br>`POST /api/premium/checkout`<br>`POST /api/premium/confirm` | `useApp()` / `openRazorpayCheckout()` |
+| **Family Plan Gifting (Razorpay)** | `—` | `ParentPortalScreen.jsx`<br>`web/src/pages/Portal.jsx` | `POST /api/portal/:token/gift/checkout`<br>`POST /api/portal/:token/gift/confirm` | `api.giftCheckout()` / `openRazorpayCheckout()` |
+| **Razorpay Webhooks** | `—` | Backend service | `POST /api/public/payments/webhook` | `payments.verifyWebhookSignature()` |
 
 ---
 
@@ -45,6 +49,10 @@ This document maps all application features, frontend screens/components, custom
 | `SuggestedOpenerBanner`| `src/components/chat/SuggestedOpenerBanner.jsx`| AI/Blueprint-generated opener suggestion for chats |
 | `FeedbackBadge` | `src/components/family/FeedbackBadge.jsx` | Parent approval ("AMMA APPROVED") or concern pill |
 | `IOSDeviceFrame` | `src/components/common/IOSDeviceFrame.jsx` | Clean mobile viewport frame for interactive desktop preview |
+| `OnboardingHeader` | `src/components/ui/kit.jsx` | Onboarding top bar combining chevron back button, interactive 7-step progress bar, and counter |
+| `StepBar` | `src/components/ui/kit.jsx` | Segmented progress bar where completed and prior steps are clickable for seamless back/forward navigation |
+| `formatBirthDateInput` | `shared/constants.js` | Auto-hyphenating birth date formatter (`170719944` → `17-07-1994`) with backspace resilience |
+| `openRazorpayCheckout` | `src/services/razorpay.js` | Universal Razorpay Standard Checkout loader and modal launcher |
 
 ---
 

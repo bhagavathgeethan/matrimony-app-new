@@ -7,6 +7,7 @@ import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import {
   Screen, FadeIn, Eyebrow, Heading, Button, Card, Avatar, Meter, SectionLabel, IconBadge, Divider, ScoreRing,
+  OnboardingHeader, getOnboardingScreenForStep,
 } from '../../components/ui/kit';
 import { t } from '@shared/i18n';
 
@@ -64,6 +65,17 @@ export const MyBlueprintSummaryScreen = () => {
 
   return (
     <Screen tabBar={completed}>
+      {!completed && (
+        <View style={{ marginBottom: 12 }}>
+          <OnboardingHeader
+            step={7}
+            total={7}
+            onBack={() => setCurrentScreen('photos')}
+            onStepPress={(s) => setCurrentScreen(getOnboardingScreenForStep(s))}
+            maxStep={7}
+          />
+        </View>
+      )}
       <FadeIn>
         <View style={styles.topRow}>
           <Heading size={34}>{t('My blueprint')}</Heading>
