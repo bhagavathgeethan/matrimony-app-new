@@ -801,3 +801,26 @@ a.store-badge:focus-visible { outline: 3px solid var(--gold); outline-offset: 2p
 .store-compact { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--border-light); flex-shrink: 0; }
 .store-compact-btn { color: var(--text); }
 .store-compact-btn.soon { opacity: 0.45; cursor: default; }
+
+/* ---------- Family glow button ---------- */
+@keyframes family-gold-glow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(201, 162, 92, 0.35), 0 0 20px rgba(201, 162, 92, 0.15), inset 0 0 6px rgba(201, 162, 92, 0.12);
+    border-color: rgba(201, 162, 92, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(249, 212, 74, 0.7), 0 0 34px rgba(201, 162, 92, 0.4), inset 0 0 12px rgba(249, 212, 74, 0.25);
+    border-color: rgba(249, 212, 74, 0.95);
+  }
+}
+.family-glow-btn {
+  animation: family-gold-glow 2.4s ease-in-out infinite;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+.family-glow-btn:hover {
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 0 24px rgba(249, 212, 74, 0.8), 0 0 40px rgba(201, 162, 92, 0.5);
+}
+@media (prefers-reduced-motion: reduce) {
+  .family-glow-btn { animation: none; }
+}

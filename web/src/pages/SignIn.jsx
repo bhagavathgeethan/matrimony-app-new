@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Check, ChevronLeft, ChevronRight, ShieldCheck, Users } from 'lucide-react';
 import { useStore, api } from '../store';
 import { Brand, Button, ScoreRing, cx } from '../components/ui';
@@ -11,8 +11,9 @@ const RESEND_SECONDS = 30;
 export function SignInPage() {
   const store = useStore();
   const navigate = useNavigate();
+  const location = useLocation();
   // Family members (invited by a member) sign in with their own number and land on their private view
-  const [family, setFamily] = useState(false);
+  const [family, setFamily] = useState(Boolean(location.state?.family));
   const [familyCode, setFamilyCode] = useState(null);
   const [portals, setPortals] = useState([]);
   const [step, setStep] = useState('phone'); // phone → otp (→ choose, family with several invites)
@@ -146,12 +147,38 @@ export function SignInPage() {
             <Button type="submit" block loading={busy} disabled={busy || !smsConsent || digits.length !== 10}>
               {t('Send OTP')}
             </Button>
-            <p className="small muted center">
-              {family ? t('Looking for a match yourself?') : t('Invited by your family?')}{' '}
-              <button type="button" className="accent" style={{ fontWeight: 700 }} onClick={() => switchMode(!family)}>
-                {family ? t('Member sign in') : t('Family sign in')}
-              </button>
-            </p>
+            {!family ? (
+              <div className="center" style={{ marginTop: 14 }}>
+                <button
+                  type="button"
+                  className="family-glow-btn"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '10px 20px',
+                    borderRadius: 999,
+                    backgroundColor: 'rgba(201, 162, 92, 0.12)',
+                    border: '1.5px solid rgba(201, 162, 92, 0.65)',
+                    color: 'var(--accent)',
+                    fontWeight: 700,
+                    fontSize: 14,
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => switchMode(true)}
+                >
+                  <Users size={16} color="var(--accent)" />
+                  <span>{t('I’m a family member')}</span>
+                </button>
+              </div>
+            ) : (
+              <p className="small muted center" style={{ marginTop: 12 }}>
+                {t('Looking for a match yourself?')}{' '}
+                <button type="button" className="accent" style={{ fontWeight: 700 }} onClick={() => switchMode(false)}>
+                  {t('Member sign in')}
+                </button>
+              </p>
+            )}
           </form>
         ) : step === 'choose' ? (
           <div className="auth-card fade-in">

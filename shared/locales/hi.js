@@ -735,7 +735,7 @@ export default {
   'Values-led matchmaking': 'मूल्यों पर आधारित रिश्ते',
   'Marriage isn’t a': 'शादी कोई',
   'résumé match.': 'बायोडाटा का मिलान नहीं।',
-  'We match on the life you want to build — money, roots, kids, ambition. Caste and salary never move your score.': 'हम उस जीवन पर मिलान करते हैं जो आप बनाना चाहते हैं — पैसा, जड़ें, बच्चे, महत्वाकांक्षा। जाति और वेतन से आपका स्कोर कभी नहीं बदलता।',
+  'We match on the life you want to build — money, roots, kids, ambition.': 'हम उस जीवन पर मिलान करते हैं जो आप बनाना चाहते हैं — पैसा, जड़ें, बच्चे, महत्वाकांक्षा।',
   'Matched on values': 'मूल्यों पर मेल',
   'DPDP private': 'DPDP निजता',
   'Family, on your terms': 'परिवार, आपकी शर्तों पर',

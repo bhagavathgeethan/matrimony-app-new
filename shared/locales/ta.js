@@ -735,7 +735,7 @@ export default {
   'Values-led matchmaking': 'மதிப்புகளின் அடிப்படையில் திருமணப் பொருத்தம்',
   'Marriage isn’t a': 'திருமணம் என்பது',
   'résumé match.': 'சுயவிவரப் பொருத்தம் அல்ல.',
-  'We match on the life you want to build — money, roots, kids, ambition. Caste and salary never move your score.': 'நீங்கள் கட்டியெழுப்ப விரும்பும் வாழ்க்கையின் அடிப்படையில் பொருத்துகிறோம் — பணம், வேர்கள், குழந்தைகள், லட்சியம். சாதியும் சம்பளமும் உங்கள் மதிப்பெண்ணை ஒருபோதும் மாற்றாது.',
+  'We match on the life you want to build — money, roots, kids, ambition.': 'நீங்கள் கட்டியெழுப்ப விரும்பும் வாழ்க்கையின் அடிப்படையில் பொருத்துகிறோம் — பணம், வேர்கள், குழந்தைகள், லட்சியம்.',
   'Matched on values': 'மதிப்புகளில் பொருத்தம்',
   'DPDP private': 'DPDP தனியுரிமை',
   'Family, on your terms': 'குடும்பம், உங்கள் விதிமுறைகளில்',

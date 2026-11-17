@@ -270,14 +270,28 @@ export function createApiClient({ baseUrl }) {
     familySignInVerify: (phone, code) => request('/portal/sign-in/verify', { method: 'POST', body: { phone, code }, auth: false }),
     // Parent portal (no account; the link token is the credential)
     getParentPortal: (token) => request(`/portal/${encodeURIComponent(token)}`, { auth: false }),
+    searchParentPortal: (token, params = {}) => {
+      const q = new URLSearchParams();
+      for (const [k, v] of Object.entries(params)) {
+        if (v !== undefined && v !== null && v !== '') q.set(k, String(v));
+      }
+      const qs = q.toString() ? `?${q}` : '';
+      return request(`/portal/${encodeURIComponent(token)}/search${qs}`, { auth: false });
+    },
     submitParentFeedback: (token, shareId, decision, note) =>
       request(`/portal/${encodeURIComponent(token)}/shares/${shareId}/feedback`, {
         method: 'POST',
         body: { decision, note },
         auth: false,
       }),
-    proposeInterest: (token, shareId, note) =>
-      request(`/portal/${encodeURIComponent(token)}/proposals`, { method: 'POST', body: { shareId, note }, auth: false }),
+    proposeInterest: (token, target, note) => {
+      const body = typeof target === 'object' && target !== null
+        ? { ...target, note: target.note !== undefined ? target.note : note }
+        : typeof target === 'string' && (target.startsWith('cand_') || target.length === 36)
+          ? { candidateId: target, note }
+          : { shareId: target, note };
+      return request(`/portal/${encodeURIComponent(token)}/proposals`, { method: 'POST', body, auth: false });
+    },
     giftCheckout: (token, plan) => request(`/portal/${encodeURIComponent(token)}/gift/checkout`, { method: 'POST', body: { plan }, auth: false }),
     giftConfirm: (token, paymentId, payload) =>
       request(`/portal/${encodeURIComponent(token)}/gift/confirm`, { method: 'POST', body: { paymentId, payload }, auth: false }),

@@ -735,7 +735,7 @@ export default {
   'Values-led matchmaking': 'মূল্যবোধভিত্তিক বিয়ের মিল',
   'Marriage isn’t a': 'বিয়ে কোনো',
   'résumé match.': 'বায়োডাটার মিল নয়।',
-  'We match on the life you want to build — money, roots, kids, ambition. Caste and salary never move your score.': 'আপনি যে জীবন গড়তে চান তার ভিত্তিতে আমরা মেলাই — টাকা, শিকড়, সন্তান, উচ্চাকাঙ্ক্ষা। জাতি ও বেতন কখনও আপনার স্কোর বদলায় না।',
+  'We match on the life you want to build — money, roots, kids, ambition.': 'আপনি যে জীবন গড়তে চান তার ভিত্তিতে আমরা মেলাই — টাকা, শিকড়, সন্তান, উচ্চাকাঙ্ক্ষা।',
   'Matched on values': 'মূল্যবোধে মিল',
   'DPDP private': 'DPDP গোপনীয়তা',
   'Family, on your terms': 'পরিবার, আপনার শর্তে',

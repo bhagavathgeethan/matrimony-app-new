@@ -5,7 +5,7 @@
 // Preview mode (no token): the signed-in member sees, read-only, what each family member sees.
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput } from 'react-native';
-import { Lock, ShieldCheck, Check, AlertTriangle, Eye, Quote, HelpCircle, LogOut, ClipboardList, Gift, Send } from 'lucide-react';
+import { Lock, ShieldCheck, Check, AlertTriangle, Eye, Quote, HelpCircle, LogOut, ClipboardList, Gift, Send, Search, X, UserCheck } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
@@ -51,6 +51,13 @@ export const ParentPortalScreen = ({ tokenFromUrl = null, portals = [], onChoose
   const [proposing, setProposing] = useState(null);
   const [proposalNote, setProposalNote] = useState('');
   const [gift, setGift] = useState(null);
+  const [activeTab, setActiveTab] = useState('shared'); // 'shared' | 'search'
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchFilters, setSearchFilters] = useState({ minScore: 0, verified: false, city: '' });
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchTotal, setSearchTotal] = useState(0);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState(null);
 
   const loadPortal = useCallback(async () => {
     if (!token) return;
@@ -87,13 +94,50 @@ export const ParentPortalScreen = ({ tokenFromUrl = null, portals = [], onChoose
     }
   };
 
+  const runSearch = useCallback(async (text = searchQuery, filters = searchFilters) => {
+    if (!token) return;
+    setSearchLoading(true);
+    setSearchError(null);
+    try {
+      const res = await api.searchParentPortal(token, {
+        q: text ? text.trim() : undefined,
+        city: filters.city ? filters.city.trim() : undefined,
+        minScore: filters.minScore || undefined,
+        verified: filters.verified ? true : undefined,
+      });
+      setSearchResults(res.results || []);
+      setSearchTotal(res.total || 0);
+    } catch (err) {
+      setSearchError(err.message);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, [token, searchQuery, searchFilters.city, searchFilters.minScore, searchFilters.verified]);
+
+  const filterCity = searchFilters.city;
+  const filterMinScore = searchFilters.minScore;
+  const filterVerified = searchFilters.verified;
+
+  useEffect(() => {
+    if (activeTab === 'search') {
+      const timer = setTimeout(() => {
+        runSearch(searchQuery, { city: filterCity, minScore: filterMinScore, verified: filterVerified });
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, searchQuery, filterCity, filterMinScore, filterVerified, runSearch]);
+
   const proposeNow = async () => {
     try {
-      await api.proposeInterest(token, proposing.id, proposalNote.trim() || undefined);
+      const target = proposing.candidateId || proposing.id;
+      await api.proposeInterest(token, target, proposalNote.trim() || undefined);
       setNotice(t('Suggestion sent — {child} decides whether to send it.', { child: portal.childName }));
       setProposing(null);
       setProposalNote('');
       await loadPortal();
+      if (activeTab === 'search') {
+        runSearch(searchQuery, searchFilters);
+      }
     } catch (err) {
       setProposing(null);
       setError(err.message);
@@ -153,6 +197,7 @@ export const ParentPortalScreen = ({ tokenFromUrl = null, portals = [], onChoose
   };
 
   const childName = portal?.childName || '';
+  const seeking = portal?.seeking || (portal?.childGender === 'man' ? t('Brides') : portal?.childGender === 'woman' ? t('Grooms') : t('Profiles'));
   const records = portal?.records || [];
   const awaiting = records.filter((r) => r.status === 'awaiting').length;
 
@@ -181,14 +226,46 @@ export const ParentPortalScreen = ({ tokenFromUrl = null, portals = [], onChoose
         <Heading size={40} color={colors.onDark} style={{ marginTop: 10 }}>
           {!portal
             ? t('Your private view')
-            : awaiting === 0
-              ? t('Nothing awaiting\nyour view')
-              : t(awaiting === 1 ? '1 profile awaits\nyour view' : '{n} profiles await\nyour view', { n: awaiting })}
+            : activeTab === 'search'
+              ? t('Search {seeking}\nfor {childName}', { seeking, childName })
+              : awaiting === 0
+                ? t('Nothing awaiting\nyour view')
+                : t(awaiting === 1 ? '1 profile awaits\nyour view' : '{n} profiles await\nyour view', { n: awaiting })}
         </Heading>
         {portal && (
           <Text style={styles.heroText}>
-            {t('{childName} chose to show you these. You can note approval or raise a concern — {childName} decides what happens next.', { childName })}
+            {activeTab === 'search'
+              ? t('Discover compatible {seeking} for {childName} based on their 4-pillar blueprint. Suggest profiles for them to review.', { seeking: seeking.toLowerCase(), childName })
+              : t('{childName} chose to show you these. You can note approval or raise a concern — {childName} decides what happens next.', { childName })}
           </Text>
+        )}
+        {portal && (
+          <View style={styles.navTabs}>
+            <TouchableOpacity
+              style={[styles.navTab, activeTab === 'shared' && styles.navTabActive]}
+              onPress={() => setActiveTab('shared')}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: activeTab === 'shared' }}
+            >
+              <Text style={[styles.navTabText, activeTab === 'shared' && styles.navTabTextActive]}>
+                {t('Shared ({n})', { n: records.length })}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.navTab, activeTab === 'search' && styles.navTabActive]}
+              onPress={() => {
+                setActiveTab('search');
+                if (searchResults.length === 0 && !searchLoading) runSearch(searchQuery, searchFilters);
+              }}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: activeTab === 'search' }}
+            >
+              <Search size={14} color={activeTab === 'search' ? colors.surfaceDark : colors.onDark} />
+              <Text style={[styles.navTabText, activeTab === 'search' && styles.navTabTextActive]}>
+                {t('Search {seeking}', { seeking })}
+              </Text>
+            </TouchableOpacity>
+          </View>
         )}
         {portals.length > 1 && (
           <View style={styles.switcher}>
@@ -211,202 +288,355 @@ export const ParentPortalScreen = ({ tokenFromUrl = null, portals = [], onChoose
         {error && <Text style={[styles.note, { color: colors.accent }]}>{error}</Text>}
         {notice && <Text style={[styles.note, { color: colors.success, fontWeight: '700' }]}>{notice}</Text>}
 
-        {portal?.compareEnabled && records.length > 1 && (
-          <Card style={{ gap: 12 }} padding={16}>
-            <Text style={styles.sectionTitle}>{t('Side by side')}</Text>
-            <View style={styles.compare}>
-              <View style={styles.compareCol}>
-                <Text style={styles.compareHead}> </Text>
-                {['City', 'Overall', ...PILLARS.map((p) => p.title), 'Your view'].map((label) => (
-                  <Text key={label} style={styles.compareLabel} numberOfLines={1}>{t(label)}</Text>
-                ))}
-              </View>
-              {records.map((r) => (
-                <View key={r.id} style={styles.compareCol}>
-                  <Text style={styles.compareHead} numberOfLines={1}>{r.candidateName}, {r.candidateAge}</Text>
-                  <Text style={styles.compareCell} numberOfLines={1}>{r.candidateCity || '—'}</Text>
-                  <Text style={[styles.compareCell, { fontWeight: '800' }]}>{r.overlapScore != null ? `${r.overlapScore}%` : '—'}</Text>
-                  {PILLARS.map((p) => (
-                    <Text key={p.key} style={styles.compareCell} numberOfLines={1}>{r.pillarScores ? pillarVerdict(r.pillarScores[p.key]).label : '—'}</Text>
+        {activeTab === 'shared' && (
+          <>
+            {portal?.compareEnabled && records.length > 1 && (
+              <Card style={{ gap: 12 }} padding={16}>
+                <Text style={styles.sectionTitle}>{t('Side by side')}</Text>
+                <View style={styles.compare}>
+                  <View style={styles.compareCol}>
+                    <Text style={styles.compareHead}> </Text>
+                    {['City', 'Overall', ...PILLARS.map((p) => p.title), 'Your view'].map((label) => (
+                      <Text key={label} style={styles.compareLabel} numberOfLines={1}>{t(label)}</Text>
+                    ))}
+                  </View>
+                  {records.map((r) => (
+                    <View key={r.id} style={styles.compareCol}>
+                      <Text style={styles.compareHead} numberOfLines={1}>{r.candidateName}, {r.candidateAge}</Text>
+                      <Text style={styles.compareCell} numberOfLines={1}>{r.candidateCity || '—'}</Text>
+                      <Text style={[styles.compareCell, { fontWeight: '800' }]}>{r.overlapScore != null ? `${r.overlapScore}%` : '—'}</Text>
+                      {PILLARS.map((p) => (
+                        <Text key={p.key} style={styles.compareCell} numberOfLines={1}>{r.pillarScores ? pillarVerdict(r.pillarScores[p.key]).label : '—'}</Text>
+                      ))}
+                      <Text style={styles.compareCell} numberOfLines={1}>{t(VIEW_LABELS[r.status])}</Text>
+                    </View>
                   ))}
-                  <Text style={styles.compareCell} numberOfLines={1}>{t(VIEW_LABELS[r.status])}</Text>
                 </View>
-              ))}
-            </View>
-          </Card>
-        )}
-
-        {records.map((record, i) => {
-          const draft = drafts[record.id];
-          const answered = ANSWERED[record.status];
-          return (
-            <FadeIn key={record.id} delay={i * 70}>
-              <Card style={styles.card} padding={18}>
-                <View style={styles.cardHead}>
-                  <View style={styles.portrait}>
-                    {record.photo ? <Image source={{ uri: record.photo }} style={styles.portraitImg} /> : <Lock size={18} color={colors.textLight} />}
-                  </View>
-                  <View style={{ flex: 1, gap: 3 }}>
-                    <Text style={styles.name}>{record.candidateName}, {record.candidateAge}</Text>
-                    <View style={styles.verified}>
-                      <ShieldCheck size={13} color={colors.success} />
-                      <Text style={styles.meta}>
-                        {record.candidateCity ? `${record.candidateCity} · ` : ''}{record.idVerified ? t('ID verified') : t('Phone verified')}
-                      </Text>
-                    </View>
-                  </View>
-                  {record.overlapScore != null && <ScoreRing score={record.overlapScore} size={64} />}
-                </View>
-
-                {record.pillarScores && (
-                  <View style={styles.pillars}>
-                    {PILLARS.map((p) => {
-                      const v = pillarVerdict(record.pillarScores[p.key]);
-                      return (
-                        <View key={p.key} style={styles.pillarRow}>
-                          <Text style={styles.pillarName}>{t(p.title)}</Text>
-                          <Badge label={v.label} tone={v.tone} />
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
-
-                {record.childNote ? (
-                  <View style={styles.childNote}>
-                    <Quote size={14} color={colors.gold} />
-                    <Text style={styles.childNoteText}>{record.childNote}</Text>
-                  </View>
-                ) : null}
-
-                {familyMode && portal.canPropose && (
-                  record.contacted ? (
-                    <Text style={styles.small}>{t('Already in touch with this person')}</Text>
-                  ) : (portal.proposals || []).some((p) => p.shareId === record.id && p.status === 'pending') ? (
-                    <Text style={styles.small}>{t('You suggested an interest — waiting for {child}.', { child: childName })}</Text>
-                  ) : (
-                    <Button small variant="secondary" icon={Send} label={t('Suggest sending interest')} onPress={() => { setProposing(record); setProposalNote(''); }} />
-                  )
-                )}
-
-                <View style={styles.masked}>
-                  <Lock size={12} color={colors.textMuted} />
-                  <Text style={styles.maskedText}>{t('Phone, email and chats are hidden from this view.')}</Text>
-                </View>
-
-                {record.status !== 'awaiting' && !draft ? (
-                  <View style={[styles.answered, { backgroundColor: answered[3] }]}>
-                    {React.createElement(answered[1], { size: 16, color: answered[2], strokeWidth: 2.6 })}
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.answeredTitle}>{t(answered[0])}</Text>
-                      <Text style={styles.answeredSub}>
-                        {t('{feedbackNote} · awaiting {childName}', { feedbackNote: t(record.feedbackNote), childName })}
-                      </Text>
-                    </View>
-                    {familyMode && (
-                      <TouchableOpacity onPress={() => reopen(record)} accessibilityRole="button">
-                        <Text style={styles.change}>{t('Change my view')}</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                ) : familyMode ? (
-                  <View style={{ gap: 10 }}>
-                    <View style={styles.actions} accessibilityRole="radiogroup">
-                      {DECISIONS.map(([key, label, Icon, fg, bg]) => {
-                        const on = draft?.decision === key;
-                        return (
-                          <TouchableOpacity
-                            key={key}
-                            disabled={pendingId === record.id}
-                            onPress={() => setDraft(record.id, { decision: key })}
-                            style={[styles.decision, { backgroundColor: on ? bg : colors.card, borderColor: on ? fg : colors.cardBorder }]}
-                            accessibilityRole="radio"
-                            accessibilityState={{ checked: on }}
-                          >
-                            <Icon size={16} color={fg} />
-                            <Text style={[styles.decisionText, { color: on ? fg : colors.textPrimary }]} numberOfLines={1}>{t(label)}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                    {draft?.decision && (
-                      <>
-                        <TextInput
-                          value={draft.note || ''}
-                          onChangeText={(v) => setDraft(record.id, { note: v })}
-                          placeholder={t('Add a note for {child} (optional)', { child: childName })}
-                          placeholderTextColor={colors.textLight}
-                          multiline
-                          maxLength={500}
-                          style={styles.noteInput}
-                          accessibilityLabel={t('Note')}
-                        />
-                        <View style={{ flexDirection: 'row', gap: 10 }}>
-                          {record.status !== 'awaiting' && (
-                            <Button small variant="secondary" label={t('Cancel')} style={{ flex: 1 }} onPress={() => dropDraft(record.id)} />
-                          )}
-                          <Button
-                            small
-                            label={pendingId === record.id ? t('Sending…') : t('Send my view')}
-                            disabled={pendingId === record.id}
-                            style={{ flex: 2 }}
-                            onPress={() => respond(record.id)}
-                          />
-                        </View>
-                      </>
-                    )}
-                  </View>
-                ) : (
-                  <Text style={styles.small}>{t('Waiting for their view')}</Text>
-                )}
               </Card>
-            </FadeIn>
-          );
-        })}
+            )}
 
-        {portal && records.length === 0 && (
-          <Card variant="tinted" style={styles.emptyCard}>
-            <Eye size={26} color={colors.gold} />
-            <Text style={styles.emptyTitle}>{t('No profiles shared right now')}</Text>
-            <Text style={styles.emptyText}>{t('When {childName} forwards a profile, it will appear here for you to review.', { childName })}</Text>
-          </Card>
+            {records.map((record, i) => {
+              const draft = drafts[record.id];
+              const answered = ANSWERED[record.status];
+              return (
+                <FadeIn key={record.id} delay={i * 70}>
+                  <Card style={styles.card} padding={18}>
+                    <View style={styles.cardHead}>
+                      <View style={styles.portrait}>
+                        {record.photo ? <Image source={{ uri: record.photo }} style={styles.portraitImg} /> : <Lock size={18} color={colors.textLight} />}
+                      </View>
+                      <View style={{ flex: 1, gap: 3 }}>
+                        <Text style={styles.name}>{record.candidateName}, {record.candidateAge}</Text>
+                        <View style={styles.verified}>
+                          <ShieldCheck size={13} color={colors.success} />
+                          <Text style={styles.meta}>
+                            {record.candidateCity ? `${record.candidateCity} · ` : ''}{record.idVerified ? t('ID verified') : t('Phone verified')}
+                          </Text>
+                        </View>
+                      </View>
+                      {record.overlapScore != null && <ScoreRing score={record.overlapScore} size={64} />}
+                    </View>
+
+                    {record.pillarScores && (
+                      <View style={styles.pillars}>
+                        {PILLARS.map((p) => {
+                          const v = pillarVerdict(record.pillarScores[p.key]);
+                          return (
+                            <View key={p.key} style={styles.pillarRow}>
+                              <Text style={styles.pillarName}>{t(p.title)}</Text>
+                              <Badge label={v.label} tone={v.tone} />
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
+
+                    {record.childNote ? (
+                      <View style={styles.childNote}>
+                        <Quote size={14} color={colors.gold} />
+                        <Text style={styles.childNoteText}>{record.childNote}</Text>
+                      </View>
+                    ) : null}
+
+                    {familyMode && portal.canPropose && (
+                      record.contacted ? (
+                        <Text style={styles.small}>{t('Already in touch with this person')}</Text>
+                      ) : (portal.proposals || []).some((p) => p.shareId === record.id && p.status === 'pending') ? (
+                        <Text style={styles.small}>{t('You suggested an interest — waiting for {child}.', { child: childName })}</Text>
+                      ) : (
+                        <Button small variant="secondary" icon={Send} label={t('Suggest sending interest')} onPress={() => { setProposing(record); setProposalNote(''); }} />
+                      )
+                    )}
+
+                    <View style={styles.masked}>
+                      <Lock size={12} color={colors.textMuted} />
+                      <Text style={styles.maskedText}>{t('Phone, email and chats are hidden from this view.')}</Text>
+                    </View>
+
+                    {record.status !== 'awaiting' && !draft ? (
+                      <View style={[styles.answered, { backgroundColor: answered[3] }]}>
+                        {React.createElement(answered[1], { size: 16, color: answered[2], strokeWidth: 2.6 })}
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.answeredTitle}>{t(answered[0])}</Text>
+                          <Text style={styles.answeredSub}>
+                            {t('{feedbackNote} · awaiting {childName}', { feedbackNote: t(record.feedbackNote), childName })}
+                          </Text>
+                        </View>
+                        {familyMode && (
+                          <TouchableOpacity onPress={() => reopen(record)} accessibilityRole="button">
+                            <Text style={styles.change}>{t('Change my view')}</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    ) : familyMode ? (
+                      <View style={{ gap: 10 }}>
+                        <View style={styles.actions} accessibilityRole="radiogroup">
+                          {DECISIONS.map(([key, label, Icon, fg, bg]) => {
+                            const on = draft?.decision === key;
+                            return (
+                              <TouchableOpacity
+                                key={key}
+                                disabled={pendingId === record.id}
+                                onPress={() => setDraft(record.id, { decision: key })}
+                                style={[styles.decision, { backgroundColor: on ? bg : colors.card, borderColor: on ? fg : colors.cardBorder }]}
+                                accessibilityRole="radio"
+                                accessibilityState={{ checked: on }}
+                              >
+                                <Icon size={16} color={fg} />
+                                <Text style={[styles.decisionText, { color: on ? fg : colors.textPrimary }]} numberOfLines={1}>{t(label)}</Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                        {draft?.decision && (
+                          <>
+                            <TextInput
+                              value={draft.note || ''}
+                              onChangeText={(v) => setDraft(record.id, { note: v })}
+                              placeholder={t('Add a note for {child} (optional)', { child: childName })}
+                              placeholderTextColor={colors.textLight}
+                              multiline
+                              maxLength={500}
+                              style={styles.noteInput}
+                              accessibilityLabel={t('Note')}
+                            />
+                            <View style={{ flexDirection: 'row', gap: 10 }}>
+                              {record.status !== 'awaiting' && (
+                                <Button small variant="secondary" label={t('Cancel')} style={{ flex: 1 }} onPress={() => dropDraft(record.id)} />
+                              )}
+                              <Button
+                                small
+                                label={pendingId === record.id ? t('Sending…') : t('Send my view')}
+                                disabled={pendingId === record.id}
+                                style={{ flex: 2 }}
+                                onPress={() => respond(record.id)}
+                              />
+                            </View>
+                          </>
+                        )}
+                      </View>
+                    ) : (
+                      <Text style={styles.small}>{t('Waiting for their view')}</Text>
+                    )}
+                  </Card>
+                </FadeIn>
+              );
+            })}
+
+            {portal && records.length === 0 && (
+              <Card variant="tinted" style={styles.emptyCard}>
+                <Eye size={26} color={colors.gold} />
+                <Text style={styles.emptyTitle}>{t('No profiles shared right now')}</Text>
+                <Text style={styles.emptyText}>{t('When {childName} forwards a profile, it will appear here for you to review.', { childName })}</Text>
+              </Card>
+            )}
+
+            {familyMode && portal?.canManage && portal.profileDetails && (
+              <Card style={{ gap: 6 }} padding={16}>
+                <View style={styles.sectionHead}>
+                  <ClipboardList size={20} color={colors.accent} />
+                  <Text style={styles.sectionTitle}>{t('{child}’s personal details', { child: childName })}</Text>
+                </View>
+                <Text style={styles.small}>{t('{child} asked you to help complete these. They’re notified of every change.', { child: childName })}</Text>
+                <DetailsSections person={{ details: portal.profileDetails, firstName: portal.profileDetails.firstName }} own onEdit={setEditing} />
+              </Card>
+            )}
+
+            {familyMode && portal && (
+              <Card style={{ gap: 10 }} padding={16}>
+                <View style={styles.sectionHead}>
+                  <Gift size={20} color={colors.gold} />
+                  <Text style={styles.sectionTitle}>{t('Gift {child} a 3Knot plan', { child: childName })}</Text>
+                </View>
+                <Text style={styles.small}>{t('Unlimited interests, see who’s interested, and more. {child} is told it’s from you.', { child: childName })}</Text>
+                {PLAN_CATALOG.filter((p) => p.months === 3).map((p) => (
+                  <Button
+                    key={p.code}
+                    small
+                    variant={p.tier === 'premium' ? 'gold' : 'secondary'}
+                    label={t('{name} · 3 months · {price}', { name: t(TIER_INFO[p.tier].name), price: priceText(p.pricePaise) })}
+                    onPress={() => giftStart(p.code)}
+                  />
+                ))}
+              </Card>
+            )}
+          </>
         )}
 
-        {familyMode && portal?.canManage && portal.profileDetails && (
-          <Card style={{ gap: 6 }} padding={16}>
-            <View style={styles.sectionHead}>
-              <ClipboardList size={20} color={colors.accent} />
-              <Text style={styles.sectionTitle}>{t('{child}’s personal details', { child: childName })}</Text>
-            </View>
-            <Text style={styles.small}>{t('{child} asked you to help complete these. They’re notified of every change.', { child: childName })}</Text>
-            <DetailsSections person={{ details: portal.profileDetails, firstName: portal.profileDetails.firstName }} own onEdit={setEditing} />
-          </Card>
-        )}
+        {activeTab === 'search' && (
+          <FadeIn>
+            <View style={styles.searchSection}>
+              <View style={styles.searchInputRow}>
+                <Search size={18} color={colors.textLight} />
+                <TextInput
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder={t('Search by name, city, profession…')}
+                  placeholderTextColor={colors.textLight}
+                  style={styles.searchInput}
+                  accessibilityLabel={t('Search')}
+                />
+                {searchQuery ? (
+                  <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <X size={16} color={colors.textLight} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
 
-        {familyMode && portal && (
-          <Card style={{ gap: 10 }} padding={16}>
-            <View style={styles.sectionHead}>
-              <Gift size={20} color={colors.gold} />
-              <Text style={styles.sectionTitle}>{t('Gift {child} a 3Knot plan', { child: childName })}</Text>
+              <View style={styles.filterRow}>
+                <Chip
+                  label={t('80%+ Aligned')}
+                  active={searchFilters.minScore >= 80}
+                  onPress={() => setSearchFilters((f) => ({ ...f, minScore: f.minScore >= 80 ? 0 : 80 }))}
+                />
+                <Chip
+                  label={t('ID Verified')}
+                  active={searchFilters.verified}
+                  onPress={() => setSearchFilters((f) => ({ ...f, verified: !f.verified }))}
+                />
+              </View>
+
+              {searchError && <Text style={[styles.note, { color: colors.accent }]}>{searchError}</Text>}
+              {searchLoading && <Text style={styles.small}>{t('Searching {seeking}…', { seeking })}</Text>}
+
+              {!searchLoading && searchResults.length === 0 && (
+                <Card variant="tinted" style={styles.emptyCard}>
+                  <Search size={28} color={colors.gold} />
+                  <Text style={styles.emptyTitle}>{t('No {seeking} found', { seeking })}</Text>
+                  <Text style={styles.emptyText}>
+                    {t('Try adjusting your search or clearing filters to see more profiles for {childName}.', { childName })}
+                  </Text>
+                  {(searchQuery || searchFilters.minScore > 0 || searchFilters.verified) && (
+                    <Button
+                      small
+                      variant="secondary"
+                      label={t('Clear filters')}
+                      onPress={() => {
+                        setSearchQuery('');
+                        setSearchFilters({ minScore: 0, verified: false, city: '' });
+                      }}
+                    />
+                  )}
+                </Card>
+              )}
+
+              {searchResults.map((cand, i) => {
+                const isSuggested = (portal?.proposals || []).some(
+                  (p) => (p.candidateId === cand.id || p.candidateId === cand.candidateId) && p.status === 'pending'
+                ) || cand.suggested;
+
+                return (
+                  <FadeIn key={cand.id} delay={i * 50}>
+                    <Card style={styles.card} padding={18}>
+                      <View style={styles.cardHead}>
+                        <View style={styles.portrait}>
+                          {cand.photo ? (
+                            <Image source={{ uri: cand.photo }} style={styles.portraitImg} />
+                          ) : (
+                            <Lock size={18} color={colors.textLight} />
+                          )}
+                        </View>
+                        <View style={{ flex: 1, gap: 3 }}>
+                          <Text style={styles.name}>{cand.candidateName}, {cand.candidateAge}</Text>
+                          <View style={styles.verified}>
+                            <ShieldCheck size={13} color={colors.success} />
+                            <Text style={styles.meta}>
+                              {cand.candidateCity ? `${cand.candidateCity} · ` : ''}
+                              {cand.idVerified ? t('ID verified') : t('Phone verified')}
+                            </Text>
+                          </View>
+                          {cand.profession ? (
+                            <Text style={styles.meta} numberOfLines={1}>{cand.profession}</Text>
+                          ) : null}
+                        </View>
+                        {cand.overlapScore != null && <ScoreRing score={cand.overlapScore} size={64} />}
+                      </View>
+
+                      {cand.pillarScores && (
+                        <View style={styles.pillars}>
+                          {PILLARS.map((p) => {
+                            const v = pillarVerdict(cand.pillarScores[p.key]);
+                            return (
+                              <View key={p.key} style={styles.pillarRow}>
+                                <Text style={styles.pillarName}>{t(p.title)}</Text>
+                                <Badge label={v.label} tone={v.tone} />
+                              </View>
+                            );
+                          })}
+                        </View>
+                      )}
+
+                      {cand.quote ? (
+                        <View style={styles.childNote}>
+                          <Quote size={14} color={colors.gold} />
+                          <Text style={styles.childNoteText}>{cand.quote}</Text>
+                        </View>
+                      ) : null}
+
+                      <View style={styles.masked}>
+                        <Lock size={12} color={colors.textMuted} />
+                        <Text style={styles.maskedText}>{t('Direct contact details and chats remain protected.')}</Text>
+                      </View>
+
+                      {cand.contacted ? (
+                        <View style={styles.statusPill}>
+                          <UserCheck size={15} color={colors.success} />
+                          <Text style={[styles.statusPillText, { color: colors.success }]}>
+                            {t('Already connected with {childName}', { childName })}
+                          </Text>
+                        </View>
+                      ) : isSuggested ? (
+                        <View style={styles.statusPill}>
+                          <Check size={15} color="#8A6A2E" />
+                          <Text style={[styles.statusPillText, { color: '#8A6A2E' }]}>
+                            {t('Suggested to {childName} · Awaiting response', { childName })}
+                          </Text>
+                        </View>
+                      ) : (
+                        <Button
+                          small
+                          variant="secondary"
+                          icon={Send}
+                          label={t('Suggest to {childName}', { childName })}
+                          onPress={() => {
+                            setProposing(cand);
+                            setProposalNote('');
+                          }}
+                        />
+                      )}
+                    </Card>
+                  </FadeIn>
+                );
+              })}
             </View>
-            <Text style={styles.small}>{t('Unlimited interests, see who’s interested, and more. {child} is told it’s from you.', { child: childName })}</Text>
-            {PLAN_CATALOG.filter((p) => p.months === 3).map((p) => (
-              <Button
-                key={p.code}
-                small
-                variant={p.tier === 'premium' ? 'gold' : 'secondary'}
-                label={t('{name} · 3 months · {price}', { name: t(TIER_INFO[p.tier].name), price: priceText(p.pricePaise) })}
-                onPress={() => giftStart(p.code)}
-              />
-            ))}
-          </Card>
+          </FadeIn>
         )}
 
         {portal && (
           <View style={styles.disclaimer}>
             <ShieldCheck size={14} color={colors.textMuted} />
             <Text style={styles.disclaimerText}>
-              {t('Parents cannot search, message, or browse other profiles. Access ends when {childName} revokes it or the share expires.', { childName })}
+              {t('Family members can search and suggest matches for {childName}. Private chats and contact details remain protected.', { childName })}
             </Text>
           </View>
         )}
@@ -472,8 +702,28 @@ const styles = StyleSheet.create({
   readOnlyText: { fontFamily: fonts.sans, fontWeight: '700', fontSize: 10, letterSpacing: 1.6, color: colors.gold, textTransform: 'uppercase' },
   sharedBy: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '600', color: 'rgba(255,246,238,0.75)', marginTop: 8 },
   heroText: { fontFamily: fonts.sans, fontSize: 15, lineHeight: 22, color: 'rgba(255,246,238,0.78)', marginTop: 6 },
+  navTabs: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  navTab: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 14,
+    borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  navTabActive: { backgroundColor: colors.gold },
+  navTabText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '700', color: colors.onDark },
+  navTabTextActive: { color: colors.surfaceDark },
   switcher: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   body: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 30, gap: 14 },
+  searchSection: { gap: 14 },
+  searchInputRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, height: 48, paddingHorizontal: 14,
+    borderRadius: radii.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.cardBorder,
+  },
+  searchInput: { flex: 1, fontFamily: fonts.sans, fontSize: 15, color: colors.textPrimary, outlineStyle: 'none' },
+  filterRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  statusPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 14,
+    borderRadius: radii.md, backgroundColor: colors.cardSecondary,
+  },
+  statusPillText: { fontFamily: fonts.sans, fontSize: 13, fontWeight: '700' },
   note: { fontFamily: fonts.sans, fontSize: 14, color: colors.textSecondary },
   small: { fontFamily: fonts.sans, fontSize: 13, lineHeight: 19, color: colors.textSecondary },
   sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },

@@ -735,7 +735,7 @@ export default {
   'Values-led matchmaking': 'मूल्यांवर आधारित विवाह जुळणी',
   'Marriage isn’t a': 'लग्न म्हणजे',
   'résumé match.': 'बायोडेटा जुळवणे नव्हे.',
-  'We match on the life you want to build — money, roots, kids, ambition. Caste and salary never move your score.': 'तुम्हाला उभारायच्या आयुष्यावर आम्ही जुळवतो — पैसा, मुळे, मुले, महत्त्वाकांक्षा. जात आणि पगार तुमचे गुण कधीही बदलत नाहीत.',
+  'We match on the life you want to build — money, roots, kids, ambition.': 'तुम्हाला उभारायच्या आयुष्यावर आम्ही जुळवतो — पैसा, मुळे, मुले, महत्त्वाकांक्षा.',
   'Matched on values': 'मूल्यांवर जुळणी',
   'DPDP private': 'DPDP गोपनीयता',
   'Family, on your terms': 'कुटुंब, तुमच्या अटींवर',

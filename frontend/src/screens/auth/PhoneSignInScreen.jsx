@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
-import { Check } from 'lucide-react';
+import { Check, Sparkles, Users } from 'lucide-react';
 import { theme } from '../../theme/tokens';
 import { useApp } from '../../context/AppContext';
 import { OnboardingScreen, TopBar, FadeIn, Eyebrow, Heading, Accent, Body, Button, Card } from '../../components/ui/kit';
@@ -34,9 +34,19 @@ export const PhoneSignInScreen = () => {
         <>
           {error && <Text style={styles.error}>{error}</Text>}
           <Button label={sending ? t('Sending…') : t('Send OTP')} disabled={!canSend} onPress={handleSend} />
-          <Text style={styles.footer} onPress={() => setCurrentScreen('family-signin')}>
-            {t('Invited by your family?')}{' '}<Text style={styles.footerLink}>{t('Family sign in')}</Text>
-          </Text>
+          <TouchableOpacity
+            onPress={() => setCurrentScreen('family-signin')}
+            style={styles.familyGlowBtn}
+            className="family-soft-glow-btn"
+            activeOpacity={0.85}
+            accessibilityRole="button"
+          >
+            <Users size={15} color={colors.accent} strokeWidth={2.2} />
+            <Text style={styles.familyGlowText}>
+              {t('Invited by your family?')}{' '}<Text style={styles.familyGlowLink}>{t('I’m a family member')}</Text>
+            </Text>
+            <Sparkles size={13} color={colors.gold} />
+          </TouchableOpacity>
         </>
       }
     >
@@ -184,6 +194,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.accent,
     textAlign: 'center',
+  },
+  familyGlowBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(201, 162, 92, 0.12)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(201, 162, 92, 0.55)',
+    boxShadow: '0 2px 10px rgba(168, 30, 60, 0.08), 0 0 16px rgba(201, 162, 92, 0.25)',
+    marginTop: 4,
+  },
+  familyGlowText: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  familyGlowLink: {
+    fontWeight: '700',
+    color: colors.accent,
   },
   footer: {
     fontFamily: fonts.sans,
