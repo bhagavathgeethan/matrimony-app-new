@@ -735,7 +735,7 @@ export default {
   'Values-led matchmaking': 'മൂല്യാധിഷ്ഠിത വിവാഹ പൊരുത്തം',
   'Marriage isn’t a': 'വിവാഹം എന്നത്',
   'résumé match.': 'ബയോഡേറ്റ പൊരുത്തമല്ല.',
-  'We match on the life you want to build — money, roots, kids, ambition. Caste and salary never move your score.': 'നിങ്ങൾ കെട്ടിപ്പടുക്കാൻ ആഗ്രഹിക്കുന്ന ജീവിതത്തെ അടിസ്ഥാനമാക്കി ഞങ്ങൾ പൊരുത്തപ്പെടുത്തുന്നു — പണം, വേരുകൾ, കുട്ടികൾ, അഭിലാഷം. ജാതിയും ശമ്പളവും നിങ്ങളുടെ സ്കോർ ഒരിക്കലും മാറ്റില്ല.',
+  'We match on the life you want to build — money, roots, kids, ambition.': 'നിങ്ങൾ കെട്ടിപ്പടുക്കാൻ ആഗ്രഹിക്കുന്ന ജീവിതത്തെ അടിസ്ഥാനമാക്കി ഞങ്ങൾ പൊരുത്തപ്പെടുത്തുന്നു — പണം, വേരുകൾ, കുട്ടികൾ, അഭിലാഷം.',
   'Matched on values': 'മൂല്യങ്ങളിൽ പൊരുത്തം',
   'DPDP private': 'DPDP സ്വകാര്യത',
   'Family, on your terms': 'കുടുംബം, നിങ്ങളുടെ വ്യവസ്ഥകളിൽ',

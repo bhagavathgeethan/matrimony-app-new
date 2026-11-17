@@ -7,7 +7,7 @@ The Matrimony Mobile Application is a values-first, DPDP-compliant relationship 
 3. **Kids & parenting** (Timeline, Hands-on approach, Career concessions)
 4. **Career ambition** (Work-life balance vs. High-growth focus)
 
-In addition, the system incorporates a **Dual-Dashboard Parent Co-Pilot Model**, providing parents with a scoped, read-only interface to review candidate cards forwarded by their child, leave advisory feedback ("Approved" or "Concern Raised"), while strictly locking out direct candidate search, unapproved contact info, and private chats.
+In addition, the system incorporates a **Collaborative Family Co-Pilot Model**, providing parents with a scoped interface to review candidate cards forwarded by their child, leave advisory feedback ("Approved" or "Concern Raised"), and actively search complementary profiles (search for brides if the child is a groom, search for grooms if the child is a bride). Parents can suggest matches to their child while strictly keeping unapproved contact info and private chats locked out.
 
 ---
 
@@ -88,7 +88,7 @@ RootNavigator
 1. **Granular Consent Engine**: Every processing category (Matching, Family Sharing, Research, Marketing) is tracked with timestamped boolean flags.
 2. **Photo Protection Engine**: Photos remain blurred until both candidates establish mutual interest, preventing unauthorized browsing.
 3. **Contact Masking**: Phone numbers and emails are never exposed directly to candidates or parents.
-4. **Parent Sandboxing**: Parent sessions use cryptographically signed share tokens with configurable TTLs (7 days, 30 days, or manual revocation). Parents have zero capability to browse, search, or access chat logs.
+4. **Parent Sandboxing & Discovery Scope**: Parent sessions use cryptographically signed share tokens with configurable TTLs (7 days, 30 days, or manual revocation). Parents can review forwarded profiles and search candidate profiles of the opposite gender (brides for grooms, grooms for brides) with compatibility calculated against the child's blueprint. Parents can recommend candidates to their child, but have zero access to private chat logs or unmasked contact details.
 5. **72-Hour Erasure Pipeline**: When a user requests account deletion, the system wipes:
    - Profile & photo binaries
    - Blueprint answers & weights

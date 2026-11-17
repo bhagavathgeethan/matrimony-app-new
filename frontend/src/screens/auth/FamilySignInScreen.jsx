@@ -102,7 +102,7 @@ export const FamilySignInScreen = () => {
               <Heading size={34}>
                 <Accent>{t('Invited by your family?')}</Accent>
               </Heading>
-              <Body size={14}>{t('Use the number your family member added. You’ll see only the profiles they share with you.')}</Body>
+              <Body size={14}>{t('Use the number your family member added. View shared profiles and search matches for them.')}</Body>
             </>
           )}
           {step === 'code' && (
@@ -220,7 +220,7 @@ export const FamilySignInScreen = () => {
         <Card variant="gold" style={styles.why} padding={14}>
           <ShieldCheck size={18} color="#8A6A2E" />
           <Text style={styles.whyText}>
-            {t('Family members cannot search, message, or browse other profiles. Access ends when your family member removes it.')}
+            {t('Family members can search and suggest matches for their family member. Contact details and private chats remain protected.')}
           </Text>
         </Card>
       </FadeIn>

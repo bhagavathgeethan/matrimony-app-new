@@ -735,7 +735,7 @@ export default {
   'Values-led matchmaking': 'ମୂଲ୍ୟବୋଧ ଆଧାରିତ ବିବାହ ସମ୍ବନ୍ଧ',
   'Marriage isn’t a': 'ବିବାହ ଅର୍ଥ',
   'résumé match.': 'ବାୟୋଡାଟା ମେଳ ନୁହେଁ।',
-  'We match on the life you want to build — money, roots, kids, ambition. Caste and salary never move your score.': 'ଆପଣ ଗଢ଼ିବାକୁ ଚାହୁଁଥିବା ଜୀବନ ଉପରେ ଆମେ ମେଳ କରୁ — ଟଙ୍କା, ମୂଳ, ପିଲା, ଆକାଂକ୍ଷା। ଜାତି ଓ ଦରମା କେବେ ଆପଣଙ୍କ ସ୍କୋର ବଦଳାଏ ନାହିଁ।',
+  'We match on the life you want to build — money, roots, kids, ambition.': 'ଆପଣ ଗଢ଼ିବାକୁ ଚାହୁଁଥିବା ଜୀବନ ଉପରେ ଆମେ ମେଳ କରୁ — ଟଙ୍କା, ମୂଳ, ପିଲା, ଆକାଂକ୍ଷା।',
   'Matched on values': 'ମୂଲ୍ୟବୋଧରେ ମେଳ',
   'DPDP private': 'DPDP ଗୋପନୀୟତା',
   'Family, on your terms': 'ପରିବାର, ଆପଣଙ୍କ ସର୍ତ୍ତରେ',

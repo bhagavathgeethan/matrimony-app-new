@@ -735,7 +735,7 @@ export default {
   'Values-led matchmaking': 'ਕਦਰਾਂ \'ਤੇ ਆਧਾਰਿਤ ਰਿਸ਼ਤੇ',
   'Marriage isn’t a': 'ਵਿਆਹ ਦਾ ਮਤਲਬ',
   'résumé match.': 'ਬਾਇਓਡਾਟਾ ਦਾ ਮੇਲ ਨਹੀਂ।',
-  'We match on the life you want to build — money, roots, kids, ambition. Caste and salary never move your score.': 'ਤੁਸੀਂ ਜੋ ਜ਼ਿੰਦਗੀ ਬਣਾਉਣਾ ਚਾਹੁੰਦੇ ਹੋ ਉਸ \'ਤੇ ਅਸੀਂ ਮੇਲ ਕਰਦੇ ਹਾਂ — ਪੈਸਾ, ਜੜ੍ਹਾਂ, ਬੱਚੇ, ਅਭਿਲਾਸ਼ਾ। ਜਾਤ ਅਤੇ ਤਨਖ਼ਾਹ ਕਦੇ ਤੁਹਾਡਾ ਸਕੋਰ ਨਹੀਂ ਬਦਲਦੇ।',
+  'We match on the life you want to build — money, roots, kids, ambition.': 'ਤੁਸੀਂ ਜੋ ਜ਼ਿੰਦਗੀ ਬਣਾਉਣਾ ਚਾਹੁੰਦੇ ਹੋ ਉਸ \'ਤੇ ਅਸੀਂ ਮੇਲ ਕਰਦੇ ਹਾਂ — ਪੈਸਾ, ਜੜ੍ਹਾਂ, ਬੱਚੇ, ਅਭਿਲਾਸ਼ਾ।',
   'Matched on values': 'ਕਦਰਾਂ \'ਤੇ ਮੇਲ',
   'DPDP private': 'DPDP ਪਰਦੇਦਾਰੀ',
   'Family, on your terms': 'ਪਰਿਵਾਰ, ਤੁਹਾਡੀਆਂ ਸ਼ਰਤਾਂ \'ਤੇ',

@@ -735,7 +735,7 @@ export default {
   'Values-led matchmaking': 'મૂલ્યો આધારિત લગ્ન મેળાપ',
   'Marriage isn’t a': 'લગ્ન એટલે',
   'résumé match.': 'બાયોડેટાનો મેળ નહીં.',
-  'We match on the life you want to build — money, roots, kids, ambition. Caste and salary never move your score.': 'તમે જે જીવન ઘડવા માંગો છો તેના પર અમે મેળ કરીએ છીએ — પૈસા, મૂળ, બાળકો, મહત્વાકાંક્ષા. જ્ઞાતિ અને પગાર ક્યારેય તમારો સ્કોર બદલતાં નથી.',
+  'We match on the life you want to build — money, roots, kids, ambition.': 'તમે જે જીવન ઘડવા માંગો છો તેના પર અમે મેળ કરીએ છીએ — પૈસા, મૂળ, બાળકો, મહત્વાકાંક્ષા.',
   'Matched on values': 'મૂલ્યો પર મેળ',
   'DPDP private': 'DPDP ગોપનીયતા',
   'Family, on your terms': 'પરિવાર, તમારી શરતો પર',

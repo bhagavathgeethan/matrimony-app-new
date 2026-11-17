@@ -60,16 +60,37 @@ export function LandingPage() {
               {t('Marriage isn’t a')}{' '}<span className="accent-gold">{t('résumé match.')}</span>
             </h1>
             <p className="lede">
-              {t('We match on the life you want to build — money, roots, kids, ambition. Caste and salary never move your score.')}
+              {t('We match on the life you want to build — money, roots, kids, ambition.')}
             </p>
             <div className="hero-promises">
               <span className="hero-promise"><Sparkles size={14} color="var(--gold)" />{' '}{t('Matched on values')}</span>
               <span className="hero-promise"><ShieldCheck size={14} color="var(--gold)" />{' '}{t('DPDP private')}</span>
               <span className="hero-promise"><Users size={14} color="var(--gold)" />{' '}{t('Family, on your terms')}</span>
             </div>
-            <div className="row wrap" style={{ marginTop: 8 }}>
+            <div className="row wrap" style={{ marginTop: 8, alignItems: 'center' }}>
               <Link to="/signin" className="btn btn-gold">{t('Create my blueprint')}</Link>
               <Link to="/signin" className="btn btn-light">{t('I already have an account')}</Link>
+              <Link
+                to="/signin"
+                state={{ family: true }}
+                className="family-glow-btn"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  padding: '9px 18px',
+                  borderRadius: 999,
+                  backgroundColor: 'rgba(201, 162, 92, 0.16)',
+                  border: '1.5px solid rgba(249, 212, 74, 0.75)',
+                  color: '#FFF1B8',
+                  fontWeight: 700,
+                  fontSize: 13.5,
+                  textDecoration: 'none',
+                }}
+              >
+                <Users size={15} color="#FFF1B8" />
+                <span>{t('I’m a family member')}</span>
+              </Link>
             </div>
             <StoreBadges light />
           </div>

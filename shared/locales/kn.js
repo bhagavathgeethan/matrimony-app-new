@@ -735,7 +735,7 @@ export default {
   'Values-led matchmaking': 'ಮೌಲ್ಯಾಧಾರಿತ ವಿವಾಹ ಹೊಂದಾಣಿಕೆ',
   'Marriage isn’t a': 'ಮದುವೆ ಎಂದರೆ',
   'résumé match.': 'ಬಯೋಡೇಟಾ ಹೊಂದಾಣಿಕೆ ಅಲ್ಲ.',
-  'We match on the life you want to build — money, roots, kids, ambition. Caste and salary never move your score.': 'ನೀವು ಕಟ್ಟಲು ಬಯಸುವ ಜೀವನದ ಮೇಲೆ ನಾವು ಹೊಂದಿಸುತ್ತೇವೆ — ಹಣ, ಬೇರುಗಳು, ಮಕ್ಕಳು, ಮಹತ್ವಾಕಾಂಕ್ಷೆ. ಜಾತಿ ಮತ್ತು ಸಂಬಳ ನಿಮ್ಮ ಅಂಕವನ್ನು ಎಂದಿಗೂ ಬದಲಾಯಿಸುವುದಿಲ್ಲ.',
+  'We match on the life you want to build — money, roots, kids, ambition.': 'ನೀವು ಕಟ್ಟಲು ಬಯಸುವ ಜೀವನದ ಮೇಲೆ ನಾವು ಹೊಂದಿಸುತ್ತೇವೆ — ಹಣ, ಬೇರುಗಳು, ಮಕ್ಕಳು, ಮಹತ್ವಾಕಾಂಕ್ಷೆ.',
   'Matched on values': 'ಮೌಲ್ಯಗಳ ಮೇಲೆ ಹೊಂದಾಣಿಕೆ',
   'DPDP private': 'DPDP ಗೌಪ್ಯತೆ',
   'Family, on your terms': 'ಕುಟುಂಬ, ನಿಮ್ಮ ಷರತ್ತುಗಳಲ್ಲಿ',

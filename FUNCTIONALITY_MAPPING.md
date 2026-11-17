@@ -10,6 +10,7 @@ This document maps all application features, frontend screens/components, custom
 | :--- | :--- | :--- | :--- | :--- |
 | **Welcome Landing** | `2a` | `WelcomeScreen.jsx` | N/A | Navigation |
 | **Phone Sign-In** | `2b` | `PhoneSignInScreen.jsx` | `POST /api/auth/send-otp` | `useAuth()` |
+| **Family Sign-In (Glowing Entry)** | `—` | `FamilySignInScreen.jsx`<br>`web/src/pages/SignIn.jsx` | `POST /api/family/auth/send-otp`<br>`POST /api/family/auth/verify-otp` | `familySession` / `useFamilySession()` |
 | **OTP Verification** | `2c` | `OTPVerifyScreen.jsx` | `POST /api/auth/verify-otp` | `useAuth()` |
 | **Onboarding Navigation & Interactive Progress** | `—` | `kit.jsx` (`OnboardingHeader`, `StepBar`)<br>`OnboardingLayout.jsx`<br>`steps.jsx` | N/A | `useApp()` / `useNavigate()` |
 | **DPDP Consent** | `2d` | `DPDPConsentScreen.jsx` | `POST /api/privacy/consent` | `useConsent()` |
@@ -24,7 +25,8 @@ This document maps all application features, frontend screens/components, custom
 | **Scannable Profile List** | `3a` | `ProfileListScreen.jsx` | `GET /api/matches/list` | `useMatches()` |
 | **Scoped Share Sheet** | `1c` | `ShareWithParentModal.jsx` | `POST /api/family/share` | `useFamilyShare()` |
 | **Batch Send Sheet** | `3b` | `BatchSendModal.jsx` | `POST /api/family/share-batch` | `useFamilyShare()` |
-| **Parent Portal (Read-Only)** | `1d` | `ParentPortalScreen.jsx` | `GET /api/family/portal/:token`<br>`POST /api/family/feedback` | `useParentPortal()` |
+| **Parent Portal & Family Co-Pilot** | `1d` | `ParentPortalScreen.jsx`<br>`web/src/pages/Portal.jsx` | `GET /api/portal/:token`<br>`POST /api/portal/:token/shares/:id/feedback` | `api.getParentPortal()` |
+| **Family Candidate Discovery (Search Brides/Grooms)** | `—` | `ParentPortalScreen.jsx` (Search Tab)<br>`web/src/pages/Portal.jsx` (Search View) | `GET /api/portal/:token/search`<br>`POST /api/portal/:token/proposals` | `api.searchParentPortal()`<br>`api.proposeInterest()` |
 | **Sent & Family Feedback** | `3c` | `SentFamilyResponsesScreen.jsx` | `GET /api/family/sent` | `useFamilyShare()` |
 | **Conversations List** | `2k` | `ConversationsListScreen.jsx` | `GET /api/chat/threads` | `useChat()` |
 | **Blueprint Chat Thread** | `2l` | `ChatThreadScreen.jsx` | `GET /api/chat/:threadId/messages`<br>`POST /api/chat/:threadId/messages` | `useChatThread()` |

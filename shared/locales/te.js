@@ -735,7 +735,7 @@ export default {
   'Values-led matchmaking': 'విలువల ఆధారిత వివాహ సరిపోలిక',
   'Marriage isn’t a': 'పెళ్ళి అంటే',
   'résumé match.': 'బయోడేటా సరిపోలిక కాదు.',
-  'We match on the life you want to build — money, roots, kids, ambition. Caste and salary never move your score.': 'మీరు నిర్మించాలనుకునే జీవితంపై మేము సరిపోలుస్తాము — డబ్బు, మూలాలు, పిల్లలు, ఆశయం. కులం, జీతం మీ స్కోర్‌ను ఎప్పటికీ మార్చవు.',
+  'We match on the life you want to build — money, roots, kids, ambition.': 'మీరు నిర్మించాలనుకునే జీవితంపై మేము సరిపోలుస్తాము — డబ్బు, మూలాలు, పిల్లలు, ఆశయం.',
   'Matched on values': 'విలువలపై సరిపోలిక',
   'DPDP private': 'DPDP గోప్యత',
   'Family, on your terms': 'కుటుంబం, మీ నిబంధనలపై',

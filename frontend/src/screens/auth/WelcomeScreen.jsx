@@ -9,7 +9,7 @@ import { Capacitor } from '@capacitor/core';
 import { t } from '@shared/i18n';
 import { LanguagePicker } from '../../components/common/LanguagePicker';
 
-const { colors, fonts, gradients } = theme;
+const { colors, fonts, gradients, radii } = theme;
 const isNativeApp = Capacitor.isNativePlatform();
 
 const PORTRAIT_LEFT = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80';
@@ -82,7 +82,7 @@ export const WelcomeScreen = () => {
             <Accent color={colors.gold}>{t('résumé match.')}</Accent>
           </Heading>
           <Body size={compact ? 14 : 16} style={{ color: 'rgba(255,246,238,0.78)' }}>
-            {t('We match on the life you want to build — money, roots, kids, ambition. Caste and salary never move your score.')}
+            {t('We match on the life you want to build — money, roots, kids, ambition.')}
           </Body>
           <View style={styles.promises}>
             {PROMISES.map(([Icon, label]) => (
@@ -100,9 +100,18 @@ export const WelcomeScreen = () => {
           <LanguagePicker dark style={{ alignSelf: 'center', minWidth: 170 }} />
           <Button label={t('Create my blueprint')} variant="gold" onPress={() => setCurrentScreen('phone')} />
           <Button label={t('I already have an account')} variant="light" onPress={() => setCurrentScreen('phone')} />
-          <TouchableOpacity onPress={() => setCurrentScreen('family-signin')} style={styles.familyLink} accessibilityRole="button">
-            <Users size={15} color={colors.gold} />
+          <TouchableOpacity
+            onPress={() => setCurrentScreen('family-signin')}
+            style={styles.familyLink}
+            className="family-glow-btn"
+            activeOpacity={0.85}
+            accessibilityRole="button"
+          >
+            <View style={styles.familyIconBadge}>
+              <Users size={15} color="#FFF1B8" strokeWidth={2.4} />
+            </View>
             <Text style={styles.familyLinkText}>{t('I’m a family member')}</Text>
+            <Sparkles size={13} color="#F9D44A" />
           </TouchableOpacity>
           <Text style={styles.legal}>
             {t('By continuing you agree to our Terms and DPDP-compliant Privacy Notice.')}
@@ -119,14 +128,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
-    paddingVertical: 8,
+    gap: 8,
+    paddingVertical: 11,
+    paddingHorizontal: 18,
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(201, 162, 92, 0.16)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(249, 212, 74, 0.75)',
+    boxShadow: '0 0 16px rgba(201, 162, 92, 0.45), 0 0 30px rgba(201, 162, 92, 0.2)',
+    backdropFilter: 'blur(8px)',
+  },
+  familyIconBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(201, 162, 92, 0.28)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   familyLinkText: {
     fontFamily: fonts.sans,
     fontSize: 14.5,
     fontWeight: '700',
-    color: colors.gold,
+    color: '#FFF1B8',
+    letterSpacing: 0.2,
   },
   // Exactly one screen tall: the photo collage takes whatever room the text and buttons leave, so nothing
   // needs scrolling. Only a very small screen that can't fit even that scrolls, inside this view.

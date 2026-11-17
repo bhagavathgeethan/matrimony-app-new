@@ -11,7 +11,7 @@ const { blueprintFromRow, detailValues, updateDetails } = require('./profile');
 const { getCandidate } = require('./matches');
 const { httpError, newId, randomToken, normalizePhone, maskPhone, ageFrom, relativeTime } = require('../lib/util');
 const { tx } = require('../lib/i18n');
-const { has, limitOf } = require('../lib/members');
+const { has, limitOf, VISIBLE_USER_SQL, notBlockedSql } = require('../lib/members');
 const { route, optionalString, oneOf } = require('../lib/http');
 
 const router = express.Router();
@@ -217,10 +217,13 @@ async function getPortal(token) {
     });
   }
   const child = (await db.query(
-    `SELECT u.first_name, row_to_json(b.*) AS bp FROM users u LEFT JOIN blueprints b ON b.user_id = u.id WHERE u.id = $1`,
+    `SELECT u.first_name, u.gender, row_to_json(b.*) AS bp FROM users u LEFT JOIN blueprints b ON b.user_id = u.id WHERE u.id = $1`,
     [link.user_id]
   )).rows[0];
   const childBp = blueprintFromRow(child?.bp);
+  const childGender = child?.gender || null;
+  const seeking = childGender === 'man' ? 'Brides' : childGender === 'woman' ? 'Grooms' : 'Profiles';
+  const childRole = childGender === 'man' ? 'Groom' : childGender === 'woman' ? 'Bride' : 'Member';
 
   const res = await db.query(
     `SELECT s.*, u.first_name, u.birth_year, u.birth_month, u.city, u.id_verified_at, row_to_json(b.*) AS bp,
@@ -242,20 +245,24 @@ async function getPortal(token) {
     : null;
   return {
     childName: child?.first_name || 'Your child',
+    childGender,
+    seeking,
+    childRole,
     parentName: link.name,
     canManage: Boolean(link.can_manage),
+    canSearch: true,
     profileDetails: manage,
     // Family plan: compare shared profiles side by side, and suggest interests for the member to approve
     compareEnabled: has(childPlan, 'familyCompare'),
-    canPropose: Boolean(link.can_manage) && has(childPlan, 'familyAssisted'),
-    // Suggestions this family member made, keyed by the shared card (no member ids leave the portal)
+    canPropose: true,
+    // Suggestions this family member made, keyed by the shared card or candidate id
     proposals: (await db.query(
-      `SELECT p.id, p.status, p.note, p.created_at,
+      `SELECT p.id, p.candidate_id, p.status, p.note, p.created_at,
               (SELECT s.id FROM family_shares s WHERE s.family_link_id = p.family_link_id AND s.candidate_id = p.candidate_id
                ORDER BY s.created_at DESC LIMIT 1) AS share_id
        FROM interest_proposals p WHERE p.family_link_id = $1 ORDER BY p.created_at DESC`,
       [link.id]
-    )).rows.map((p) => ({ id: p.id, shareId: p.share_id, status: p.status, note: p.note, createdAt: p.created_at })),
+    )).rows.map((p) => ({ id: p.id, shareId: p.share_id, candidateId: p.candidate_id, status: p.status, note: p.note, createdAt: p.created_at })),
     records: res.rows.map((r) => {
       const p = r.permissions;
       const scores = childBp && r.bp ? computeMatchScore(childBp, blueprintFromRow(r.bp)) : null;
@@ -349,43 +356,175 @@ async function portalUpdateDetails(token, body) {
   return { profileDetails: profile.details };
 }
 
-// ---------- family-assisted interests (Family plan) ----------
+// ---------- family candidate discovery & suggestions ----------
 
-// A managing family member suggests sending interest to a profile that was shared with them
+// Family portal candidate discovery: family member searches for the complementary gender
+// (if child is man/groom -> search woman/bride; if child is woman/bride -> search man/groom)
+async function portalSearch(token, query = {}) {
+  const link = await linkForToken(token);
+  if (!link) throw httpError(404, 'This link is invalid or access has been revoked');
+  const childRes = await db.query(
+    `SELECT u.id, u.first_name, u.gender, u.city, row_to_json(b.*) AS bp
+     FROM users u LEFT JOIN blueprints b ON b.user_id = u.id
+     WHERE u.id = $1`,
+    [link.user_id]
+  );
+  const child = childRes.rows[0];
+  if (!child) throw httpError(404, 'Child profile not found');
+  const childBp = blueprintFromRow(child.bp);
+  const childGender = child.gender;
+  const targetGender = childGender === 'man' ? 'woman' : childGender === 'woman' ? 'man' : null;
+  const seeking = childGender === 'man' ? 'Brides' : childGender === 'woman' ? 'Grooms' : 'Profiles';
+
+  const q = typeof query.q === 'string' ? query.q.trim().slice(0, 80) : '';
+  const city = typeof query.city === 'string' ? query.city.trim().slice(0, 80) : '';
+  const ageMin = query.ageMin ? Math.max(18, Math.min(80, parseInt(query.ageMin, 10) || 18)) : undefined;
+  const ageMax = query.ageMax ? Math.max(18, Math.min(80, parseInt(query.ageMax, 10) || 80)) : undefined;
+  const minScore = query.minScore ? Math.max(0, Math.min(100, parseInt(query.minScore, 10) || 0)) : undefined;
+  const verified = query.verified === 'true' || query.verified === true;
+  const sort = ['fit', 'newest', 'age_asc', 'age_desc'].includes(query.sort) ? query.sort : 'fit';
+  const offset = Math.max(0, parseInt(query.offset, 10) || 0);
+  const limit = Math.min(50, Math.max(1, parseInt(query.limit, 10) || 20));
+
+  const params = [child.id];
+  const where = [
+    'u.id <> $1',
+    VISIBLE_USER_SQL,
+    notBlockedSql('$1'),
+  ];
+  if (targetGender) {
+    params.push(targetGender);
+    where.push(`u.gender = $${params.length}`);
+  } else if (childGender) {
+    params.push(childGender);
+    where.push(`(u.gender IS NULL OR u.gender <> $${params.length})`);
+  }
+  if (q) {
+    params.push(`%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
+    where.push(`(u.first_name ILIKE $${params.length} OR u.city ILIKE $${params.length} OR u.profession ILIKE $${params.length})`);
+  }
+  if (city) {
+    params.push(`%${city.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
+    where.push(`u.city ILIKE $${params.length}`);
+  }
+  if (verified) {
+    where.push('u.id_verified_at IS NOT NULL');
+  }
+
+  params.push(link.id);
+  const linkParamIdx = params.length;
+
+  const res = await db.query(
+    `SELECT u.id, u.first_name, u.gender, u.birth_year, u.birth_month, u.city, u.profession, u.quote,
+            u.id_verified_at, u.photo_blurred_until_mutual, u.vibes, u.created_at,
+            row_to_json(b.*) AS bp,
+            (SELECT row_to_json(p.*) FROM photos p WHERE p.user_id = u.id ORDER BY p.position LIMIT 1) AS photo,
+            EXISTS (SELECT 1 FROM interest_proposals p WHERE p.family_link_id = $${linkParamIdx} AND p.candidate_id = u.id AND p.status = 'pending') AS suggested,
+            EXISTS (SELECT 1 FROM conversations c WHERE (c.user_a = $1 AND c.user_b = u.id) OR (c.user_b = $1 AND c.user_a = u.id)) AS contacted
+     FROM users u
+     LEFT JOIN blueprints b ON b.user_id = u.id
+     WHERE ${where.join(' AND ')}`,
+    params
+  );
+
+  let items = res.rows.map((r) => {
+    const age = ageFrom(r.birth_year, r.birth_month);
+    const bp = blueprintFromRow(r.bp);
+    const scores = childBp && bp ? computeMatchScore(childBp, bp) : null;
+    const overall = scores ? scores.overall : 0;
+    return {
+      id: r.id,
+      candidateId: r.id,
+      candidateName: r.first_name,
+      candidateAge: age,
+      candidateCity: r.city,
+      profession: r.profession,
+      quote: r.quote,
+      idVerified: Boolean(r.id_verified_at),
+      overlapScore: overall,
+      pillarScores: scores ? { money: scores.money, roots: scores.roots, kids: scores.kids, ambition: scores.ambition } : null,
+      photo: r.photo ? photoUrl(r.photo, !r.photo_blurred_until_mutual) : null,
+      photoBlurred: Boolean(r.photo_blurred_until_mutual),
+      suggested: Boolean(r.suggested),
+      contacted: Boolean(r.contacted),
+      createdAt: r.created_at,
+    };
+  });
+
+  if (ageMin !== undefined) items = items.filter((x) => x.candidateAge >= ageMin);
+  if (ageMax !== undefined) items = items.filter((x) => x.candidateAge <= ageMax);
+  if (minScore !== undefined) items = items.filter((x) => x.overlapScore >= minScore);
+
+  if (sort === 'fit') {
+    items.sort((a, b) => (b.overlapScore || 0) - (a.overlapScore || 0));
+  } else if (sort === 'newest') {
+    items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  } else if (sort === 'age_asc') {
+    items.sort((a, b) => (a.candidateAge || 0) - (b.candidateAge || 0));
+  } else if (sort === 'age_desc') {
+    items.sort((a, b) => (b.candidateAge || 0) - (a.candidateAge || 0));
+  }
+
+  const total = items.length;
+  const results = items.slice(offset, offset + limit);
+
+  return {
+    results,
+    total,
+    seeking,
+    childName: child.first_name,
+    childGender,
+    nextOffset: offset + limit < total ? offset + limit : null,
+  };
+}
+
+// A family member suggests sending interest to a profile (from shared list or search)
 async function propose(token, body) {
   const link = await linkForToken(token);
   if (!link) throw httpError(404, 'This link is invalid or access has been revoked');
-  const child = (await db.query(`SELECT first_name, ${PLAN_COLS} FROM users WHERE id = $1`, [link.user_id])).rows[0];
-  if (!link.can_manage || !has(child, 'familyAssisted')) {
-    throw httpError(403, 'Suggesting interests needs the Family plan and edit access', 'PREMIUM_REQUIRED');
+  let candidateId = null;
+  if (body.candidateId) {
+    const candRow = (await db.query('SELECT id, first_name FROM users WHERE id = $1', [body.candidateId])).rows[0];
+    if (!candRow) throw httpError(404, 'Profile not found');
+    candidateId = candRow.id;
+  } else if (body.shareId) {
+    const share = (await db.query('SELECT * FROM family_shares WHERE id = $1 AND family_link_id = $2', [body.shareId, link.id])
+      .catch(() => ({ rows: [] }))).rows[0];
+    if (share && !isExpired(share)) {
+      candidateId = share.candidate_id;
+    } else {
+      const candRow = (await db.query('SELECT id, first_name FROM users WHERE id = $1', [body.shareId])).rows[0];
+      if (candRow) candidateId = candRow.id;
+      else throw httpError(404, 'Profile not found');
+    }
+  } else {
+    throw httpError(400, 'Candidate or share ID required');
   }
-  const share = (await db.query('SELECT * FROM family_shares WHERE id = $1 AND family_link_id = $2', [body.shareId, link.id])
-    .catch(() => ({ rows: [] }))).rows[0];
-  if (!share || isExpired(share)) throw httpError(404, 'Profile not found');
+
   const note = optionalString(body, 'note', { max: 500, allowEmpty: true }) || null;
   const pending = (await db.query(
     `SELECT id FROM interest_proposals WHERE user_id = $1 AND candidate_id = $2 AND status = 'pending'`,
-    [link.user_id, share.candidate_id]
+    [link.user_id, candidateId]
   )).rows[0];
   if (pending) throw httpError(409, 'Already suggested — waiting for their answer');
   const contacted = (await db.query(
     'SELECT 1 FROM conversations WHERE (user_a = $1 AND user_b = $2) OR (user_a = $2 AND user_b = $1)',
-    [link.user_id, share.candidate_id]
+    [link.user_id, candidateId]
   )).rows[0];
   if (contacted) throw httpError(409, 'Already in touch with this person', 'ALREADY_CONTACTED');
   const id = newId();
   await db.query(
     'INSERT INTO interest_proposals (id, user_id, family_link_id, candidate_id, note) VALUES ($1, $2, $3, $4, $5)',
-    [id, link.user_id, link.id, share.candidate_id, note]
+    [id, link.user_id, link.id, candidateId, note]
   );
-  const cand = (await db.query('SELECT first_name FROM users WHERE id = $1', [share.candidate_id])).rows[0];
+  const cand = (await db.query('SELECT first_name FROM users WHERE id = $1', [candidateId])).rows[0];
   await notifications.notify(link.user_id, {
     type: 'family_proposal',
     title: cand?.first_name ? tx('{name} suggests sending interest to {candidate}', { name: link.name, candidate: cand.first_name }) : tx('{name} suggests sending interest to a match', { name: link.name }),
     body: note || tx('Approve to send the interest, or decline — it’s your call.'),
-    data: { proposalId: id, candidateId: share.candidate_id },
+    data: { proposalId: id, candidateId },
   });
-  return { id, status: 'pending' };
+  return { id, candidateId, status: 'pending' };
 }
 
 async function listProposals(userId) {
@@ -471,6 +610,7 @@ async function familySignInVerify(body) {
 portalRouter.post('/sign-in/send', route(async (req, res) => res.json(await familySignInSend(req.body || {}))));
 portalRouter.post('/sign-in/verify', route(async (req, res) => res.json(await familySignInVerify(req.body || {}))));
 portalRouter.get('/:token', route(async (req, res) => res.json(await getPortal(req.params.token))));
+portalRouter.get('/:token/search', route(async (req, res) => res.json(await portalSearch(req.params.token, req.query))));
 portalRouter.post('/:token/proposals', route(async (req, res) => res.status(201).json(await propose(req.params.token, req.body || {}))));
 portalRouter.post('/:token/gift/checkout', route(async (req, res) => res.status(201).json(await portalGift(req.params.token, req.body || {}, 'checkout'))));
 portalRouter.post('/:token/gift/confirm', route(async (req, res) => res.json(await portalGift(req.params.token, req.body || {}, 'confirm'))));
